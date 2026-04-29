@@ -86,6 +86,7 @@ Cursor / IDE **rules** and team **playbooks** should repeat the short chain: **r
 ## See also
 
 - [`../ROADMAP.md`](../ROADMAP.md) — roadmap themes; [`../../TODOS.md`](../../TODOS.md) — session scratchpad
+- [`AGENT_CLIENT_WORKFLOWS.md`](./AGENT_CLIENT_WORKFLOWS.md) — Windsurf workflows vs Cursor rules, committed paths, slash commands
 - [`PERSISTENCE_POLICY.md`](./PERSISTENCE_POLICY.md) — YAML `retention` / `allow_delete_cell` (startup file, `mosaic_hexxla_get_persistence_policy`)
 - [`IMPLEMENTATION_PLAN.md`](./IMPLEMENTATION_PLAN.md) — roadmap and shipped tools
 - [`HEXXLA_API_ROADMAP.md`](./HEXXLA_API_ROADMAP.md) — Hexxla API coverage

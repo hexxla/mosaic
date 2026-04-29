@@ -95,6 +95,7 @@ Full CLI flags: **`go run ./cmd/<name> -help`**.
 | [docs/mosaic/PERSISTENCE_POLICY.md](docs/mosaic/PERSISTENCE_POLICY.md) | YAML retention, MCP policy tool |
 | [docs/mosaic/MCP_AGENT_BLUEPRINT.md](docs/mosaic/MCP_AGENT_BLUEPRINT.md) | Agent workflow, context packs, optional retrieval budgeting |
 | [README.md#usage-reinforcement](#usage-reinforcement) | Why models skip tools; rules, **`AGENTS.md`**, YAML **`retention.notes`**; quick best practices |
+| [docs/mosaic/AGENT_CLIENT_WORKFLOWS.md](docs/mosaic/AGENT_CLIENT_WORKFLOWS.md) | Cursor vs Windsurf vs others — rules, slash workflows, MCP; repo paths |
 | [configs/config.yaml](configs/config.yaml) | Example **`retention`** / **`retrieval`** / **`allow_delete_cell`** (comments inline) |
 | [AGENTS.md](AGENTS.md) | Instructions for AI coding assistants (architecture, CI, doc index) |
 | [TODOS.md](TODOS.md) | Active / pending session notes |
@@ -116,6 +117,7 @@ Mosaic exposes many MCP tools, but **nothing forces the model to call them**—*
 | **Repository instructions** | **[`AGENTS.md`](AGENTS.md)** — how assistants should work in *this* codebase; add Mosaic-specific bullets there if your team uses a single entry point. |
 | **MCP / server text** | Policy YAML **`retention.notes`** (and related fields) is injected into **MCP server instructions** at startup—use it to restate capture mode and “must call `put_cell` for every turn” when that is operator policy. See [`configs/config.yaml`](configs/config.yaml) and [PERSISTENCE_POLICY.md](docs/mosaic/PERSISTENCE_POLICY.md). |
 | **Deep reference** | **[`docs/mosaic/MCP_AGENT_BLUEPRINT.md`](docs/mosaic/MCP_AGENT_BLUEPRINT.md)** — full retrieval and persistence narrative. |
+| **Slash / playbook workflows** | **[`docs/mosaic/AGENT_CLIENT_WORKFLOWS.md`](docs/mosaic/AGENT_CLIENT_WORKFLOWS.md)** — how **Windsurf** (`.windsurf/workflows/`, e.g. **`/mosaic-save-turns`**) differs from **Cursor** (rules + Plan mode + repo checklists). |
 
 **Best practices (short)**
 

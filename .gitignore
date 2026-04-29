@@ -101,5 +101,7 @@ NOTES.md
 .windsurf/*
 !.windsurf/rules/
 !.windsurf/rules/**
+!.windsurf/workflows/
+!.windsurf/workflows/**
 .continue/
 .codex/
