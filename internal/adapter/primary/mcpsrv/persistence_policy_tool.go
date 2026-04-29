@@ -11,11 +11,28 @@ import (
 
 // MosaicConfigPolicyResponse is the MCP JSON payload for mosaic_hexxla_get_persistence_policy.
 type MosaicConfigPolicyResponse struct {
-	Version         int                    `json:"version"`
-	Retention       config.RetentionPolicy `json:"retention"`
-	AllowDeleteCell bool                   `json:"allow_delete_cell"`
-	ConfigFile      string                 `json:"config_file,omitempty"`
-	IsDefaultConfig bool                   `json:"is_default"`
+	Version         int                       `json:"version"`
+	Retention       mosaicRetentionPolicyJSON `json:"retention"`
+	AllowDeleteCell bool                      `json:"allow_delete_cell"`
+	ConfigFile      string                    `json:"config_file,omitempty"`
+	IsDefaultConfig bool                      `json:"is_default"`
+}
+
+// mosaicRetentionPolicyJSON mirrors config.RetentionPolicy with enforcement as a boolean for MCP clients.
+type mosaicRetentionPolicyJSON struct {
+	Version     int    `json:"version"`
+	CaptureMode string `json:"capture_mode"`
+	Enforcement bool   `json:"enforcement"`
+	Notes       string `json:"notes,omitempty"`
+}
+
+func newMosaicRetentionPolicyJSON(r config.RetentionPolicy) mosaicRetentionPolicyJSON {
+	return mosaicRetentionPolicyJSON{
+		Version:     r.Version,
+		CaptureMode: string(r.CaptureMode),
+		Enforcement: r.Enforcement == config.PolicyEnforcementReject,
+		Notes:       r.Notes,
+	}
 }
 
 // RegisterPersistencePolicyTool registers mosaic_hexxla_get_persistence_policy (read-only; reflects startup-loaded YAML or defaults).
@@ -24,7 +41,7 @@ func RegisterPersistencePolicyTool(server *mcp.Server, rt config.MosaicRuntimeCo
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "mosaic_hexxla_get_persistence_policy",
-		Description: "Return the Mosaic config snapshot loaded at server startup (YAML via -policy or MOSAIC_POLICY_FILE). Includes retention (capture_mode, enforcement, notes), allow_delete_cell, and optional config path. persistence_policy in YAML is deprecated in favor of retention.",
+		Description: "Return the Mosaic config snapshot loaded at server startup (YAML via -policy or MOSAIC_POLICY_FILE). Includes retention (capture_mode, enforcement as boolean, notes), allow_delete_cell, and optional config path. persistence_policy in YAML is deprecated in favor of retention.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ empty) (*mcp.CallToolResult, MosaicConfigPolicyResponse, error) {
 		if log != nil {
 			log.DebugContext(ctx, "mosaic_hexxla_get_persistence_policy invoked")
@@ -32,7 +49,7 @@ func RegisterPersistencePolicyTool(server *mcp.Server, rt config.MosaicRuntimeCo
 		isDefault := configFilePath == ""
 		out := MosaicConfigPolicyResponse{
 			Version:         config.MosaicConfigVersion,
-			Retention:       rt.Retention,
+			Retention:       newMosaicRetentionPolicyJSON(rt.Retention),
 			AllowDeleteCell: rt.AllowDeleteCell,
 			ConfigFile:      configFilePath,
 			IsDefaultConfig: isDefault,

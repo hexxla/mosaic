@@ -10,7 +10,7 @@ import (
 const MosaicConfigVersion = 1
 
 // CaptureMode describes what classes of turn data the product intends to persist into Hexxla.
-// It is advisory for agents unless [RetentionPolicy.Enforcement] is "reject".
+// It is advisory for agents unless RetentionPolicy.Enforcement is PolicyEnforcementReject (YAML: enforcement: true).
 type CaptureMode string
 
 const (
@@ -27,7 +27,7 @@ const (
 )
 
 // PolicyEnforcement controls whether the MCP server blocks puts that violate [CaptureMode].
-// Config YAML uses booleans: false → off, true → reject. JSON/MCP responses still use the strings "off" and "reject".
+// Config YAML uses booleans: false → off, true → reject (internal string). MCP JSON exposes enforcement as a boolean; legacy YAML strings "off"/"reject" remain accepted.
 type PolicyEnforcement string
 
 const (
@@ -54,7 +54,14 @@ func DefaultRetentionPolicy() RetentionPolicy {
 	}
 }
 
-// CheckPutCell returns nil if the put is allowed, or an error when enforcement rejects the kind.
+// EnforcementEnabled reports whether retention enforcement is active (YAML enforcement: true):
+// the server returns errors for put_cell kinds that conflict with capture_mode. This matches the
+// boolean in mosaic_hexxla_get_persistence_policy JSON, not the internal PolicyEnforcement string.
+func (p RetentionPolicy) EnforcementEnabled() bool {
+	return p.Enforcement == PolicyEnforcementReject
+}
+
+// CheckPutCell returns nil if the put is allowed, or an error when enforcement blocks the kind.
 func (p *RetentionPolicy) CheckPutCell(kind domain.CellPutKind) error {
 	if p == nil || p.Enforcement != PolicyEnforcementReject {
 		return nil
@@ -68,15 +75,15 @@ func (p *RetentionPolicy) CheckPutCell(kind domain.CellPutKind) error {
 		return nil
 	case CaptureModeNone:
 		if k == domain.CellPutKindUserMessage || k == domain.CellPutKindAssistantResponse {
-			return fmt.Errorf("retention policy: capture_mode %q rejects chat turns", p.CaptureMode)
+			return fmt.Errorf("retention policy: capture_mode %q does not allow chat turn puts when enforcement is enabled", p.CaptureMode)
 		}
 	case CaptureModeUserOnly:
 		if k == domain.CellPutKindAssistantResponse {
-			return fmt.Errorf("retention policy: capture_mode %q rejects assistant_message puts", p.CaptureMode)
+			return fmt.Errorf("retention policy: capture_mode %q does not allow assistant_message puts when enforcement is enabled", p.CaptureMode)
 		}
 	case CaptureModeAssistantOnly:
 		if k == domain.CellPutKindUserMessage {
-			return fmt.Errorf("retention policy: capture_mode %q rejects user_message puts", p.CaptureMode)
+			return fmt.Errorf("retention policy: capture_mode %q does not allow user_message puts when enforcement is enabled", p.CaptureMode)
 		}
 	}
 	return nil

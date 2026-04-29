@@ -18,6 +18,12 @@ func TestDefaultMosaicConfig_llm_curates_and_gates(t *testing.T) {
 	if cfg.AllowDeleteCell {
 		t.Fatal("DefaultMosaicConfig AllowDeleteCell: got true want false")
 	}
+	if cfg.DatabasePassphrase != "" {
+		t.Fatal("DefaultMosaicConfig DatabasePassphrase: expected empty")
+	}
+	if cfg.Retrieval.SessionApproxTokenBudget != 0 {
+		t.Fatalf("DefaultMosaicConfig Retrieval.SessionApproxTokenBudget: got %d want 0", cfg.Retrieval.SessionApproxTokenBudget)
+	}
 }
 
 func TestDefaultRetentionPolicy_llm_curates(t *testing.T) {

@@ -41,6 +41,18 @@ Hexxla also exposes **`Tx.LoadContext`** and **`Tx.LoadContextAt`** — simpler 
 
 ---
 
+## Session retrieval budget & metering (optional)
+
+Configured in Mosaic YAML under **`retrieval`** (see [`configs/config.yaml`](../../configs/config.yaml)).
+
+- **Per-call shaping (relevance / waste)** — Use **small rings**, **`max_results` / `max_cells`**, and **byte or approximate-token budgets** on **`mosaic_hexxla_load_context_pack`** (and related read tools) so each response stays tight. That is the primary lever for “don’t pull irrelevant bulk.”
+- **Cumulative session cap (egress / runaway)** — **`retrieval.session_approx_token_budget`** (when **> 0**) limits **total approximate JSON output** metered per MCP **session** over the life of the server process (until reconnect/restart or a new session id). It is an **egress and runaway-loop brake**, **not** a relevance filter and **not** a substitute for per-call budgets.
+- **Observability** — **`mosaic_hexxla_retrieval_budget_status`** reports **`approx_tokens_used`**, whether **enforcement** is on (**`budgeting_enabled`**), and whether metering is active (**`metering_enabled`**). With **`session_approx_token_budget: 0`**, there is **no hard cap**, but usage can still be **metered** for visibility.
+
+Keep this distinction explicit in docs and agent instructions so expectations do not drift: **small incremental retrieval** vs **optional cumulative cap**.
+
+---
+
 ## Persistence: what gets saved
 
 - Mosaic **does not** auto-save chat turns. Long-lived store of user/model text is explicit: tools that **write** cells (**`mosaic_hexxla_put_cell`**, **`mosaic_hexxla_put_embedding`**, etc.) persist data the client chooses to submit (e.g. **`kind`** `user_message` / `assistant_response`, **`source_id`** for session/session key). There is **no** default “record everything”; retrieval/query tools only **read**.
@@ -63,6 +75,7 @@ Cursor / IDE **rules** and team **playbooks** should repeat the short chain: **r
 
 ## See also
 
+- [`../ROADMAP.md`](../ROADMAP.md) — roadmap themes; [`../../TODOS.md`](../../TODOS.md) — session scratchpad
 - [`PERSISTENCE_POLICY.md`](./PERSISTENCE_POLICY.md) — YAML `retention` / `allow_delete_cell` (startup file, `mosaic_hexxla_get_persistence_policy`)
 - [`IMPLEMENTATION_PLAN.md`](./IMPLEMENTATION_PLAN.md) — roadmap and shipped tools
 - [`HEXXLA_API_ROADMAP.md`](./HEXXLA_API_ROADMAP.md) — Hexxla API coverage

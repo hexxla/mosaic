@@ -23,6 +23,10 @@ retention:
   notes: "optional operator note"
 
 allow_delete_cell: false       # optional; default false — disables mosaic_hexxla_delete_cell when false
+
+# optional — encrypted DB passphrase (prefer env / flag over committing YAML)
+# database:
+#   passphrase: "use MOSAIC_DB_PASSPHRASE or mosaic-mcp -db-passphrase instead when possible"
 ```
 
 ### `retention`
@@ -52,6 +56,32 @@ If the **`retention`** key is **omitted** entirely, defaults match [`DefaultRete
 - **Omitted** → **`false`**: `mosaic_hexxla_delete_cell` is rejected until the operator sets `allow_delete_cell: true`.
 - Set to **`true`** to allow `DeleteCell` through the MCP and [CellMutationService](internal/core/services/cell_mutation.go).
 
+### Encrypted HexxlaDB files (`database`)
+
+HexxlaDB supports AES-XTS at-rest encryption (passphrase via Argon2id, or raw key via HKDF). Mosaic wires credentials into [`hexxladb.Open`](https://pkg.go.dev/github.com/hexxla/hexxladb#Open) for **`cmd/mosaic-mcp`** and **`cmd/mosaic-seed`**.
+
+| Mechanism | Role |
+| --------- | ---- |
+| **`mosaic-mcp -db-passphrase`** | Highest precedence for passphrase (avoid on shared hosts — may appear in process listings). |
+| **`MOSAIC_DB_PASSPHRASE`** | Env passphrase (preferred over YAML in Git). |
+| **`database.passphrase`** in policy YAML | Lowest precedence; convenient for local dev, risky to commit. |
+| **`MOSAIC_DB_ENCRYPTION_KEY_HEX`** | Hex-encoded raw key for `Options.EncryptionKey`. **Mutually exclusive** with passphrase sources. |
+
+If the database file is encrypted and no credential is provided, open fails (see upstream **`ErrEncryptionKeyRequired`** / mismatch errors).
+
+### Creating a database file (layout + encryption)
+
+HexxlaDB **`Open`** creates the file when it does not exist. Mosaic wraps that in:
+
+| Command | Purpose |
+| ------- | ------- |
+| **`cmd/mosaic-create-db`** | Empty DB only — builds **[`config.NewMosaicDatabaseOptions`](../../internal/config/mosaic_hexxla_db.go)(layout)**, then **[`config.ApplyHexxlaEncryption`](../../internal/config/hexxla_open.go)**, then **`hexxladb.Open`**. |
+| **`cmd/mosaic-seed`** | Same layout + optional encryption, then seeds cells/embeddings if the corpus is non-empty. |
+
+**Encryption** is never implicit: credentials come only from the passphrase/key mechanisms in the table above (`ApplyHexxlaEncryption` / `BuildHexxlaOpenOptions`). **Layout** (MVCC, page size, max value bytes, embedding dimension, distance metric) is optional on both commands — each flag defaults to the Mosaic values in **`DefaultMosaicDatabaseLayout`** (see **`mosaic-create-db -help`** / **`mosaic-seed -help`**).
+
+**CLI and Make examples:** [DATABASE_CREATION.md](./DATABASE_CREATION.md).
+
 ## Runtime gates (code)
 
 [`config.MosaicRuntimeConfig`](../../internal/config/mosaic_runtime.go): **`AllowsPutCell`**, **`PutCellDenied`**, **`AllowsDeleteCell`**, **`DeleteCellDenied`**.
@@ -60,7 +90,7 @@ If the **`retention`** key is **omitted** entirely, defaults match [`DefaultRete
 
 ## MCP
 
-- **`mosaic_hexxla_get_persistence_policy`** — Returns JSON: **`retention`**, **`allow_delete_cell`**, **`config_file`**, **`is_default`**.
+- **`mosaic_hexxla_get_persistence_policy`** — Returns JSON: **`retention`** (`capture_mode`, **`enforcement`** as boolean — `true` when the server blocks conflicting turn-related puts), **`allow_delete_cell`**, **`config_file`**, **`is_default`**.
 
 ## Example file
 

@@ -8,7 +8,7 @@ import (
 )
 
 // retentionEnforcementField decodes retention.enforcement from YAML.
-// Use boolean true/false (recommended): true means the server rejects put_cell kinds that conflict
+// Use boolean true/false (recommended): true means the server returns an error for put_cell kinds that conflict
 // with capture_mode; false means advisory only (same as legacy enforcement: off).
 // For backward compatibility, strings "off" and "reject" are still accepted.
 type retentionEnforcementField struct {

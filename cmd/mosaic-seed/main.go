@@ -2,8 +2,8 @@
 // embeddings — the same ingestion pattern as github.com/hexxla/hexxladb/examples/llm_context_engine
 // (PutCell + PutEmbedding per turn) overlaid on coordinates from conversational_memory's spiral grid.
 //
-// Requires a running Ollama with the embedding model (default: all-minilm). Use the resulting file
-// with MOSAIC_DB_PATH when running cmd/mosaic-mcp.
+// Requires a running Ollama with the embedding model (default: all-minilm).
+// Path resolution matches cmd/mosaic-create-db — see [config.ResolveMosaicDBPath].
 package main
 
 import (
@@ -21,13 +21,9 @@ import (
 
 	"github.com/hexxla/hexxladb"
 
+	"github.com/sploitzberg/go-llm-project-structure/internal/config"
 	ollamac "github.com/sploitzberg/go-llm-project-structure/internal/ollama"
 )
-
-// defaultDBPath mirrors hexxladb demos (.tmp under the project root, gitignored — not system /tmp).
-const defaultDBPath = ".tmp/mosaic-seed.hexxla"
-
-const envDBPath = "MOSAIC_DB_PATH"
 
 // defaultOllamaURL is overridden by MOSAIC_OLLAMA_URL when -ollama is not set (after parsing).
 const defaultOllamaURL = "http://127.0.0.1:11434"
@@ -35,22 +31,44 @@ const defaultOllamaURL = "http://127.0.0.1:11434"
 const envOllamaURL = "MOSAIC_OLLAMA_URL"
 const envEmbedModel = "MOSAIC_EMBED_MODEL"
 
-// Must match [hexxladb.Options.EmbeddingDimension] for this seed Open options.
-const embeddingDimAllMiniLM = 384
-
 func main() {
 	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
-	dbFlag := flag.String("db", "", "path to HexxlaDB file (default: MOSAIC_DB_PATH, else "+defaultDBPath+")")
-	force := flag.Bool("force", false, "remove existing database file(s) and re-seed")
+	dbFlag := flag.String("db", "", "path to HexxlaDB file (overrides -name; default: "+config.EnvDBPath+", else "+config.MosaicDefaultRelDBFile+")")
+	nameFlag := flag.String("name", "", "base name for the file: <db-dir>/<name>.hexxla (mutually exclusive with -db; directory from -db-dir or "+config.EnvMosaicDBDir+")")
+	dbDirFlag := flag.String("db-dir", "", "parent directory when using -name (default: from "+config.EnvMosaicDBDir+" or .tmp)")
+	var replaceExisting bool
+	flag.BoolVar(&replaceExisting, "force", false, "replace existing file at the chosen path: delete it then seed")
+	flag.BoolVar(&replaceExisting, "replace", false, "same as -force")
 	ollamaFlag := flag.String("ollama", "", "Ollama base URL (empty: "+envOllamaURL+" or "+defaultOllamaURL+")")
 	embedModel := flag.String("embed-model", "", "Ollama embedding model (empty: "+envEmbedModel+" or all-minilm)")
+	dbPassphrase := flag.String("db-passphrase", "", "optional HexxlaDB encryption passphrase (overrides "+config.EnvDBPassphrase+")")
+
+	mvcc := flag.Bool("mvcc", true, "enable MVCC (format v2) for a new database")
+	pageSize := flag.Uint("page-size", uint(config.MosaicDefaultPageSize), "page size for new file (4096, 8192, 16384, or 65536)")
+	maxVal := flag.Uint("max-value-bytes", uint(config.MosaicDefaultMaxValueBytes), "max encoded value size per cell")
+	embedDim := flag.Uint("embedding-dim", uint(config.MosaicEmbeddingDimensionAllMiniLM), "embedding vector width (must match the embed model output)")
+	metricStr := flag.String("distance-metric", "cosine", "embedding distance: cosine, l2, or dot")
 
 	flag.Parse()
 
-	dbPath := resolveDBPath(*dbFlag)
+	dbPath, err := config.ResolveMosaicDBPath(config.MosaicDBPathInput{
+		DBFlag:    *dbFlag,
+		NameFlag:  *nameFlag,
+		DBDirFlag: *dbDirFlag,
+	}, true)
+	if err != nil {
+		log.Error(err.Error())
+		os.Exit(2)
+	}
 	ollamaBase := resolveOllamaURL(*ollamaFlag)
 	model := resolveEmbedModel(*embedModel)
+
+	layout, err := config.ParseMosaicDatabaseLayoutFromCLI(*mvcc, *pageSize, *maxVal, *embedDim, *metricStr)
+	if err != nil {
+		log.Error(err.Error())
+		os.Exit(2)
+	}
 
 	u, err := url.Parse(ollamaBase)
 	if err != nil {
@@ -60,22 +78,10 @@ func main() {
 	oc := ollamac.NewClient(u, model)
 	oc.HTTP = &http.Client{Timeout: ollamac.DefaultEmbedTimeout}
 
-	if err := run(log, dbPath, *force, oc); err != nil {
+	if err := run(log, dbPath, replaceExisting, oc, *dbPassphrase, layout); err != nil {
 		log.Error(err.Error())
 		os.Exit(1)
 	}
-}
-
-func resolveDBPath(flagValue string) string {
-	p := strings.TrimSpace(flagValue)
-	if p != "" {
-		return filepath.Clean(p)
-	}
-	p = strings.TrimSpace(os.Getenv(envDBPath))
-	if p != "" {
-		return filepath.Clean(p)
-	}
-	return filepath.Clean(defaultDBPath)
 }
 
 func resolveOllamaURL(flagValue string) string {
@@ -107,6 +113,8 @@ func run(
 	dbPath string,
 	force bool,
 	oc *ollamac.Client,
+	dbPassphraseFlag string,
+	layout config.MosaicDatabaseLayout,
 ) error {
 	ctx := context.Background()
 
@@ -127,8 +135,13 @@ func run(
 	}
 
 	if exists && !force {
-		log.Info("database already exists; skipping seed (use -force to replace)", "path", dbPath)
+		log.Info("database file already exists; skipping seed — use a different -db or -name, or pass -replace / -force to overwrite",
+			"path", dbPath)
 		return nil
+	}
+
+	if force && exists {
+		log.Info("replacing existing database file", "path", dbPath)
 	}
 
 	if force {
@@ -140,14 +153,11 @@ func run(
 		_ = os.Remove(dbPath + "-wal")
 	}
 
-	// Matches examples/llm_context_engine Open (384-d cosine; MVCC enabled for new DBs).
-	opts := &hexxladb.Options{
-		EnableMVCC:    true,
-		PageSize:      65536,
-		MaxValueBytes: 16384,
-
-		EmbeddingDimension: embeddingDimAllMiniLM,
-		DistanceMetric:     hexxladb.DistanceCosine,
+	opts := config.NewMosaicDatabaseOptions(layout)
+	if err := config.ApplyHexxlaEncryption(opts, config.HexxlaOpenParams{
+		FlagPassphrase: dbPassphraseFlag,
+	}); err != nil {
+		return fmt.Errorf("database encryption options: %w", err)
 	}
 
 	db, err := hexxladb.Open(dbPath, opts)
@@ -161,18 +171,19 @@ func run(
 	}()
 
 	sessionID := fmt.Sprintf("mosaic-seed-%d", time.Now().UnixNano())
+	embedDim := int(layout.EmbeddingDimension)
 
 	if len(seedConversation) == 0 {
 		log.Info("no seed corpus; database opened empty", "path", dbPath)
 		return nil
 	}
 
-	log.Info("seeding corpus with embeddings", "turns", len(seedConversation))
+	log.Info("seeding corpus with embeddings", "turns", len(seedConversation), "embedding_dim", embedDim)
 
 	for i := range seedConversation {
 		msg := seedConversation[i]
 
-		vec, err := oc.Embed(ctx, msg.content, embeddingDimAllMiniLM)
+		vec, err := oc.Embed(ctx, msg.content, embedDim)
 		if err != nil {
 			return fmt.Errorf("embed turn %d: %w", i, err)
 		}
@@ -216,7 +227,7 @@ func run(
 	log.Info("seeded HexxlaDB",
 		"path", dbPath,
 		"turns", len(seedConversation),
-		"embedding_dim", embeddingDimAllMiniLM,
+		"embedding_dim", embedDim,
 		"sessionID", sessionID,
 	)
 	return nil

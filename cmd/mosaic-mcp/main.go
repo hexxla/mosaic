@@ -35,17 +35,26 @@ func main() {
 }
 
 func run(log *slog.Logger) error {
-	policyFlag := flag.String("policy", "", "path to Mosaic config YAML (retention section; overrides MOSAIC_POLICY_FILE)")
+	policyFlag := flag.String("policy", "", "path to Mosaic config YAML (retention section; overrides "+config.EnvPolicyFile+")")
+	dbPassphraseFlag := flag.String("db-passphrase", "", "optional HexxlaDB encryption passphrase (overrides "+config.EnvDBPassphrase+"; avoid on shared hosts — visible in process list)")
+	dbFlag := flag.String("db", "", "path to HexxlaDB file (overrides -name and "+config.EnvDBPath+")")
+	nameFlag := flag.String("name", "", "base name: <db-dir>/<name>.hexxla (overrides "+config.EnvDBPath+"; mutually exclusive with -db)")
+	dbDirFlag := flag.String("db-dir", "", "parent directory when using -name (default: from "+config.EnvMosaicDBDir+" or .tmp)")
 	flag.Parse()
 
 	mcpCfg, err := config.LoadMCPFromEnv()
 	if err != nil {
 		return fmt.Errorf("config: %w", err)
 	}
-	dbCfg, err := config.LoadDBFromEnv()
+	dbPath, err := config.ResolveMosaicDBPath(config.MosaicDBPathInput{
+		DBFlag:    *dbFlag,
+		NameFlag:  *nameFlag,
+		DBDirFlag: *dbDirFlag,
+	}, false)
 	if err != nil {
 		return fmt.Errorf("config: %w", err)
 	}
+	dbCfg := config.DB{Path: dbPath}
 	ollamaCfg, err := config.LoadOllamaFromEnv()
 	if err != nil {
 		return fmt.Errorf("config ollama: %w", err)
@@ -65,11 +74,22 @@ func run(log *slog.Logger) error {
 	}
 	log.Info("mosaic config",
 		"capture_mode", mosaicLoaded.Retention.CaptureMode,
-		"enforcement", mosaicLoaded.Retention.Enforcement,
+		"enforcement_enabled", mosaicLoaded.Retention.EnforcementEnabled(),
 		"allow_delete_cell", mosaicLoaded.AllowDeleteCell,
+		"retrieval_session_approx_token_budget", mosaicLoaded.Retrieval.SessionApproxTokenBudget,
 		"config_file", configPathUsed)
 
-	db, err := hexxladb.Open(dbCfg.Path, nil)
+	retrievalBudget := mcpsrv.NewRetrievalBudgetTracker(mosaicLoaded.Retrieval)
+
+	openOpts, err := config.BuildHexxlaOpenOptions(config.HexxlaOpenParams{
+		FlagPassphrase: *dbPassphraseFlag,
+		YAMLPassphrase: mosaicLoaded.DatabasePassphrase,
+	})
+	if err != nil {
+		return fmt.Errorf("database encryption options: %w", err)
+	}
+
+	db, err := hexxladb.Open(dbCfg.Path, openOpts)
 	if err != nil {
 		return fmt.Errorf("open database: %w", err)
 	}
@@ -115,18 +135,19 @@ func run(log *slog.Logger) error {
 
 	policyInstructions := config.MCPPolicyInstructions(runtimeCfg, configPathUsed)
 	srv := mcpsrv.NewServer("mosaic", version, mcpsrv.ServerInstructions(policyInstructions))
-	mcpsrv.RegisterHealthTool(srv, healthSvc, log)
-	mcpsrv.RegisterCellQueryTool(srv, cellRetrieval, log)
-	mcpsrv.RegisterCellSearchTool(srv, cellRetrieval, log)
-	mcpsrv.RegisterEmbeddingSearchTool(srv, embeddingSvc, log)
-	mcpsrv.RegisterContextPackTool(srv, contextAssembly, log)
+	mcpsrv.RegisterHealthTool(srv, healthSvc, log, retrievalBudget)
+	mcpsrv.RegisterCellQueryTool(srv, cellRetrieval, log, retrievalBudget)
+	mcpsrv.RegisterCellSearchTool(srv, cellRetrieval, log, retrievalBudget)
+	mcpsrv.RegisterEmbeddingSearchTool(srv, embeddingSvc, log, retrievalBudget)
+	mcpsrv.RegisterContextPackTool(srv, contextAssembly, log, retrievalBudget)
 	mcpsrv.RegisterContextBudgetEstimateTool(srv, log)
 	mcpsrv.RegisterCellMutationTools(srv, mutationSvc, runtimeCfg, log)
-	mcpsrv.RegisterSeamTools(srv, seamSvc, log)
+	mcpsrv.RegisterSeamTools(srv, seamSvc, log, retrievalBudget)
 	mcpsrv.RegisterFacetEdgeTools(srv, facetEdgeSvc, log)
-	mcpsrv.RegisterFacetEdgeBrowseTools(srv, facetEdgeBrowse, log)
-	mcpsrv.RegisterTagBrowseTools(srv, tagBrowseSvc, log)
+	mcpsrv.RegisterFacetEdgeBrowseTools(srv, facetEdgeBrowse, log, retrievalBudget)
+	mcpsrv.RegisterTagBrowseTools(srv, tagBrowseSvc, log, retrievalBudget)
 	mcpsrv.RegisterPersistencePolicyTool(srv, runtimeCfg, configPathUsed, log)
+	mcpsrv.RegisterRetrievalBudgetStatusTool(srv, retrievalBudget, log)
 	h := mcpsrv.StreamableHTTPHandler(srv, log)
 
 	mux := http.NewServeMux()

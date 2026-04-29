@@ -11,14 +11,14 @@ import (
 )
 
 // RegisterSeamTools wires seam discovery and writes: find_seams, mark_conflict, mark_supersedes, resolve_seam.
-func RegisterSeamTools(server *mcp.Server, svc primary.SeamLifecycle, log *slog.Logger) {
-	registerFindSeamsTool(server, svc, log)
+func RegisterSeamTools(server *mcp.Server, svc primary.SeamLifecycle, log *slog.Logger, budget *RetrievalBudgetTracker) {
+	registerFindSeamsTool(server, svc, log, budget)
 	registerMarkConflictTool(server, svc, log)
 	registerMarkSupersedesTool(server, svc, log)
 	registerResolveSeamTool(server, svc, log)
 }
 
-func registerFindSeamsTool(server *mcp.Server, svc primary.SeamLifecycle, log *slog.Logger) {
+func registerFindSeamsTool(server *mcp.Server, svc primary.SeamLifecycle, log *slog.Logger, budget *RetrievalBudgetTracker) {
 	type findSeamsInput struct {
 		CenterQ        int  `json:"center_q" jsonschema:"axial q of search center"`
 		CenterR        int  `json:"center_r" jsonschema:"axial r of search center"`
@@ -29,7 +29,7 @@ func registerFindSeamsTool(server *mcp.Server, svc primary.SeamLifecycle, log *s
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "mosaic_hexxla_find_seams",
 		Description: "List seams HexxlaDB.FindSeams: endpoints within hex distance radius of (center_q, center_r). Set unresolved_only to focus on seams not yet ResolveSeam'd. Larger radii scan more neighbouring cells.",
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, in findSeamsInput) (*mcp.CallToolResult, domain.FindSeamsResponse, error) {
+	}, func(ctx context.Context, req *mcp.CallToolRequest, in findSeamsInput) (*mcp.CallToolResult, domain.FindSeamsResponse, error) {
 		if log != nil {
 			log.DebugContext(ctx, "mosaic_hexxla_find_seams invoked", "center_q", in.CenterQ, "center_r", in.CenterR)
 		}
@@ -37,10 +37,12 @@ func registerFindSeamsTool(server *mcp.Server, svc primary.SeamLifecycle, log *s
 		if in.Radius != nil {
 			radius = *in.Radius
 		}
-		out, err := svc.FindSeams(ctx, &domain.FindSeamsQuery{
-			Center:         domain.AxialCoord{Q: in.CenterQ, R: in.CenterR},
-			Radius:         radius,
-			UnresolvedOnly: in.UnresolvedOnly,
+		out, err := RunBudgetedRead(budget, req, func() (domain.FindSeamsResponse, error) {
+			return svc.FindSeams(ctx, &domain.FindSeamsQuery{
+				Center:         domain.AxialCoord{Q: in.CenterQ, R: in.CenterR},
+				Radius:         radius,
+				UnresolvedOnly: in.UnresolvedOnly,
+			})
 		})
 		if err != nil {
 			return nil, domain.FindSeamsResponse{}, err

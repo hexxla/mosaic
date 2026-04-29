@@ -17,6 +17,9 @@ const EnvPolicyFile = "MOSAIC_POLICY_FILE"
 type MosaicConfigLoaded struct {
 	Retention       RetentionPolicy
 	AllowDeleteCell bool
+	// DatabasePassphrase is optional at-rest encryption passphrase from YAML (prefer MOSAIC_DB_PASSPHRASE or -db-passphrase).
+	DatabasePassphrase string
+	Retrieval          RetrievalBudgetConfig
 }
 
 // retentionYAMLFields is the retention subsection (capture_mode, enforcement, notes).
@@ -26,9 +29,22 @@ type retentionYAMLFields struct {
 	Notes       string                    `yaml:"notes"`
 }
 
+// databaseYAMLFields is optional DB encryption hints (avoid committing real secrets in Git).
+type databaseYAMLFields struct {
+	Passphrase string `yaml:"passphrase"`
+}
+
+// retrievalYAMLFields is optional limits for MCP read-tool payload budgeting (see docs in configs/config.yaml).
+type retrievalYAMLFields struct {
+	SessionApproxTokenBudget int      `yaml:"session_approx_token_budget"`
+	BytesPerApproxToken      *float64 `yaml:"bytes_per_approx_token,omitempty"`
+}
+
 // rawMosaicConfig is the top-level YAML document.
 type rawMosaicConfig struct {
 	Version int `yaml:"version"`
+
+	Database *databaseYAMLFields `yaml:"database"`
 
 	Retention *retentionYAMLFields `yaml:"retention"`
 	// PersistencePolicy is deprecated; use retention.
@@ -39,6 +55,8 @@ type rawMosaicConfig struct {
 	Notes       string                    `yaml:"notes"`
 
 	AllowDeleteCell *bool `yaml:"allow_delete_cell"`
+
+	Retrieval *retrievalYAMLFields `yaml:"retrieval,omitempty"`
 }
 
 // DefaultMosaicConfig is the in-process default when no file is loaded.
@@ -47,6 +65,7 @@ func DefaultMosaicConfig() MosaicConfigLoaded {
 	return MosaicConfigLoaded{
 		Retention:       DefaultRetentionPolicy(),
 		AllowDeleteCell: false,
+		Retrieval:       DefaultRetrievalBudgetConfig(),
 	}
 }
 
@@ -122,9 +141,30 @@ func ParseMosaicConfigYAML(data []byte) (MosaicConfigLoaded, error) {
 		return MosaicConfigLoaded{}, err
 	}
 
+	dbPass := ""
+	if raw.Database != nil {
+		dbPass = strings.TrimSpace(raw.Database.Passphrase)
+	}
+
+	retrieval := DefaultRetrievalBudgetConfig()
+	if raw.Retrieval != nil {
+		if raw.Retrieval.SessionApproxTokenBudget < 0 {
+			return MosaicConfigLoaded{}, errors.New("mosaic config: retrieval.session_approx_token_budget must be >= 0")
+		}
+		retrieval.SessionApproxTokenBudget = raw.Retrieval.SessionApproxTokenBudget
+		if raw.Retrieval.BytesPerApproxToken != nil {
+			if err := validateRetrievalBytesPerApproxToken(*raw.Retrieval.BytesPerApproxToken); err != nil {
+				return MosaicConfigLoaded{}, err
+			}
+			retrieval.BytesPerApproxToken = *raw.Retrieval.BytesPerApproxToken
+		}
+	}
+
 	return MosaicConfigLoaded{
-		Retention:       rt,
-		AllowDeleteCell: allowDelete,
+		Retention:          rt,
+		AllowDeleteCell:    allowDelete,
+		DatabasePassphrase: dbPass,
+		Retrieval:          retrieval,
 	}, nil
 }
 

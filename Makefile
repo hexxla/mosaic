@@ -1,6 +1,6 @@
 # Makefile for LLM Folder Bootstrap CLI
 
-.PHONY: help build build-mosaic-mcp build-mosaic-seed test test-all integration lint fmt ci clean install install-mosaic-mcp install-mosaic-seed seed reseed mosaic-dev run run-mosaic-mcp run-mosaic-seed tidy vet update govulncheck \
+.PHONY: help build build-mosaic-mcp build-mosaic-seed build-mosaic-create-db test test-all integration lint fmt ci clean install install-mosaic-mcp install-mosaic-seed install-mosaic-create-db seed reseed mosaic-dev run run-mosaic-mcp run-mosaic-seed run-mosaic-create-db create-db tidy vet update govulncheck \
 	build-linux build-darwin build-windows build-all
 
 # Bare `make` runs the full CI pipeline (same as `make ci`). Use `make help` to list targets.
@@ -17,6 +17,7 @@ EXE     = $(if $(filter windows,$(GOOS)),.exe,)
 BINARY_NAME := go-llm-project-structure
 MOSAIC_BINARY := mosaic-mcp
 MOSAIC_SEED_BINARY := mosaic-seed
+MOSAIC_CREATE_DB_BINARY := mosaic-create-db
 VERSION     ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 
 # Local Mosaic/MCP defaults (repository-relative `./.tmp`, not system `/tmp`). Override when invoking make.
@@ -25,6 +26,15 @@ MOSAIC_MCP_ADDR      ?= 127.0.0.1:8787
 MOSAIC_MCP_PATH      ?= /mcp
 MOSAIC_OLLAMA_URL    ?= http://127.0.0.1:11434
 MOSAIC_EMBED_MODEL   ?= all-minilm
+
+# Extra arguments appended to `go run` for Mosaic commands (quote when passing multiple flags).
+# Examples:
+#   make create-db MOSAIC_CREATE_DB_FLAGS='-replace -policy configs/config.yaml'
+#   make seed MOSAIC_SEED_FLAGS='-page-size 4096'
+#   make run-mosaic-mcp MOSAIC_MCP_FLAGS='-policy configs/config.yaml'
+MOSAIC_CREATE_DB_FLAGS ?=
+MOSAIC_SEED_FLAGS      ?=
+MOSAIC_MCP_FLAGS       ?=
 
 # Build for the host OS/arch.
 build:
@@ -44,6 +54,12 @@ build-mosaic-seed:
 	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -ldflags="-s -w -X main.version=$(VERSION)" \
 		-o $(BINDIR)/$(MOSAIC_SEED_BINARY)$(EXE) ./cmd/mosaic-seed
 	@echo "  → $(BINDIR)/$(MOSAIC_SEED_BINARY)$(EXE)"
+
+build-mosaic-create-db:
+	@mkdir -p $(BINDIR)
+	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -ldflags="-s -w -X main.version=$(VERSION)" \
+		-o $(BINDIR)/$(MOSAIC_CREATE_DB_BINARY)$(EXE) ./cmd/mosaic-create-db
+	@echo "  → $(BINDIR)/$(MOSAIC_CREATE_DB_BINARY)$(EXE)"
 
 # Cross-compile helpers — override GOARCH if needed (e.g. make build-linux GOARCH=arm64).
 build-linux:
@@ -120,12 +136,16 @@ install-mosaic-mcp:
 install-mosaic-seed:
 	go install ./cmd/mosaic-seed
 
+install-mosaic-create-db:
+	go install ./cmd/mosaic-create-db
+
 help:
 	@echo "Available targets:"
 	@echo "  make ci              Full pipeline (same as GitHub Actions: ./scripts/ci/ci.sh)"
 	@echo "  make build           Build the CLI binary for host OS"
 	@echo "  make build-mosaic-mcp  Build mosaic-mcp (local MCP Streamable HTTP server)"
 	@echo "  make build-mosaic-seed Build mosaic-seed (HexxlaDB file with demo corpus)"
+	@echo "  make build-mosaic-create-db Build mosaic-create-db (empty Mosaic-compatible HexxlaDB file)"
 	@echo "  make build-all       Cross-compile for linux/darwin/windows (amd64)"
 	@echo "  make build-linux     Cross-compile for linux/amd64"
 	@echo "  make build-darwin    Cross-compile for darwin/amd64"
@@ -139,11 +159,13 @@ help:
 	@echo "  make install         Install the CLI locally"
 	@echo "  make install-mosaic-mcp Install mosaic-mcp to GOPATH/bin"
 	@echo "  make install-mosaic-seed Install mosaic-seed to GOPATH/bin"
+	@echo "  make install-mosaic-create-db Install mosaic-create-db to GOPATH/bin"
 	@echo "  make run             Run the CLI via go run"
-	@echo "  make seed            Seed HexxlaDB (+ Ollama embeddings; MOSAIC_OLLAMA_URL / MOSAIC_EMBED_MODEL)"
-	@echo "  make reseed          Seed with -force (replace DB)"
-	@echo "  make mosaic-dev      seed then run mosaic-mcp (MOSAIC_* env defaults in Makefile)"
-	@echo "  make run-mosaic-mcp Run mosaic-mcp via go run (uses MOSAIC_DB_PATH etc.)"
+	@echo "  make seed            Seed HexxlaDB (+ Ollama; MOSAIC_* ; optional MOSAIC_SEED_FLAGS)"
+	@echo "  make reseed          Seed with -force (optional MOSAIC_SEED_FLAGS)"
+	@echo "  make mosaic-dev      seed then run mosaic-mcp (optional MOSAIC_SEED_FLAGS / MOSAIC_MCP_FLAGS)"
+	@echo "  make run-mosaic-mcp Run mosaic-mcp (MOSAIC_* ; optional MOSAIC_MCP_FLAGS e.g. -policy)"
+	@echo "  make run-mosaic-create-db | make create-db  Empty DB (MOSAIC_DB_PATH; MOSAIC_CREATE_DB_FLAGS)"
 	@echo "  make clean           Remove build artifacts"
 	@echo "  make tidy            go mod tidy"
 	@echo "  make llm-setup       Setup LLM tool configurations"
@@ -154,19 +176,24 @@ run:
 # Seed `.tmp/mosaic-seed.hexxla` (or MOSAIC_DB_PATH). Skips if the file already exists; use `make reseed`.
 seed run-mosaic-seed:
 	MOSAIC_DB_PATH="$(MOSAIC_DB_PATH)" MOSAIC_OLLAMA_URL="$(MOSAIC_OLLAMA_URL)" MOSAIC_EMBED_MODEL="$(MOSAIC_EMBED_MODEL)" \
-		go run ./cmd/mosaic-seed -db "$(MOSAIC_DB_PATH)"
+		go run ./cmd/mosaic-seed -db "$(MOSAIC_DB_PATH)" $(MOSAIC_SEED_FLAGS)
 
 # Replace the DB and seed from scratch.
 reseed:
 	MOSAIC_DB_PATH="$(MOSAIC_DB_PATH)" MOSAIC_OLLAMA_URL="$(MOSAIC_OLLAMA_URL)" MOSAIC_EMBED_MODEL="$(MOSAIC_EMBED_MODEL)" \
-		go run ./cmd/mosaic-seed -db "$(MOSAIC_DB_PATH)" -force
+		go run ./cmd/mosaic-seed -db "$(MOSAIC_DB_PATH)" -force $(MOSAIC_SEED_FLAGS)
 
 # Seed (if needed) then start mosaic-mcp until Ctrl+C.
 mosaic-dev: seed
-	MOSAIC_DB_PATH="$(MOSAIC_DB_PATH)" MOSAIC_MCP_ADDR="$(MOSAIC_MCP_ADDR)" MOSAIC_MCP_PATH="$(MOSAIC_MCP_PATH)" go run ./cmd/mosaic-mcp
+	MOSAIC_DB_PATH="$(MOSAIC_DB_PATH)" MOSAIC_MCP_ADDR="$(MOSAIC_MCP_ADDR)" MOSAIC_MCP_PATH="$(MOSAIC_MCP_PATH)" \
+		go run ./cmd/mosaic-mcp $(MOSAIC_MCP_FLAGS)
 
 run-mosaic-mcp:
-	MOSAIC_DB_PATH="$(MOSAIC_DB_PATH)" MOSAIC_MCP_ADDR="$(MOSAIC_MCP_ADDR)" MOSAIC_MCP_PATH="$(MOSAIC_MCP_PATH)" go run ./cmd/mosaic-mcp
+	MOSAIC_DB_PATH="$(MOSAIC_DB_PATH)" MOSAIC_MCP_ADDR="$(MOSAIC_MCP_ADDR)" MOSAIC_MCP_PATH="$(MOSAIC_MCP_PATH)" \
+		go run ./cmd/mosaic-mcp $(MOSAIC_MCP_FLAGS)
+
+run-mosaic-create-db create-db:
+	MOSAIC_DB_PATH="$(MOSAIC_DB_PATH)" go run ./cmd/mosaic-create-db -db "$(MOSAIC_DB_PATH)" $(MOSAIC_CREATE_DB_FLAGS)
 
 clean:
 	rm -rf bin

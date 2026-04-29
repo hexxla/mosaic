@@ -46,6 +46,9 @@ func TestMCPPolicyInstructions_enforcementRejectAndNotes(t *testing.T) {
 	if !strings.Contains(s, "Retention enforcement: true") {
 		t.Fatalf("expected enforcement true line: %q", s)
 	}
+	if !strings.Contains(s, "returns an error for put_cell kinds") {
+		t.Fatalf("expected updated enforcement wording: %q", s)
+	}
 	if !strings.Contains(s, "Keep assistant turns out of DB.") {
 		t.Fatalf("expected notes: %q", s)
 	}

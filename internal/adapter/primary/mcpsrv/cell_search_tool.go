@@ -12,7 +12,7 @@ import (
 )
 
 // RegisterCellSearchTool registers mosaic_hexxla_search_cells (Hexxla Tx.SearchCells: lexical relevance + filters).
-func RegisterCellSearchTool(server *mcp.Server, svc primary.CellRetrieval, log *slog.Logger) {
+func RegisterCellSearchTool(server *mcp.Server, svc primary.CellRetrieval, log *slog.Logger, budget *RetrievalBudgetTracker) {
 	type cellSearchInput struct {
 		Query          string   `json:"query,omitempty" jsonschema:"matches content, tags, source_id; empty matches all with filters"`
 		RequireTags    []string `json:"require_tags,omitempty"`
@@ -31,7 +31,7 @@ func RegisterCellSearchTool(server *mcp.Server, svc primary.CellRetrieval, log *
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "mosaic_hexxla_search_cells",
 		Description: "Lexical relevance search (HexxlaDB SearchCells): scored substring/tag/source matches; optional scan radius; optional embed_query_text for ANN-accelerated hybrid retrieval. Requires DB embeddings + MOSAIC_OLLAMA when embed_query_text set. Top hits only — mosaic_hexxla_load_context_pack for lattice context (retrieval_hint).",
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, in cellSearchInput) (*mcp.CallToolResult, domain.CellHitsResponse, error) {
+	}, func(ctx context.Context, req *mcp.CallToolRequest, in cellSearchInput) (*mcp.CallToolResult, domain.CellHitsResponse, error) {
 		if log != nil {
 			log.DebugContext(ctx, "mosaic_hexxla_search_cells invoked")
 		}
@@ -52,13 +52,19 @@ func RegisterCellSearchTool(server *mcp.Server, svc primary.CellRetrieval, log *
 			MaxScanRadius:  in.MaxScanRadius,
 			EmbedQueryText: strings.TrimSpace(in.EmbedQueryText),
 		}
-		hits, err := svc.SearchCells(ctx, cmd)
+		out, err := RunBudgetedRead(budget, req, func() (domain.CellHitsResponse, error) {
+			hits, err2 := svc.SearchCells(ctx, cmd)
+			if err2 != nil {
+				return domain.CellHitsResponse{}, err2
+			}
+			return domain.CellHitsResponse{
+				Hits:          hits,
+				RetrievalHint: domain.RetrievalHintLexicalOrANN,
+			}, nil
+		})
 		if err != nil {
 			return nil, domain.CellHitsResponse{}, err
 		}
-		return nil, domain.CellHitsResponse{
-			Hits:          hits,
-			RetrievalHint: domain.RetrievalHintLexicalOrANN,
-		}, nil
+		return nil, out, nil
 	})
 }

@@ -59,7 +59,7 @@ func validateContextPackBudgetInput(in *contextPackInput) error {
 }
 
 // RegisterContextPackTool registers mosaic_hexxla_load_context_pack (Hexxla Tx.LoadContextPackFrom).
-func RegisterContextPackTool(server *mcp.Server, svc primary.ContextAssembly, log *slog.Logger) {
+func RegisterContextPackTool(server *mcp.Server, svc primary.ContextAssembly, log *slog.Logger, budget *RetrievalBudgetTracker) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name: "mosaic_hexxla_load_context_pack",
 		Description: "Expand hex-neighbourhood context from seed coordinates using HexxlaDB LoadContextPackFrom (ring walk + UTF-8 byte budget via ByteLenBudgeter, optional seams & supersession filtering). " +
@@ -67,7 +67,7 @@ func RegisterContextPackTool(server *mcp.Server, svc primary.ContextAssembly, lo
 			"Preview bytes with mosaic_hexxla_estimate_context_budget_bytes. " +
 			"Use AFTER mosaic_hexxla_search_embedding / mosaic_hexxla_query_cells / mosaic_hexxla_search_cells when top-K hits are not enough — pass coords from those hits as seeds. " +
 			"Embedding search alone returns semantically similar cells only; this tool pulls adjacent lattice context for richer prompts.",
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, in contextPackInput) (*mcp.CallToolResult, domain.ContextPackResponse, error) {
+	}, func(ctx context.Context, req *mcp.CallToolRequest, in contextPackInput) (*mcp.CallToolResult, domain.ContextPackResponse, error) {
 		if log != nil {
 			log.DebugContext(ctx, "mosaic_hexxla_load_context_pack invoked")
 		}
@@ -95,7 +95,9 @@ func RegisterContextPackTool(server *mcp.Server, svc primary.ContextAssembly, lo
 			IncludeFacetText:    in.IncludeFacetText,
 			Explain:             in.Explain,
 		}
-		out, err := svc.LoadFromSeeds(ctx, cmd)
+		out, err := RunBudgetedRead(budget, req, func() (domain.ContextPackResponse, error) {
+			return svc.LoadFromSeeds(ctx, cmd)
+		})
 		if err != nil {
 			return nil, domain.ContextPackResponse{}, err
 		}

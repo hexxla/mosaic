@@ -9,6 +9,24 @@ import (
 	"github.com/sploitzberg/go-llm-project-structure/internal/core/domain"
 )
 
+func TestParseMosaicConfigYAML_database_passphrase(t *testing.T) {
+	t.Parallel()
+	raw := `
+version: 1
+database:
+  passphrase: "from-yaml-only"
+retention:
+  capture_mode: llm_curates
+`
+	cfg, err := config.ParseMosaicConfigYAML([]byte(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.DatabasePassphrase != "from-yaml-only" {
+		t.Fatalf("got %q", cfg.DatabasePassphrase)
+	}
+}
+
 func TestParseMosaicConfigYAML_retention_section(t *testing.T) {
 	t.Parallel()
 	raw := `
@@ -168,5 +186,17 @@ enforcement: true
 	}
 	if err := p.CheckPutCell(domain.CellPutKindFact); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestRetentionPolicy_EnforcementEnabled(t *testing.T) {
+	t.Parallel()
+	off := config.RetentionPolicy{Enforcement: config.PolicyEnforcementOff}
+	if off.EnforcementEnabled() {
+		t.Fatal("expected false when enforcement off")
+	}
+	on := config.RetentionPolicy{Enforcement: config.PolicyEnforcementReject}
+	if !on.EnforcementEnabled() {
+		t.Fatal("expected true when enforcement on")
 	}
 }

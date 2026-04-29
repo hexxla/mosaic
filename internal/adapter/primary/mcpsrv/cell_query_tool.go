@@ -13,7 +13,7 @@ import (
 )
 
 // RegisterCellQueryTool registers mosaic_hexxla_query_cells (Hexxla Tx.QueryCells: tags, time, spatial, sort, optional explain).
-func RegisterCellQueryTool(server *mcp.Server, svc primary.CellRetrieval, log *slog.Logger) {
+func RegisterCellQueryTool(server *mcp.Server, svc primary.CellRetrieval, log *slog.Logger, budget *RetrievalBudgetTracker) {
 	type cellQueryInput struct {
 		Query          string   `json:"query,omitempty" jsonschema:"substring match on content, tags, or source_id"`
 		RequireTags    []string `json:"require_tags,omitempty" jsonschema:"all of these tags (AND)"`
@@ -37,7 +37,7 @@ func RegisterCellQueryTool(server *mcp.Server, svc primary.CellRetrieval, log *s
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "mosaic_hexxla_query_cells",
 		Description: "Indexed cell query (HexxlaDB QueryCells): tags, source, time window, spatial radius, sort, explain. Optional embed_query_text: Ollama embeds then ANN-accelerated candidate selection with same predicates (hybrid retrieval). Requires DB embeddings + MOSAIC_OLLAMA. Returns ranked hits only — use mosaic_hexxla_load_context_pack with hit coords if neighbourhood context needed (retrieval_hint).",
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, in cellQueryInput) (*mcp.CallToolResult, domain.CellHitsResponse, error) {
+	}, func(ctx context.Context, req *mcp.CallToolRequest, in cellQueryInput) (*mcp.CallToolResult, domain.CellHitsResponse, error) {
 		if log != nil {
 			log.DebugContext(ctx, "mosaic_hexxla_query_cells invoked")
 		}
@@ -75,13 +75,19 @@ func RegisterCellQueryTool(server *mcp.Server, svc primary.CellRetrieval, log *s
 			Explain:        in.Explain,
 			EmbedQueryText: strings.TrimSpace(in.EmbedQueryText),
 		}
-		hits, err := svc.QueryCells(ctx, cmd)
+		out, err := RunBudgetedRead(budget, req, func() (domain.CellHitsResponse, error) {
+			hits, err2 := svc.QueryCells(ctx, cmd)
+			if err2 != nil {
+				return domain.CellHitsResponse{}, err2
+			}
+			return domain.CellHitsResponse{
+				Hits:          hits,
+				RetrievalHint: domain.RetrievalHintLexicalOrANN,
+			}, nil
+		})
 		if err != nil {
 			return nil, domain.CellHitsResponse{}, err
 		}
-		return nil, domain.CellHitsResponse{
-			Hits:          hits,
-			RetrievalHint: domain.RetrievalHintLexicalOrANN,
-		}, nil
+		return nil, out, nil
 	})
 }

@@ -157,6 +157,16 @@ Environment variables control behavior:
 
 ---
 
+## Roadmap and session notes
+
+| Document | Purpose |
+| -------- | ------- |
+| [`TODOS.md`](TODOS.md) | Lightweight active/pending work; update after sessions (same idea as HexxlaDB’s `TODOS.md`) |
+| [`docs/ROADMAP.md`](docs/ROADMAP.md) | Roadmap themes and out-of-scope boundaries |
+| [`CHANGELOG.md`](CHANGELOG.md) | User-visible releases and notable changes |
+
+---
+
 ## Leveraging Go Package Documentation
 
 Use [pkg.go.dev](https://pkg.go.dev) for official Go package documentation. Visit `https://pkg.go.dev/<import-path>` for any package (e.g., https://pkg.go.dev/net/http). Check API docs before using unfamiliar packages to ensure idiomatic usage.

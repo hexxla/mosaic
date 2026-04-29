@@ -26,7 +26,7 @@ trace.out
 go.work
 go.work.sum
 
-# [go.mod replace] Local clone/symlink of github.com/hexxla/hexxladb (`./hexxladb`; CI clones it beside the repo root)
+# Optional local checkout/symlink of github.com/hexxla/hexxladb at repo root for upstream development only (not committed; Mosaic resolves hexxladb from the module proxy).
 /hexxladb/
 /hexxladb
 

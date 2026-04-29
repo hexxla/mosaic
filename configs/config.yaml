@@ -7,7 +7,11 @@
 #   ./mosaic-mcp -policy configs/config.yaml
 #   export MOSAIC_POLICY_FILE="$PWD/configs/config.yaml"
 #
-# Required env for DB: MOSAIC_DB_PATH, etc.
+# MCP needs a DB path: set MOSAIC_DB_PATH, or run mosaic-mcp with -db PATH or -name BASENAME.
+# With -name BASENAME: creates/opens .tmp/BASENAME.hexxla unless MOSAIC_DB_DIR or -db-dir is set.
+# Optional at-rest encryption (see docs/mosaic/PERSISTENCE_POLICY.md):
+#   - Prefer MOSAIC_DB_PASSPHRASE or -db-passphrase over a passphrase in this file.
+#   - Or MOSAIC_DB_ENCRYPTION_KEY_HEX (raw key, hex) — mutually exclusive with passphrase.
 
 version: 1
 
@@ -28,15 +32,35 @@ version: 1
 # Examples below — match capture_mode; swap templates when you change capture_mode (active block matches built-in defaults: llm_curates).
 
 retention:
-  capture_mode: llm_curates
-  enforcement: false
+  capture_mode: save_all_turns
+  enforcement: true
   # Example notes — align with capture_mode. Optional templates for other modes (uncomment one `notes:` line and remove the active one).
-  # notes: "[save_all_turns] Persist every user_message and assistant_response—full transcript intent, including low-signal and chit-chat. Do not filter turns for importance; this is not LLM curation (use llm_curates for selective persistence). Issue puts for all turns the application sends; fact cells as usual where applicable."
+  notes: "[save_all_turns] Persist every user_message and assistant_response—full transcript intent, including low-signal and chit-chat. Do not filter turns for importance; this is not LLM curation (use llm_curates for selective persistence). Issue puts for all turns the application sends; fact cells as usual where applicable."
   # notes: "[user_only] Only user turns are in capture scope (assistant_message may fail if enforcement is true). Prioritize what the user stated: goals, constraints, examples, terminology, preferences, and facts they asserted. Encode structured knowledge as fact cells when possible."
   # notes: "[assistant_only] Only assistant turns are in capture scope (user_message may fail if enforcement is true). Keep assistant outputs that should survive the session: definitive answers, step-by-step procedures, recommendations, generated artifacts described in text, and safety or compliance notes worth replaying."
   # notes: "[none] Conversational turn kinds are out of scope under enforcement; fact cells remain OK. Use this for knowledge-only storage: definitions, parameters, canonical statements, and other structured facts—not chat transcripts."
-  notes: "[llm_curates] You choose what to persist: durable preferences and constraints; stable facts, definitions, and vocabulary; decisions and commitments; ideas, designs, and hypotheses worth revisiting; risks, open questions, and follow-ups; corrections to earlier stored cells; short summaries when they help future turns. Prefer fact cells for canonical knowledge; use turn kinds when mirroring chat. Skip low-value chit-chat unless the user asks to remember it."
+  # notes: "[llm_curates] You, the LLM assistant, choose what to persist: durable preferences and constraints; stable facts, definitions, and vocabulary; decisions and commitments; ideas, designs, and hypotheses worth revisiting; risks, open questions, and follow-ups; corrections to earlier stored cells; short summaries when they help future turns. Prefer fact cells for canonical knowledge; use turn kinds when mirroring chat. Skip low-value chit-chat unless the user asks to remember it."
 
-# allow_delete_cell — optional; default false. When false, mosaic_hexxla_delete_cell is rejected.
+# allow_delete_cell — optional; default false. When false, mosaic_hexxla_delete_cell returns an error.
 # Set true for local dev when you need deletes.
 allow_delete_cell: false
+
+# --- retrieval (optional per-session cap + always-on metering for HexxlaDB read tools) ---
+# Semantic note: cumulative cap = egress / runaway brake, not a relevance filter — use per-call rings
+#   and context-pack byte budgets for retrieval shaping — see docs/mosaic/MCP_AGENT_BLUEPRINT.md.
+# session_approx_token_budget — 0 = no hard cap (default), but usage is still metered in-memory for
+#   mosaic_hexxla_retrieval_budget_status. When > 0, the server rejects further reads when cumulative
+#   approximate tokens would exceed the cap (same session key; process lifetime unless client reconnects).
+# Approximate tokens: ceil(utf8_json_bytes / bytes_per_approx_token) per structured tool result;
+#   same 2–16 clamp as context pack bytes_per_approx_token. Covered tools: health, query/search cells,
+#   embedding search, context pack, find_seams, facet/edge reads, list_tags, tag_counts. Excludes:
+#   estimate_context_budget, persistence policy, writes.
+# bytes_per_approx_token — optional; default 4; must be 2–16 if set.
+#
+# retrieval:
+#   session_approx_token_budget: 200000
+#   bytes_per_approx_token: 4
+
+# database — optional passphrase for encrypted HexxlaDB files (YAML is convenient but risky to commit).
+# database:
+#   passphrase: "replace-with-env-or-flag-in-production"

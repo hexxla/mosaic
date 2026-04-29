@@ -22,9 +22,9 @@ func MCPPolicyInstructions(rt MosaicRuntimeConfig, configFilePath string) string
 	r := rt.Retention
 	fmt.Fprintf(&b, "Retention capture_mode: %s\n", r.CaptureMode)
 	if r.Enforcement == PolicyEnforcementReject {
-		fmt.Fprintf(&b, "Retention enforcement: true — server rejects put_cell kinds that conflict with capture_mode.\n")
+		fmt.Fprintf(&b, "Retention enforcement: true — the server returns an error for put_cell kinds that conflict with capture_mode.\n")
 	} else {
-		fmt.Fprintf(&b, "Retention enforcement: false — capture_mode is advisory only; server does not block puts by kind (allow_delete_cell is separate).\n")
+		fmt.Fprintf(&b, "Retention enforcement: false — capture_mode is advisory only; the server does not block puts by kind (allow_delete_cell is separate).\n")
 	}
 	if strings.TrimSpace(r.Notes) != "" {
 		fmt.Fprintf(&b, "Retention notes: %s\n", strings.TrimSpace(r.Notes))
