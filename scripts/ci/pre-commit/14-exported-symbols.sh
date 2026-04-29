@@ -36,7 +36,7 @@ for file in $domain_files; do
 
             if [ -n "$exported_fields" ]; then
                 echo -e "${YELLOW}warning:${NC} Domain struct $type in $file has exported fields: $exported_fields"
-                ((warnings++))
+                warnings=$((warnings + 1))
             fi
         fi
     done
@@ -53,14 +53,14 @@ for file in $domain_files; do
 
         # Warn about other exported functions that might be internal
         echo -e "${YELLOW}warning:${NC} Domain file $file has exported function $func_name that might be an implementation detail"
-        ((warnings++))
+        warnings=$((warnings + 1))
     done
 done
 
 # Check that domain doesn't export implementation patterns
 if grep -r "internal.*adapter\|internal.*core/services" internal/core/domain 2>/dev/null | grep -q .; then
     echo -e "${RED}error:${NC} Domain has references to adapter or services packages"
-    ((errors++))
+    errors=$((errors + 1))
 fi
 
 if ((errors > 0)); then

@@ -26,6 +26,10 @@ trace.out
 go.work
 go.work.sum
 
+# [go.mod replace] Local clone/symlink of github.com/hexxla/hexxladb (`./hexxladb`; CI clones it beside the repo root)
+/hexxladb/
+/hexxladb
+
 # ===============================================
 # Build artifacts
 # ===============================================
@@ -72,6 +76,7 @@ Thumbs.db
 
 # Tooling
 .golangci.yml.cache
+# Local HexxlaDB databases (upstream hexxladb demos use `.tmp/` under repo root; mosaic-seed: `.tmp/mosaic-seed.hexxla`).
 .tmp/
 __debug_bin
 __debug_bin.exe

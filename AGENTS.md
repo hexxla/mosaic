@@ -49,6 +49,10 @@ This project uses **Hexagonal Architecture** (also known as **Ports & Adapters**
 
 **Security is mandatory** — see `rules/security.mdc`
 
+### Mosaic MCP (HexxlaDB tools)
+
+When assisting with **`cmd/mosaic-mcp`** or MCP tool behaviour: follow **retrieve → check `retrieval_hint` → `mosaic_hexxla_load_context_pack`** when neighbourhood / seam context is needed (not only ANN top‑K). Full blueprint → [`docs/mosaic/MCP_AGENT_BLUEPRINT.md`](docs/mosaic/MCP_AGENT_BLUEPRINT.md); Cursor rule → [`.cursor/rules/mosaic-mcp-agent.mdc`](.cursor/rules/mosaic-mcp-agent.mdc).
+
 ### Full Documentation
 
 - Detailed layer explanations → [`internal/README.md`](internal/README.md)

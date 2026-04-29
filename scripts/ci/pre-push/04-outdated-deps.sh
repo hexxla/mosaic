@@ -16,8 +16,8 @@ fi
 
 echo -e "${CYAN}> Checking for outdated dependencies${NC}"
 
-# Check for outdated direct dependencies
-outdated=$(go list -u -m all 2>/dev/null | grep -v "^\[" | awk '{if ($2 != $3) print $0}')
+# Only fail on outdated *direct* modules (not every transitive in the build graph).
+outdated=$(go list -m -u -f '{{if and .Update (not .Indirect)}}{{.Path}} {{.Version}} [{{.Update.Version}}]{{end}}' all 2>/dev/null | grep '.' || true)
 
 if [ -n "$outdated" ]; then
     echo -e "${RED}error:${NC} Outdated dependencies found:"

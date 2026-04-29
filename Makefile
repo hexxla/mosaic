@@ -1,6 +1,6 @@
 # Makefile for LLM Folder Bootstrap CLI
 
-.PHONY: help build build-mosaic-mcp test test-all integration lint fmt ci clean install install-mosaic-mcp run run-mosaic-mcp tidy vet update govulncheck \
+.PHONY: help build build-mosaic-mcp build-mosaic-seed test test-all integration lint fmt ci clean install install-mosaic-mcp install-mosaic-seed seed reseed mosaic-dev run run-mosaic-mcp run-mosaic-seed tidy vet update govulncheck \
 	build-linux build-darwin build-windows build-all
 
 # Bare `make` runs the full CI pipeline (same as `make ci`). Use `make help` to list targets.
@@ -16,7 +16,15 @@ EXE     = $(if $(filter windows,$(GOOS)),.exe,)
 # Build settings
 BINARY_NAME := go-llm-project-structure
 MOSAIC_BINARY := mosaic-mcp
+MOSAIC_SEED_BINARY := mosaic-seed
 VERSION     ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+
+# Local Mosaic/MCP defaults (repository-relative `./.tmp`, not system `/tmp`). Override when invoking make.
+MOSAIC_DB_PATH       ?= .tmp/mosaic-seed.hexxla
+MOSAIC_MCP_ADDR      ?= 127.0.0.1:8787
+MOSAIC_MCP_PATH      ?= /mcp
+MOSAIC_OLLAMA_URL    ?= http://127.0.0.1:11434
+MOSAIC_EMBED_MODEL   ?= all-minilm
 
 # Build for the host OS/arch.
 build:
@@ -30,6 +38,12 @@ build-mosaic-mcp:
 	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -ldflags="-s -w -X main.version=$(VERSION)" \
 		-o $(BINDIR)/$(MOSAIC_BINARY)$(EXE) ./cmd/mosaic-mcp
 	@echo "  → $(BINDIR)/$(MOSAIC_BINARY)$(EXE)"
+
+build-mosaic-seed:
+	@mkdir -p $(BINDIR)
+	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -ldflags="-s -w -X main.version=$(VERSION)" \
+		-o $(BINDIR)/$(MOSAIC_SEED_BINARY)$(EXE) ./cmd/mosaic-seed
+	@echo "  → $(BINDIR)/$(MOSAIC_SEED_BINARY)$(EXE)"
 
 # Cross-compile helpers — override GOARCH if needed (e.g. make build-linux GOARCH=arm64).
 build-linux:
@@ -103,11 +117,15 @@ install:
 install-mosaic-mcp:
 	go install ./cmd/mosaic-mcp
 
+install-mosaic-seed:
+	go install ./cmd/mosaic-seed
+
 help:
 	@echo "Available targets:"
 	@echo "  make ci              Full pipeline (same as GitHub Actions: ./scripts/ci/ci.sh)"
 	@echo "  make build           Build the CLI binary for host OS"
 	@echo "  make build-mosaic-mcp  Build mosaic-mcp (local MCP Streamable HTTP server)"
+	@echo "  make build-mosaic-seed Build mosaic-seed (HexxlaDB file with demo corpus)"
 	@echo "  make build-all       Cross-compile for linux/darwin/windows (amd64)"
 	@echo "  make build-linux     Cross-compile for linux/amd64"
 	@echo "  make build-darwin    Cross-compile for darwin/amd64"
@@ -120,8 +138,12 @@ help:
 	@echo "  make govulncheck     Vulnerability scan only"
 	@echo "  make install         Install the CLI locally"
 	@echo "  make install-mosaic-mcp Install mosaic-mcp to GOPATH/bin"
+	@echo "  make install-mosaic-seed Install mosaic-seed to GOPATH/bin"
 	@echo "  make run             Run the CLI via go run"
-	@echo "  make run-mosaic-mcp Run mosaic-mcp via go run"
+	@echo "  make seed            Seed HexxlaDB (+ Ollama embeddings; MOSAIC_OLLAMA_URL / MOSAIC_EMBED_MODEL)"
+	@echo "  make reseed          Seed with -force (replace DB)"
+	@echo "  make mosaic-dev      seed then run mosaic-mcp (MOSAIC_* env defaults in Makefile)"
+	@echo "  make run-mosaic-mcp Run mosaic-mcp via go run (uses MOSAIC_DB_PATH etc.)"
 	@echo "  make clean           Remove build artifacts"
 	@echo "  make tidy            go mod tidy"
 	@echo "  make llm-setup       Setup LLM tool configurations"
@@ -129,8 +151,22 @@ help:
 run:
 	go run ./cmd/go-llm-project-structure
 
+# Seed `.tmp/mosaic-seed.hexxla` (or MOSAIC_DB_PATH). Skips if the file already exists; use `make reseed`.
+seed run-mosaic-seed:
+	MOSAIC_DB_PATH="$(MOSAIC_DB_PATH)" MOSAIC_OLLAMA_URL="$(MOSAIC_OLLAMA_URL)" MOSAIC_EMBED_MODEL="$(MOSAIC_EMBED_MODEL)" \
+		go run ./cmd/mosaic-seed -db "$(MOSAIC_DB_PATH)"
+
+# Replace the DB and seed from scratch.
+reseed:
+	MOSAIC_DB_PATH="$(MOSAIC_DB_PATH)" MOSAIC_OLLAMA_URL="$(MOSAIC_OLLAMA_URL)" MOSAIC_EMBED_MODEL="$(MOSAIC_EMBED_MODEL)" \
+		go run ./cmd/mosaic-seed -db "$(MOSAIC_DB_PATH)" -force
+
+# Seed (if needed) then start mosaic-mcp until Ctrl+C.
+mosaic-dev: seed
+	MOSAIC_DB_PATH="$(MOSAIC_DB_PATH)" MOSAIC_MCP_ADDR="$(MOSAIC_MCP_ADDR)" MOSAIC_MCP_PATH="$(MOSAIC_MCP_PATH)" go run ./cmd/mosaic-mcp
+
 run-mosaic-mcp:
-	go run ./cmd/mosaic-mcp
+	MOSAIC_DB_PATH="$(MOSAIC_DB_PATH)" MOSAIC_MCP_ADDR="$(MOSAIC_MCP_ADDR)" MOSAIC_MCP_PATH="$(MOSAIC_MCP_PATH)" go run ./cmd/mosaic-mcp
 
 clean:
 	rm -rf bin

@@ -2,7 +2,7 @@
 
 **Purpose:** Single working checklist for exposing HexxlaDB through Mosaic’s hexagonal stack and MCP tools. Update this file as slices land so sessions stay aligned.
 
-**Companion docs:** [HEXXLA_API_ROADMAP.md](./HEXXLA_API_ROADMAP.md) (priority overview), [HEXXLADB_API_NOTES.md](./HEXXLADB_API_NOTES.md), [MCP_BLUEPRINT.md](./MCP_BLUEPRINT.md), [MCP_AGENT_BLUEPRINT.md](./MCP_AGENT_BLUEPRINT.md) (agent/tool chaining).
+**Companion docs:** [HEXXLA_API_ROADMAP.md](./HEXXLA_API_ROADMAP.md) (priority overview), [HEXXLADB_API_NOTES.md](./HEXXLADB_API_NOTES.md), [MCP_BLUEPRINT.md](./MCP_BLUEPRINT.md), [MCP_AGENT_BLUEPRINT.md](./MCP_AGENT_BLUEPRINT.md) (agent/tool chaining), [HYBRID_RETRIEVAL_PLAN.md](./HYBRID_RETRIEVAL_PLAN.md) (hybrid **`embed_query_text`**, retrieval backlog, token-budget pointers).
 
 ---
 
@@ -77,7 +77,7 @@ Foundation already in the repo; keep these stable when adding phases.
 - [x] `secondary.ContextPackLoader` / `primary.ContextAssembly` / `ContextAssemblyService` (defaults: ring 3, tokens 4096; caps seeds 32, tokens 100k)
 - [x] Retrieval tools populate **`retrieval_hint`** JSON + expanded **tool descriptions** so models chain embed/query → context pack when needed
 
-**Remaining (optional):** `Tx.LoadContext` / `Tx.LoadContextAt` are **not** superseded by Pack — they are simpler (count-limited raw ring walk; temporal validity). Mosaic still prefers **`mosaic_hexxla_load_context_pack`** for LLM assembly; see commented sketch in [`internal/adapter/secondary/hexxlastore/load_context_sketch.go`](../../internal/adapter/secondary/hexxlastore/load_context_sketch.go).
+**Remaining (optional):** `Tx.LoadContext` / `Tx.LoadContextAt` are **not** superseded by Pack — they are simpler (count-limited raw ring walk; temporal validity). Mosaic still prefers **`mosaic_hexxla_load_context_pack`** for LLM assembly; rationale in [MCP_AGENT_BLUEPRINT.md](./MCP_AGENT_BLUEPRINT.md) (`LoadContext` vs **`LoadContextPackFrom`**).
 
 **Exit criteria:** Caller passes seed coords (from retrieval) and receives a budgeted pack — **done**.
 
@@ -146,6 +146,7 @@ Append a line per focused session:
 | 2026-04-29 | Phase 5 facets / edges | `mosaic_hexxla_put_facet`, `mosaic_hexxla_link_cells`; **`go.mod`** pinned **`hexxladb v0.3.0`** (no **`replace`**); **Active phase** → Phase 6 |
 | 2026-04-29 | Tag discovery + audit | **`mosaic_hexxla_list_tags`**, **`mosaic_hexxla_tag_counts`**; [HEXXLA_API_SURFACE_COVERAGE.md](./HEXXLA_API_SURFACE_COVERAGE.md); Phase 6 narrowed to operator-only ops (Compaction / prune / changelog) |
 | 2026-04-29 | Facet / edge reads | **`mosaic_hexxla_get_facet`**, **`mosaic_hexxla_list_facets`**, **`mosaic_hexxla_get_edge`**, **`mosaic_hexxla_list_edges_from`** (+ Hexxla **`FacetWalkRecord`** / **`EdgeWalkRecord`**) |
+| 2026-04-29 | Hybrid retrieval | **`embed_query_text`** on **`mosaic_hexxla_query_cells`** / **`mosaic_hexxla_search_cells`** → **`CellQuery.Embedding`** / **`CellSearchConfig.Embedding`**; [HYBRID_RETRIEVAL_PLAN.md](./HYBRID_RETRIEVAL_PLAN.md) |
 
 ---
 

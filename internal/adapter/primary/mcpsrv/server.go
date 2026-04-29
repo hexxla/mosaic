@@ -11,11 +11,21 @@ import (
 
 // NewServer builds an MCP [mcp.Server] with no registered tools yet. Tools register here or via helpers
 // in this package once application ports are wired.
-func NewServer(name, version string) *mcp.Server {
+//
+// opts may set [mcp.ServerOptions.Instructions] (e.g. persistence policy text from config.MCPPolicyInstructions).
+func NewServer(name, version string, opts *mcp.ServerOptions) *mcp.Server {
 	return mcp.NewServer(&mcp.Implementation{
 		Name:    name,
 		Version: version,
-	}, nil)
+	}, opts)
+}
+
+// ServerInstructions sets only MCP server instructions (sent to clients at initialize), e.g. active persistence policy.
+func ServerInstructions(instructions string) *mcp.ServerOptions {
+	if instructions == "" {
+		return nil
+	}
+	return &mcp.ServerOptions{Instructions: instructions}
 }
 
 // StreamableHTTPHandler exposes the MCP server over MCP Streamable HTTP (JSON-RPC over HTTP POST/SSE GET).
