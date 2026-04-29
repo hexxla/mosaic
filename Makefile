@@ -1,6 +1,6 @@
 # Makefile for LLM Folder Bootstrap CLI
 
-.PHONY: help build test test-all integration lint fmt ci clean install run tidy vet update govulncheck \
+.PHONY: help build build-mosaic-mcp test test-all integration lint fmt ci clean install install-mosaic-mcp run run-mosaic-mcp tidy vet update govulncheck \
 	build-linux build-darwin build-windows build-all
 
 # Bare `make` runs the full CI pipeline (same as `make ci`). Use `make help` to list targets.
@@ -15,6 +15,7 @@ EXE     = $(if $(filter windows,$(GOOS)),.exe,)
 
 # Build settings
 BINARY_NAME := go-llm-project-structure
+MOSAIC_BINARY := mosaic-mcp
 VERSION     ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 
 # Build for the host OS/arch.
@@ -23,6 +24,12 @@ build:
 	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -ldflags="-s -w -X main.version=$(VERSION)" \
 		-o $(BINDIR)/$(BINARY_NAME)$(EXE) ./cmd/go-llm-project-structure
 	@echo "  → $(BINDIR)/$(BINARY_NAME)$(EXE)"
+
+build-mosaic-mcp:
+	@mkdir -p $(BINDIR)
+	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -ldflags="-s -w -X main.version=$(VERSION)" \
+		-o $(BINDIR)/$(MOSAIC_BINARY)$(EXE) ./cmd/mosaic-mcp
+	@echo "  → $(BINDIR)/$(MOSAIC_BINARY)$(EXE)"
 
 # Cross-compile helpers — override GOARCH if needed (e.g. make build-linux GOARCH=arm64).
 build-linux:
@@ -93,10 +100,14 @@ clean-llm: clean-llm-all
 install:
 	go install ./cmd/go-llm-project-structure
 
+install-mosaic-mcp:
+	go install ./cmd/mosaic-mcp
+
 help:
 	@echo "Available targets:"
 	@echo "  make ci              Full pipeline (same as GitHub Actions: ./scripts/ci/ci.sh)"
 	@echo "  make build           Build the CLI binary for host OS"
+	@echo "  make build-mosaic-mcp  Build mosaic-mcp (local MCP Streamable HTTP server)"
 	@echo "  make build-all       Cross-compile for linux/darwin/windows (amd64)"
 	@echo "  make build-linux     Cross-compile for linux/amd64"
 	@echo "  make build-darwin    Cross-compile for darwin/amd64"
@@ -108,13 +119,18 @@ help:
 	@echo "  make fmt             Format code"
 	@echo "  make govulncheck     Vulnerability scan only"
 	@echo "  make install         Install the CLI locally"
+	@echo "  make install-mosaic-mcp Install mosaic-mcp to GOPATH/bin"
 	@echo "  make run             Run the CLI via go run"
+	@echo "  make run-mosaic-mcp Run mosaic-mcp via go run"
 	@echo "  make clean           Remove build artifacts"
 	@echo "  make tidy            go mod tidy"
 	@echo "  make llm-setup       Setup LLM tool configurations"
 
 run:
 	go run ./cmd/go-llm-project-structure
+
+run-mosaic-mcp:
+	go run ./cmd/mosaic-mcp
 
 clean:
 	rm -rf bin
