@@ -91,9 +91,15 @@ __debug_bin.exe
 TODO.md
 NOTES.md
 
-# LLM tool configurations
-.cursor/
+# Cursor — ignore local IDE noise; version-control agent rules under .cursor/rules/
+.cursor/*
+!.cursor/rules/
+!.cursor/rules/**
+
+# LLM tool configurations (other tools)
 .claude/
-.windsurf/
+.windsurf/*
+!.windsurf/rules/
+!.windsurf/rules/**
 .continue/
 .codex/

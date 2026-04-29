@@ -35,8 +35,11 @@ func RegisterCellQueryTool(server *mcp.Server, svc primary.CellRetrieval, log *s
 	}
 
 	mcp.AddTool(server, &mcp.Tool{
-		Name:        "mosaic_hexxla_query_cells",
-		Description: "Indexed cell query (HexxlaDB QueryCells): tags, source, time window, spatial radius, sort, explain. Optional embed_query_text: Ollama embeds then ANN-accelerated candidate selection with same predicates (hybrid retrieval). Requires DB embeddings + MOSAIC_OLLAMA. Returns ranked hits only — use mosaic_hexxla_load_context_pack with hit coords if neighbourhood context needed (retrieval_hint).",
+		Name: "mosaic_hexxla_query_cells",
+		Description: "Indexed cell query (HexxlaDB QueryCells): tags, source, time window, spatial radius, sort, explain. " +
+			"Use require_tags (e.g. preference) for structured slices instead of vague query-only search when fetching tagged memories. " +
+			"Optional embed_query_text: Ollama embeds then ANN-accelerated candidate selection with same predicates (hybrid retrieval). Requires DB embeddings + MOSAIC_OLLAMA for hybrid. " +
+			"Returns ranked hits only — mosaic_hexxla_load_context_pack with hit coords for neighbourhood context (retrieval_hint).",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in cellQueryInput) (*mcp.CallToolResult, domain.CellHitsResponse, error) {
 		if log != nil {
 			log.DebugContext(ctx, "mosaic_hexxla_query_cells invoked")

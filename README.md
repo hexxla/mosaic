@@ -94,12 +94,37 @@ Full CLI flags: **`go run ./cmd/<name> -help`**.
 | [docs/mosaic/DATABASE_CREATION.md](docs/mosaic/DATABASE_CREATION.md) | Creating DBs, encryption, Make wrappers |
 | [docs/mosaic/PERSISTENCE_POLICY.md](docs/mosaic/PERSISTENCE_POLICY.md) | YAML retention, MCP policy tool |
 | [docs/mosaic/MCP_AGENT_BLUEPRINT.md](docs/mosaic/MCP_AGENT_BLUEPRINT.md) | Agent workflow, context packs, optional retrieval budgeting |
+| [README.md#usage-reinforcement](#usage-reinforcement) | Why models skip tools; rules, **`AGENTS.md`**, YAML **`retention.notes`**; quick best practices |
 | [configs/config.yaml](configs/config.yaml) | Example **`retention`** / **`retrieval`** / **`allow_delete_cell`** (comments inline) |
 | [AGENTS.md](AGENTS.md) | Instructions for AI coding assistants (architecture, CI, doc index) |
 | [TODOS.md](TODOS.md) | Active / pending session notes |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Roadmap themes and out-of-scope boundaries |
 | [CHANGELOG.md](CHANGELOG.md) | Notable shipped changes |
 | [docs/architecture/architecture.md](docs/architecture/architecture.md) | Dependency layout and design overview |
+
+---
+
+## Usage reinforcement
+
+Mosaic exposes many MCP tools, but **nothing forces the model to call them**—**tool use is best-effort**, not guaranteed across clients. Reasoning models may answer from the chat alone, forget to chain **embedding search → `load_context_pack`**, skip **`list_tags`** before writes, or omit **`put_cell`** for turns even when your policy expects it. Reliability varies by model, system prompt, context length, and how clearly tools are described—treat **explicit project instructions** as part of the product, not an afterthought.
+
+**Reinforce behavior when your client allows it**
+
+| Layer | What to use |
+| ----- | ----------- |
+| **Project rules** | This repo’s **[`.cursor/rules/mosaic-mcp-agent.mdc`](.cursor/rules/mosaic-mcp-agent.mdc)** (Cursor; `alwaysApply`); similar files under **`.windsurf/rules/`** for Windsurf. Copy the intent into any “project rules” or team playbook your host supports. |
+| **Repository instructions** | **[`AGENTS.md`](AGENTS.md)** — how assistants should work in *this* codebase; add Mosaic-specific bullets there if your team uses a single entry point. |
+| **MCP / server text** | Policy YAML **`retention.notes`** (and related fields) is injected into **MCP server instructions** at startup—use it to restate capture mode and “must call `put_cell` for every turn” when that is operator policy. See [`configs/config.yaml`](configs/config.yaml) and [PERSISTENCE_POLICY.md](docs/mosaic/PERSISTENCE_POLICY.md). |
+| **Deep reference** | **[`docs/mosaic/MCP_AGENT_BLUEPRINT.md`](docs/mosaic/MCP_AGENT_BLUEPRINT.md)** — full retrieval and persistence narrative. |
+
+**Best practices (short)**
+
+- Prefer **structured discovery** then **local expansion**: seeds from **`mosaic_hexxla_search_embedding`** or **`query_cells` / `search_cells`**, then **`mosaic_hexxla_load_context_pack`** with modest ring/budget first; increase only if the answer is still thin.
+- Before **`put_cell`**, use **`list_tags` / `tag_counts`** when taxonomy is unknown so you **reuse** tags instead of fragmenting vocabulary.
+- If writes are policy-sensitive, call **`mosaic_hexxla_get_persistence_policy`**; for full thread capture, follow the **user message → `put_cell` → reply → `put_cell` assistant** sequence described in the blueprint and rules when **`save_all_turns`** (or equivalent) applies.
+- Optional: **`mosaic_hexxla_health`** when embedding dimension or DB state is uncertain.
+
+None of this replaces good **operator** choices (PII, retention, localhost-only); it only helps **agents** use the tools you already enabled.
 
 ---
 
@@ -118,14 +143,6 @@ Quality checks (tests, lint, dependency policy) run in CI — same targets local
 ## Roadmap and rough edges
 
 Exploration items and known limitations (e.g. **oversized one-shot** under session cap, meter lifetime) are tracked in **[TODOS.md](TODOS.md)**; higher-level themes live in **[docs/ROADMAP.md](docs/ROADMAP.md)**.
-
----
-
-## Assistant / agent workflow (optional)
-
-This repo includes machine-readable workflow hints for tools that call Mosaic MCP—tool roles, retrieval chaining, and when to use **`mosaic_hexxla_load_context_pack`**. The canonical copy lives at **[`.cursor/rules/mosaic-mcp-agent.mdc`](.cursor/rules/mosaic-mcp-agent.mdc)** (Markdown with optional front matter). You can lift the content into **whatever rule or instructions format your editor or agent host supports** (rules files, project docs, or MCP client configuration)—nothing here assumes a specific IDE.
-
-For the full narrative, see **[docs/mosaic/MCP_AGENT_BLUEPRINT.md](docs/mosaic/MCP_AGENT_BLUEPRINT.md)**.
 
 ---
 

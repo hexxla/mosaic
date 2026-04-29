@@ -16,7 +16,7 @@ func RegisterHealthTool(server *mcp.Server, health primary.Health, log *slog.Log
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "mosaic_hexxla_health",
-		Description: "Run HexxlaDB HealthCheck (cells, seams, tag/source indexes, orphans, MVCC stats, warnings) plus database layout (page size, max value bytes, embedding dimension/metric) and integrity_ok",
+		Description: "Run HexxlaDB HealthCheck (cells, seams, tag/source indexes, orphans, MVCC stats, warnings) plus database layout (page size, max value bytes, embedding dimension/metric) and integrity_ok. Use before heavy retrieval when embedding setup or DB integrity is unknown; empty embedding hits may mean dimension mismatch or missing vectors.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, _ healthInput) (*mcp.CallToolResult, domain.HealthSummary, error) {
 		if log != nil {
 			log.DebugContext(ctx, "mosaic_hexxla_health invoked")

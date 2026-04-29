@@ -32,8 +32,9 @@ func registerPutCellTool(server *mcp.Server, svc primary.CellMutation, gates con
 	}
 
 	mcp.AddTool(server, &mcp.Tool{
-		Name:        "mosaic_hexxla_put_cell",
-		Description: "Write one cell at axial (q,r) via HexxlaDB PutCell (DB.Update). kind=fact uses a fact template; user_message / assistant_response match conversational_memory-style tags. source_id is required (provenance source for fact, session id for user/assistant templates).",
+		Name: "mosaic_hexxla_put_cell",
+		Description: "Write one cell at axial (q,r) via HexxlaDB PutCell (DB.Update). Before choosing tags, call mosaic_hexxla_list_tags (and mosaic_hexxla_tag_counts) when taxonomy is unknown — reuse existing tags when relevant instead of inventing near-duplicates. " +
+			"kind=fact uses a fact template; user_message / assistant_response match conversational_memory-style tags. source_id is required (provenance source for fact, session id for user/assistant templates).",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in putCellInput) (*mcp.CallToolResult, domain.MutationOK, error) {
 		if log != nil {
 			log.DebugContext(ctx, "mosaic_hexxla_put_cell invoked", "q", in.Q, "r", in.R)

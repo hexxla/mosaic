@@ -29,8 +29,10 @@ func RegisterCellSearchTool(server *mcp.Server, svc primary.CellRetrieval, log *
 	}
 
 	mcp.AddTool(server, &mcp.Tool{
-		Name:        "mosaic_hexxla_search_cells",
-		Description: "Lexical relevance search (HexxlaDB SearchCells): scored substring/tag/source matches; optional scan radius; optional embed_query_text for ANN-accelerated hybrid retrieval. Requires DB embeddings + MOSAIC_OLLAMA when embed_query_text set. Top hits only — mosaic_hexxla_load_context_pack for lattice context (retrieval_hint).",
+		Name: "mosaic_hexxla_search_cells",
+		Description: "Lexical relevance search (HexxlaDB SearchCells): scored substring/tag/source matches; optional scan radius; optional embed_query_text for ANN-accelerated hybrid retrieval. " +
+			"Substring match can return zero hits if that phrase is not stored literally — try mosaic_hexxla_search_embedding for semantic discovery. " +
+			"Requires DB embeddings + MOSAIC_OLLAMA when embed_query_text set. Top hits only — mosaic_hexxla_load_context_pack for lattice context (retrieval_hint).",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in cellSearchInput) (*mcp.CallToolResult, domain.CellHitsResponse, error) {
 		if log != nil {
 			log.DebugContext(ctx, "mosaic_hexxla_search_cells invoked")

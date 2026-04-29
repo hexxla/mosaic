@@ -58,6 +58,16 @@ Keep this distinction explicit in docs and agent instructions so expectations do
 - Mosaic **does not** auto-save chat turns. Long-lived store of user/model text is explicit: tools that **write** cells (**`mosaic_hexxla_put_cell`**, **`mosaic_hexxla_put_embedding`**, etc.) persist data the client chooses to submit (e.g. **`kind`** `user_message` / `assistant_response`, **`source_id`** for session/session key). There is **no** default “record everything”; retrieval/query tools only **read**.
 - Decide your product policy (what to store, TTL, PIIs) **above** Mosaic; expose only via mutation calls.
 
+### Full-turn persistence (explicit agent workflow)
+
+When product policy is to **store every user/assistant exchange**, the agent should treat **`mosaic_hexxla_put_cell`** as the **bookends** of each turn:
+
+1. Right after the user message is known → **`put_cell`** with **`kind=user_message`** (session **`source_id`**, project **`(q,r)`** / tags).
+2. Generate the reply (retrieval steps from [Recommended workflow](#recommended-workflow) as needed).
+3. After the assistant reply is finalized → **`put_cell`** with **`kind=assistant_response`** (same **`source_id`**).
+
+YAML **`retention.capture_mode: save_all_turns`** matches “both sides in scope”; use **`mosaic_hexxla_get_persistence_policy`** and [`PERSISTENCE_POLICY.md`](./PERSISTENCE_POLICY.md) for enforcement details. Cursor does not provide built-in cross-session Memories (see [external memory note](https://omegamax.co/blog/cursor-removed-memories)); Mosaic MCP is one way to keep durable context **outside** the editor.
+
 ---
 
 ## Client-side instructions (non-repo)

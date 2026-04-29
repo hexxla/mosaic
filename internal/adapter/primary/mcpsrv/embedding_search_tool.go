@@ -20,7 +20,7 @@ func RegisterEmbeddingSearchTool(server *mcp.Server, svc primary.EmbeddingSearch
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "mosaic_hexxla_search_embedding",
-		Description: "Semantic retrieval: embed the query via Ollama (MOSAIC_EMBED_MODEL) and run HexxlaDB SearchByEmbedding ANN — returns top-K similar cells (coords, scores, text, tags). This is NOT full conversational context: neighbours, seams, and supersession may be missing. If the answer is incomplete, call mosaic_hexxla_load_context_pack with coords from matches as seeds (response JSON includes retrieval_hint).",
+		Description: "Semantic retrieval: embed the query via Ollama (MOSAIC_EMBED_MODEL) and run HexxlaDB SearchByEmbedding ANN — returns top-K similar cells (coords, scores, text, tags). Use as a first step to get seed coordinates; then call mosaic_hexxla_load_context_pack with 1-3 of those {q,r} to expand hex-neighbourhood context. This tool alone is NOT full conversational context: neighbours, seams, and supersession may be missing. response JSON includes retrieval_hint.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in embeddingSearchInput) (*mcp.CallToolResult, domain.EmbeddingSearchResponse, error) {
 		if log != nil {
 			log.DebugContext(ctx, "mosaic_hexxla_search_embedding invoked")
