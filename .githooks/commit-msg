@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Git commit-msg hook wrapper
+# Runs all commit-msg validation scripts
+
+set -euo pipefail
+
+# Find project root (go up from .githooks directory)
+HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT="$(cd "$HOOK_DIR/.." && pwd)"
+cd "$ROOT"
+
+# Run commit-msg scripts
+./scripts/ci/commit-msg/00-conventional-commit.sh "$1"
+./scripts/ci/commit-msg/01-length.sh "$1"

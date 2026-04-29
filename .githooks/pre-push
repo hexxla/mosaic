@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Git pre-push hook wrapper
+# Runs all pre-push validation scripts
+
+set -euo pipefail
+
+# Find project root (go up from .githooks directory)
+HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT="$(cd "$HOOK_DIR/.." && pwd)"
+cd "$ROOT"
+
+# Run pre-push scripts
+./scripts/ci/pre-push/00-build.sh
+./scripts/ci/pre-push/01-tests.sh
+./scripts/ci/pre-push/02-hex-arch-guardrail.sh
+./scripts/ci/pre-push/03-coverage.sh
+./scripts/ci/pre-push/04-outdated-deps.sh

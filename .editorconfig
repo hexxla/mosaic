@@ -1,0 +1,63 @@
+# https://editorconfig.org
+
+root = true
+
+# Defaults for all files
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# Go source files
+[*.{go,mod,sum,work}]
+indent_style = tab
+indent_size = 8
+tab_width = 8
+
+# Makefiles — Critical: must use real tabs
+[Makefile]
+indent_style = tab
+indent_size = 4          # Visual width (usually 4 or 8)
+tab_width = 4
+
+[{*.mk,GNUmakefile,makefile}]
+indent_style = tab
+indent_size = 4
+tab_width = 4
+
+# Shell scripts
+[*.sh]
+indent_style = space
+indent_size = 2
+
+# YAML / Config files
+[*.{yml,yaml}]
+indent_style = space
+indent_size = 2
+
+# JSON
+[*.json]
+indent_style = space
+indent_size = 2
+
+# Markdown
+[*.md]
+indent_style = space
+indent_size = 2
+trim_trailing_whitespace = false
+
+# Docker
+[Dockerfile]
+indent_style = tab
+indent_size = 4
+
+# Protobuf & others
+[*.proto]
+indent_style = space
+indent_size = 2
+
+# Ignore generated files
+[*.{lock,generated.*,min.*}]
+trim_trailing_whitespace = unset
+insert_final_newline = unset

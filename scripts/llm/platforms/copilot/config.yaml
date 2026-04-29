@@ -1,0 +1,291 @@
+platform: copilot
+folder: .github
+
+structure:
+  - path: hooks/
+    type: dir
+  - path: skills/
+    type: dir
+
+  - path: hooks/copilot-cli-policy.json
+    type: file
+    content: |
+      {
+        "version": 1,
+        "hooks": {
+          "post-tool-use": [
+            {
+              "command": ".github/hooks/scripts/post-write.sh",
+              "description": "Run quality checks after code generation"
+            }
+          ]
+        }
+      }
+
+  - path: hooks/scripts/post-write.sh
+    type: file
+    source: scripts/llm/hooks/post-write-go.sh
+
+  - path: agents/architect.md
+    type: file
+    content: |
+      # Architect Agent
+
+      You are an expert in Hexagonal Architecture.
+      Ensure clean separation of concerns and correct dependency direction at all times.
+
+  - path: agents/reviewer.md
+    type: file
+    content: |
+      # Reviewer Agent
+
+      You are a strict code reviewer focused on architecture, Go best practices, and security.
+
+  - path: agents/security.md
+    type: file
+    content: |
+      # Security Analyst Agent
+
+      You are a security expert. When reviewing or writing code:
+      - Look for SQL injection, XSS, and authentication vulnerabilities
+      - Check for hardcoded secrets, credentials, or API keys
+      - Validate input sanitization and output encoding
+      - Ensure proper error handling that doesn't leak sensitive information
+      - Verify secure session management and CSRF protection
+      - Check for dependency vulnerabilities
+      - Ensure compliance with OWASP Top 10 security principles
+
+  - path: agents/performance.md
+    type: file
+    content: |
+      # Performance Optimization Agent
+
+      You are a performance optimization expert. When reviewing or writing code:
+      - Identify inefficient algorithms and suggest optimizations
+      - Look for N+1 query problems and recommend batching
+      - Suggest caching strategies for frequently accessed data
+      - Recommend async patterns for I/O-bound operations
+      - Analyze memory usage patterns for potential leaks
+      - Identify bottlenecks in database queries
+      - Suggest connection pooling and resource reuse
+
+  - path: agents/documentation.md
+    type: file
+    content: |
+      # Documentation Generator Agent
+
+      You are a documentation specialist. When reviewing or writing code:
+      - Ensure all exported functions have complete godoc comments
+      - Generate API documentation from code annotations
+      - Create architecture diagrams for complex systems
+      - Write clear README files for new packages
+      - Document configuration options and environment variables
+      - Maintain changelog entries for significant changes
+      - Ensure code examples are accurate and up-to-date
+
+  - path: agents/test-coverage.md
+    type: file
+    content: |
+      # Test Coverage Agent
+
+      You are a testing expert. When reviewing or writing code:
+      - Analyze test coverage and identify uncovered code paths
+      - Suggest edge cases and boundary conditions to test
+      - Generate table-driven test cases for new code
+      - Recommend integration test scenarios for complex flows
+      - Ensure tests are fast, focused, and deterministic
+      - Validate that tests fail when code is broken
+      - Suggest mocking strategies for external dependencies
+
+  - path: agents/dependency.md
+    type: file
+    content: |
+      # Dependency Management Agent
+
+      You are a dependency management expert. When reviewing or writing code:
+      - Monitor dependencies for known security vulnerabilities
+      - Suggest updates to outdated packages
+      - Identify dependency conflicts and version mismatches
+      - Recommend alternative libraries with better maintenance
+      - Ensure go.mod and go.sum are properly committed
+      - Validate that dependencies are minimal and necessary
+      - Check for deprecated or unmaintained packages
+
+  - path: agents/error-handling.md
+    type: file
+    content: |
+      # Error Handling Agent
+
+      You are an error handling expert. When reviewing or writing code:
+      - Ensure all errors are checked and not ignored
+      - Validate error wrapping with %w for context preservation
+      - Check that error messages are informative and actionable
+      - Recommend proper error logging strategies
+      - Ensure errors are returned early when possible
+      - Validate error types are appropriate for the domain
+      - Check for proper error propagation through the stack
+
+  - path: skills/hexagonal-review/SKILL.md
+    type: file
+    content: |
+      ---
+      name: hexagonal-review
+      description: Reviews code for Hexagonal Architecture compliance
+      ---
+
+      # Hexagonal Architecture Review Skill
+
+      When reviewing changes:
+      - Verify `core/domain/` purity
+      - Ensure `core/services/` only uses ports
+      - Confirm adapters properly implement secondary ports
+
+  - path: skills/security-review/SKILL.md
+    type: file
+    content: |
+      ---
+      name: security-review
+      description: Performs security review on code changes
+      ---
+
+      # Security Review Skill
+
+      When reviewing code:
+      - Look for hardcoded secrets or credentials
+      - Check for insecure error handling or logging of sensitive data
+      - Verify input validation and context usage
+      - Ensure compliance with security rules
+
+  - path: skills/error-handling/SKILL.md
+    type: file
+    content: |
+      ---
+      name: go-error-handling
+      description: Validates Go error handling patterns
+      ---
+
+      # Go Error Handling Skill
+
+      When reviewing or writing Go code:
+      - Ensure all errors are checked and not ignored
+      - Validate error wrapping with `%w` for context preservation
+      - Check that error messages are informative and actionable
+      - Recommend using `errors.Is` and `errors.As` for error comparison
+      - Ensure errors are returned early when possible (fail fast)
+      - Validate error types are appropriate for the domain
+      - Check for proper error propagation through the call stack
+      - Avoid returning wrapped errors at package boundaries
+      - Use custom error types for domain-specific errors
+      - Ensure error variables are exported for use by callers
+
+  - path: skills/context-usage/SKILL.md
+    type: file
+    content: |
+      ---
+      name: go-context-usage
+      description: Validates Go context.Context usage patterns
+      ---
+
+      # Go Context Usage Skill
+
+      When reviewing or writing Go code:
+      - Ensure context.Context is the first parameter in functions that need it
+      - Validate context is not stored in struct fields
+      - Check that context is not used as a value in struct fields
+      - Ensure context is passed through the call chain properly
+      - Validate context cancellation is checked with select statements
+      - Ensure context is not nil when used
+      - Check that context is not used in exported API signatures incorrectly
+      - Validate context deadlines are set appropriately
+      - Ensure context values are used sparingly and for request-scoped data
+      - Check that context.WithValue is used for request-scoped metadata only
+
+  - path: skills/concurrency/SKILL.md
+    type: file
+    content: |
+      ---
+      name: go-concurrency
+      description: Validates Go concurrency patterns
+      ---
+
+      # Go Concurrency Skill
+
+      When reviewing or writing Go code:
+      - Validate goroutines are properly awaited (WaitGroup, channels)
+      - Check for potential goroutine leaks
+      - Ensure channels are closed correctly (by sender, not receiver)
+      - Validate mutex usage (Lock/Unlock pairs, defer Unlock)
+      - Check for data races in concurrent code
+      - Ensure select statements have default cases where appropriate
+      - Validate channel buffer sizes are appropriate
+      - Check for proper error handling in goroutines
+      - Ensure atomic operations are used where needed
+      - Recommend using sync.Pool for object reuse
+      - Validate that shared state is properly protected
+
+  - path: skills/test-coverage/SKILL.md
+    type: file
+    content: |
+      ---
+      name: go-test-coverage
+      description: Analyzes Go test coverage and suggests improvements
+      ---
+
+      # Go Test Coverage Skill
+
+      When reviewing or writing Go code:
+      - Analyze test coverage using `go test -coverprofile`
+      - Identify uncovered code paths and branches
+      - Suggest edge cases and boundary conditions to test
+      - Recommend table-driven tests for multiple scenarios
+      - Ensure tests are fast and deterministic
+      - Validate that tests fail when code is broken
+      - Suggest mocking strategies for external dependencies
+      - Recommend integration tests for complex flows
+      - Check for test file naming conventions (*_test.go)
+      - Ensure test functions start with Test and are exported
+      - Validate subtests are used with t.Run for organization
+
+  - path: skills/interface-design/SKILL.md
+    type: file
+    content: |
+      ---
+      name: go-interface-design
+      description: Validates Go interface design and abstractions
+      ---
+
+      # Go Interface Design Skill
+
+      When reviewing or writing Go code:
+      - Ensure interfaces are small and focused (single responsibility)
+      - Validate interfaces are defined by the consumer, not the implementer
+      - Check that interfaces don't leak implementation details
+      - Recommend interface composition over large interfaces
+      - Ensure interfaces are named after behavior (e.g., Reader, Writer)
+      - Validate that empty interfaces are used only for type assertions
+      - Check for unnecessary interface abstraction
+      - Recommend concrete types where interfaces are overkill
+      - Ensure interface methods are cohesive and related
+      - Validate that interface changes are backward compatible
+
+  - path: skills/struct-tag/SKILL.md
+    type: file
+    content: |
+      ---
+      name: go-struct-tag
+      description: Validates Go struct tags for serialization
+      ---
+
+      # Go Struct Tag Skill
+
+      When reviewing or writing Go code:
+      - Ensure JSON tags match exported field names (snake_case or camelCase)
+      - Validate YAML tags are present where needed
+      - Check that database tags match column names
+      - Ensure omitempty is used appropriately
+      - Validate that required fields don't have omitempty
+      - Check for duplicate or conflicting tags
+      - Ensure tag values are properly quoted
+      - Validate that tag keys are lowercase
+      - Check for custom tag validation where needed
+      - Ensure struct tags are consistent across the codebase

@@ -1,0 +1,98 @@
+# .golangci.yml
+version: "2"
+
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+  tests: true
+
+linters:
+  default: standard
+  enable:
+    - depguard
+    - errorlint
+    - gocritic
+    - gosec
+    - misspell
+    - modernize
+    - revive
+    - whitespace
+    - copyloopvar
+
+  settings:
+    depguard:
+      rules:
+        # Rule 1: core/domain/ must remain pure
+        domain_pure:
+          files:
+            - internal/core/domain/**/*.go
+          deny:
+            - pkg:
+                "github.com/sploitzberg/go-llm-project-structure/internal/(adapt\
+                er|core/services|core/ports)"
+              desc: "core/domain/ must not depend on adapter, services, or ports (hexagonal rule)"
+
+        # Rule 2: core/services/ must not depend on adapter
+        service_clean:
+          files:
+            - internal/core/services/**/*.go
+          deny:
+            - pkg:
+                "github.com/sploitzberg/go-llm-project-structure/internal/adapte\
+                r"
+              desc: "core/services/ must not depend on adapter/ (use ports instead)"
+
+        # Rule 3: core/ports/ must remain clean
+        port_clean:
+          files:
+            - internal/core/ports/**/*.go
+          deny:
+            - pkg:
+                "github.com/sploitzberg/go-llm-project-structure/internal/(adapt\
+                er|core/services)"
+              desc: "core/ports/ must not depend on adapter or services"
+
+        # Rule 4: primary adapters should be clean
+        primary_adapter_clean:
+          files:
+            - internal/adapter/primary/**/*.go
+          deny:
+            - pkg:
+                "github.com/sploitzberg/go-llm-project-structure/internal/(core/servi\
+                ces|adapter/secondary)"
+              desc: "primary adapters should only depend on core/domain and core/ports"
+
+        # Rule 5: secondary adapters should not depend on primary adapters
+        secondary_adapter_clean:
+          files:
+            - internal/adapter/secondary/**/*.go
+          deny:
+            - pkg:
+                "github.com/sploitzberg/go-llm-project-structure/internal/adapte\
+                r/primary"
+              desc: "secondary adapters should not depend on primary adapters"
+
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+
+    revive:
+      rules:
+        - name: error-strings
+        - name: error-return
+        - name: exported
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/sploitzberg/go-llm-project-structure
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

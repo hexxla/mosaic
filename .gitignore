@@ -1,0 +1,94 @@
+# ===============================================
+# Go-specific ignores
+# ===============================================
+
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary
+*.test
+
+# Coverage and profiling
+*.out
+*.coverprofile
+coverage.*
+coverage.out
+profile.cov
+cpu.prof
+mem.prof
+trace.out
+
+# Go workspace
+go.work
+go.work.sum
+
+# ===============================================
+# Build artifacts
+# ===============================================
+
+# Default build directory
+/bin/
+/dist/
+/out/
+/tmp/
+
+# OS-specific build folders (recommended for cross-compilation)
+bin/linux/
+bin/darwin/
+bin/windows/
+bin/*-*/                 # Catch OS-arch patterns (e.g., linux-amd64, darwin-arm64)
+bin/*/                  # Catch any other OS/arch folders
+
+# Release artifacts
+*.tar.gz
+*.zip
+
+# ===============================================
+# Common development files
+# ===============================================
+
+# Environment & secrets
+.env
+.env*.local
+*.pem
+*.key
+credentials.json
+
+# Logs
+*.log
+
+# Editor / IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Tooling
+.golangci.yml.cache
+.tmp/
+__debug_bin
+__debug_bin.exe
+
+# Generated files
+*.generated.go
+*.pb.go
+*.pb.gw.go
+*.gen.go
+
+# Personal notes
+TODO.md
+NOTES.md
+
+# LLM tool configurations
+.cursor/
+.claude/
+.windsurf/
+.continue/
+.codex/

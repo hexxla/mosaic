@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Git pre-commit hook wrapper
+# Runs all pre-commit validation scripts
+
+set -euo pipefail
+
+# Find project root (go up from .githooks directory)
+HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT="$(cd "$HOOK_DIR/.." && pwd)"
+cd "$ROOT"
+
+# Run pre-commit scripts
+./scripts/ci/pre-commit/00-gofmt.sh
+./scripts/ci/pre-commit/01-goimports.sh
+./scripts/ci/pre-commit/02-golangci-lint.sh
+./scripts/ci/pre-commit/03-tests.sh
+./scripts/ci/pre-commit/04-hex-arch-guardrail.sh
+./scripts/ci/pre-commit/05-gosec.sh
+./scripts/ci/pre-commit/06-go-vet.sh
+./scripts/ci/pre-commit/07-secrets.sh
+./scripts/ci/pre-commit/12-file-quality.sh
+./scripts/ci/pre-commit/13-interface-impl.sh
+./scripts/ci/pre-commit/14-exported-symbols.sh
+./scripts/ci/pre-commit/15-import-order.sh
+./scripts/ci/pre-commit/16-error-wrapping.sh
+./scripts/ci/pre-commit/17-struct-fields.sh
+./scripts/ci/pre-commit/18-go-conventions.sh
