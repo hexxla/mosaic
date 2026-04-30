@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **README** — Version badge uses a **static** **`v0.1.0`** shield (linked to **`/releases/tag/v0.1.0`**) because **`img.shields.io/github/v/tag/hexxla/mosaic`** resolves to **no tag** until **`v*`** tags exist on the GitHub repo; switch back to **`github/v/tag`** after the first tag is published if you prefer a dynamic badge.
 - **README & changelog links** — GitHub Actions badges, **releases**, clone URL, and **[Unreleased]** compare links use **`github.com/hexxla/mosaic`** (canonical repo). **pkg.go.dev** and **Go Report Card** remain **`github.com/sploitzberg/mosaic`** (Go module path).
 - **Dependencies** — **`github.com/modelcontextprotocol/go-sdk`** **v1.6.0** (was v1.5.0).
 - **Release workflow** — Drop mandatory **GPG** import (was failing when **`GPG_PRIVATE_KEY`** / **`GPG_PASSPHRASE`** secrets are unset); **[`.goreleaser.yml`](.goreleaser.yml)** does not define **`signs`**. Restore **`crazy-max/ghaction-import-gpg`** and **`GPG_FINGERPRINT`** when you add signing to GoReleaser and repository secrets.
