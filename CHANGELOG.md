@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **README** — **Get started** rewritten: binaries and **`go install`** first (Releases, Makefile **`build-*` / `install-*`**), shorter steps, plain-language **`-name`** explanation; **Commands** section prefers installed binaries over **`go run`**.
+- **README · Get started** — Primary build **`make build-mosaic-mcp build-mosaic-create-db`** (**`bin/<os>-<arch>/`**); **`build-mosaic-seed`** framed as developer-only (**`make seed`** uses **`go run`**). **`go install`** for **`mosaic-mcp`** / **`mosaic-create-db`** only unless using the seed binary.
 
 - **README** — Version badge uses a **static** **`v0.1.0`** shield (linked to **`/releases/tag/v0.1.0`**) because **`img.shields.io/github/v/tag/hexxla/mosaic`** resolves to **no tag** until **`v*`** tags exist on the GitHub repo; switch back to **`github/v/tag`** after the first tag is published if you prefer a dynamic badge.
 - **README & changelog links** — GitHub Actions badges, **releases**, clone URL, and **[Unreleased]** compare links use **`github.com/hexxla/mosaic`** (canonical repo). **pkg.go.dev** and **Go Report Card** remain **`github.com/sploitzberg/mosaic`** (Go module path).
