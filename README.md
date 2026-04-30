@@ -20,31 +20,61 @@
 
 ## Get started
 
-**You need:** [Go 1.26+](https://go.dev/dl/). **Run [Ollama](https://ollama.com)** on your machine (defaults match the [Makefile](Makefile): **`MOSAIC_OLLAMA_URL`**, **`MOSAIC_EMBED_MODEL`**). Mosaic calls it for **`mosaic_hexxla_search_embedding`**, hybrid **`embed_query_text`** on structured and lexical search tools, **`mosaic_hexxla_put_embedding`** when given text (not raw vectors), and for **`mosaic-seed`** embeddings.
+**Background**
 
-1. **Clone and enter the repo**
-   ```bash
-   git clone https://github.com/hexxla/mosaic.git
-   cd mosaic
-   ```
+- **[Ollama](https://ollama.com)** should be running locally. Mosaic uses it for semantic search, hybrid lexical search (`embed_query_text`), embedding writes from text, and optional **`mosaic-seed`** demo data. Default URL and model match the [Makefile](Makefile): **`MOSAIC_OLLAMA_URL`**, **`MOSAIC_EMBED_MODEL`** (often **`all-minilm`** — pull that model once with Ollama if you use the defaults).
 
-2. **Create a database** — you choose where the **`.hexxla`** file lives:
-   - **`-db path/to/file.hexxla`** — full path (relative or absolute).
-   - **`-name myworkspace`** — writes **`<dir>/myworkspace.hexxla`**. **`<dir>`** is **`-db-dir`**, or **`MOSAIC_DB_DIR`**, or **`.tmp`** when you only pass **`-name`**.
-   - If you omit **`-db`**, **`-name`**, and **`MOSAIC_DB_PATH`**, **`mosaic-create-db`** and **`mosaic-seed`** create **`mosaic.hexxla` in the shell’s current working directory** (typically wherever you ran the command).
+**`-name myworkspace`** (works on **`mosaic-mcp`**, **`mosaic-create-db`**, **`mosaic-seed`**) is shorthand for “use a database file **`myworkspace.hexxla`**” instead of typing a path. You pick the folder with **`-db-dir`** or **`MOSAIC_DB_DIR`**; if you omit both, Mosaic uses **`.tmp`** next to where you ran the command. Prefer **`-db /absolute/or/relative/path.hexxla`** when you already know exactly where the file lives.
 
-   **Empty database (fast, no corpus):** `go run ./cmd/mosaic-create-db -name myworkspace`, or **`make create-db`** (the Makefile sets **`MOSAIC_DB_PATH`** — override with **`MOSAIC_DB_PATH=/path/to/db.hexxla`**).
+---
 
-   **Seed demo corpus** *(development samples only — fills a demo lattice + embeddings; requires Ollama)* — **`make seed`** skips if the DB file already exists; **`make reseed`** replaces it. Use **`MOSAIC_DB_PATH`** or **`go run ./cmd/mosaic-seed -db …`** to put the file wherever you want.
+### 1. Install binaries
 
-3. **Start the MCP server** using the **same** path resolution (**`-db`**, **`-name`** / **`MOSAIC_DB_DIR`**, or **`MOSAIC_DB_PATH`**):
-   ```bash
-   make run-mosaic-mcp MOSAIC_MCP_FLAGS='-policy configs/config.yaml -name myworkspace'
-   ```
+Pick one:
 
-4. **Attach your MCP client** to **`http://127.0.0.1:8787/mcp`** (defaults from the [Makefile](Makefile): **`MOSAIC_MCP_ADDR`**, **`MOSAIC_MCP_PATH`**).
+| Approach | Notes |
+| -------- | ----- |
+| **[GitHub Releases](https://github.com/hexxla/mosaic/releases)** | Download the archive for your OS/arch and extract **`mosaic-mcp`** (published by GoReleaser). |
+| **`go install` (no clone)** | Needs [Go 1.26+](https://go.dev/dl/). Binaries go to **`GOBIN`** or **`$(go env GOPATH)/bin`** — ensure that directory is on your **`PATH`**. Replace **`v0.1.0`** with the tag you want:<br>`go install github.com/sploitzberg/mosaic/cmd/mosaic-mcp@v0.1.0`<br>`go install github.com/sploitzberg/mosaic/cmd/mosaic-create-db@v0.1.0`<br>Optional demo DB: **`.../cmd/mosaic-seed@v0.1.0`**. |
+| **Clone + [Makefile](Makefile)** | Build into **`bin/<GOOS>-<GOARCH>/`**:<br>`make build-mosaic-mcp build-mosaic-create-db`<br>Use **`make build`** for **`mosaic-mcp`** only; **`make build-all`** cross-compiles for linux/darwin/windows (**amd64** helpers: **`make build-linux`**, etc.). **`make install-mosaic-mcp`** installs **`mosaic-mcp`** via **`go install`**. |
 
-**Policy YAML:** [configs/config.yaml](configs/config.yaml) is a minimal example. All keys → **[docs/mosaic/MOSAIC_CONFIG.md](docs/mosaic/MOSAIC_CONFIG.md)**. Paths, **`MOSAIC_DB_*`**, **`-replace`**, **encrypted databases**, and matching **`mosaic-mcp`** config → **[docs/mosaic/DATABASE_CREATION.md](docs/mosaic/DATABASE_CREATION.md)**.
+Contributors often use **`make run-mosaic-mcp`** / **`make create-db`** — those invoke **`go run`** from the repo rather than installed binaries.
+
+---
+
+### 2. Create a database
+
+Creates an empty **`.hexxla`** file (same **`-name`** / **`-db`** rules as the server):
+
+```bash
+mosaic-create-db -name myworkspace
+```
+
+Add **`-policy /path/to/config.yaml`** when you use a policy file (for encryption hints, Ollama overrides, retention, etc.). A minimal example lives at [configs/config.yaml](configs/config.yaml) in the repo.
+
+Optional: **`mosaic-seed`** builds a demo lattice with embeddings (needs Ollama). More on paths, **`MOSAIC_DB_PATH`**, **`replace`**, encryption → **[docs/mosaic/DATABASE_CREATION.md](docs/mosaic/DATABASE_CREATION.md)**.
+
+---
+
+### 3. Run the server
+
+Use the **same** **`-name`** or **`-db`** you used when creating the database. Policy is optional; include it when you rely on YAML settings:
+
+```bash
+mosaic-mcp -name myworkspace
+# with policy:
+mosaic-mcp -policy /path/to/config.yaml -name myworkspace
+```
+
+Listen URL defaults are **`127.0.0.1:8787`** and **`/mcp`** — override with **`MOSAIC_MCP_ADDR`** / **`MOSAIC_MCP_PATH`** if needed.
+
+---
+
+### 4. Attach your MCP client
+
+Use **`http://127.0.0.1:8787/mcp`** (adjust host/port/path if you changed env vars).
+
+Full policy keys → **[docs/mosaic/MOSAIC_CONFIG.md](docs/mosaic/MOSAIC_CONFIG.md)**.
 
 ---
 
@@ -121,13 +151,15 @@ Load optional policy YAML at **`mosaic-mcp`** startup: **`-policy PATH`** or **`
 | **`mosaic-create-db`** | Create empty HexxlaDB (layout + optional encryption) |
 | **`mosaic-seed`** | Create DB + optional seeded corpus + Ollama embeddings |
 
+After install, use **`PATH`** or a path to the built binary:
+
 ```bash
-go run ./cmd/mosaic-mcp -help
-go run ./cmd/mosaic-create-db -help
-go run ./cmd/mosaic-seed -help
+mosaic-mcp -help
+mosaic-create-db -help
+mosaic-seed -help
 ```
 
-Make wrappers: **`make run-mosaic-mcp`**, **`make create-db`**, **`make seed`**, **`make ci`**.
+From a git clone, **`go run ./cmd/… -help`** works the same; **Make** helpers (**`make run-mosaic-mcp`**, **`make create-db`**, **`make seed`**, **`make mosaic-dev`**, **`make ci`**) are for development.
 
 ---
 
