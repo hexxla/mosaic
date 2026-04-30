@@ -33,12 +33,9 @@
    - **`-name myworkspace`** — writes **`<dir>/myworkspace.hexxla`**. **`<dir>`** is **`-db-dir`**, or **`MOSAIC_DB_DIR`**, or **`.tmp`** when you only pass **`-name`**.
    - If you omit **`-db`**, **`-name`**, and **`MOSAIC_DB_PATH`**, **`mosaic-create-db`** and **`mosaic-seed`** create **`mosaic.hexxla` in the shell’s current working directory** (typically wherever you ran the command).
 
-   **Empty database (fast, no corpus):**  
-   `go run ./cmd/mosaic-create-db -name myworkspace`  
-   or **`make create-db`** (the Makefile sets **`MOSAIC_DB_PATH`** — override with **`MOSAIC_DB_PATH=/path/to/db.hexxla`**).
+   **Empty database (fast, no corpus):** `go run ./cmd/mosaic-create-db -name myworkspace`, or **`make create-db`** (the Makefile sets **`MOSAIC_DB_PATH`** — override with **`MOSAIC_DB_PATH=/path/to/db.hexxla`**).
 
-   **Seed demo corpus** *(development samples only — fills a demo lattice + embeddings; requires Ollama)*:  
-   **`make seed`** skips if the DB file already exists; **`make reseed`** replaces it. Use **`MOSAIC_DB_PATH`** or **`go run ./cmd/mosaic-seed -db …`** to put the file wherever you want.
+   **Seed demo corpus** *(development samples only — fills a demo lattice + embeddings; requires Ollama)* — **`make seed`** skips if the DB file already exists; **`make reseed`** replaces it. Use **`MOSAIC_DB_PATH`** or **`go run ./cmd/mosaic-seed -db …`** to put the file wherever you want.
 
 3. **Start the MCP server** using the **same** path resolution (**`-db`**, **`-name`** / **`MOSAIC_DB_DIR`**, or **`MOSAIC_DB_PATH`**):
    ```bash

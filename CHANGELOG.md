@@ -7,7 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Nothing yet.
+### Changed
+
+- **Release workflow** — Drop mandatory **GPG** import (was failing when **`GPG_PRIVATE_KEY`** / **`GPG_PASSPHRASE`** secrets are unset); **[`.goreleaser.yml`](.goreleaser.yml)** does not define **`signs`**. Restore **`crazy-max/ghaction-import-gpg`** and **`GPG_FINGERPRINT`** when you add signing to GoReleaser and repository secrets.
+- **README** — Remove trailing spaces (file quality / **Get started** hard breaks merged into single lines).
 
 ## [0.1.0] - 2026-04-29
 
