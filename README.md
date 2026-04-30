@@ -109,7 +109,7 @@ Agents often get **stateless** tool loops and **flat** similarity search. Mosaic
 
 Load optional policy YAML at **`mosaic-mcp`** startup: **`-policy PATH`** or **`MOSAIC_POLICY_FILE`**. **`version:`** must be **`1`**.
 
-**Keys:** **`retention`**, **`allow_delete_cell`**, optional **`retrieval`**, optional **`database`** (encryption hint, MVCC retention, post-delete maintenance).
+**Keys:** **`retention`**, **`allow_delete_cell`**, optional **`retrieval`**, optional **`ollama`** (**`base_url`**, **`embed_model`** — overrides Makefile / env **`MOSAIC_OLLAMA_*`** when set), optional **`database`** (encryption hint, MVCC retention, post-delete maintenance).
 
 **References:** **[docs/mosaic/MOSAIC_CONFIG.md](docs/mosaic/MOSAIC_CONFIG.md)** · **[docs/mosaic/PERSISTENCE_POLICY.md](docs/mosaic/PERSISTENCE_POLICY.md)** · **[configs/config.yaml](configs/config.yaml)**
 

@@ -86,7 +86,7 @@ func (s *CellMutationService) PutEmbedding(ctx context.Context, cmd *domain.PutE
 	var vec []float32
 	if hasText {
 		if s.embedText == nil {
-			return fmt.Errorf("cell mutation: text embedding requires MOSAIC_OLLAMA_URL and MOSAIC_EMBED_MODEL")
+			return fmt.Errorf("cell mutation: text embedding requires Ollama (policy ollama: base_url/embed_model or env MOSAIC_OLLAMA_URL / MOSAIC_EMBED_MODEL)")
 		}
 		var err error
 		vec, err = s.embedText.Embed(ctx, strings.TrimSpace(cmd.Text), int(s.embedDim))

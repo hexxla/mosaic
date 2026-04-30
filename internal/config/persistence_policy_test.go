@@ -9,6 +9,28 @@ import (
 	"github.com/sploitzberg/mosaic/internal/core/domain"
 )
 
+func TestParseMosaicConfigYAML_ollama_section(t *testing.T) {
+	t.Parallel()
+	raw := `
+version: 1
+ollama:
+  base_url: http://ollama.local:11434
+  embed_model: custom-embed
+retention:
+  capture_mode: llm_curates
+`
+	cfg, err := config.ParseMosaicConfigYAML([]byte(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.OllamaBaseURL != "http://ollama.local:11434" {
+		t.Fatalf("base_url: %q", cfg.OllamaBaseURL)
+	}
+	if cfg.OllamaEmbedModel != "custom-embed" {
+		t.Fatalf("embed_model: %q", cfg.OllamaEmbedModel)
+	}
+}
+
 func TestParseMosaicConfigYAML_database_passphrase(t *testing.T) {
 	t.Parallel()
 	raw := `

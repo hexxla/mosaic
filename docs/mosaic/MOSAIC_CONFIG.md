@@ -28,6 +28,7 @@ Restart **`mosaic-mcp`** after editing YAML.
 | **`retention`** | No | Which chat turn kinds may be stored and whether the server **enforces** capture rules. |
 | **`allow_delete_cell`** | No | Default **`false`**. When **`false`**, **`mosaic_hexxla_delete_cell`** errors. |
 | **`retrieval`** | No | Optional cumulative session read budget (metering / cap). |
+| **`ollama`** | No | Optional **`base_url`** and **`embed_model`** — override **`MOSAIC_OLLAMA_URL`** / **`MOSAIC_EMBED_MODEL`** when set (see precedence below). |
 | **`database`** | No | Optional passphrase hint, MVCC retention, post-delete prune/compact. |
 
 Legacy/alternate shapes (`persistence_policy`, flat `capture_mode` at root) are accepted by the parser; prefer the **`retention`** block.
@@ -60,6 +61,21 @@ Cumulative approximate-token metering on structured JSON outputs from HexxlaDB *
 | **`bytes_per_approx_token`** | float | **`4`**; must be **2–16** if set |
 
 Tools **`estimate_context_budget`**, **`mosaic_hexxla_get_persistence_policy`**, and writes are outside this budget.
+
+---
+
+## `ollama` (optional)
+
+HTTP root and embedding model for **Ollama** (hybrid query/search, **`mosaic_hexxla_search_embedding`**, text path on **`mosaic_hexxla_put_embedding`**, **`mosaic-seed`** when it embeds).
+
+| Field | Type | Default / notes |
+| ----- | ---- | ----------------- |
+| **`base_url`** | string | Omit to fall back to **`MOSAIC_OLLAMA_URL`**, then **`http://127.0.0.1:11434`**. |
+| **`embed_model`** | string | Omit to fall back to **`MOSAIC_EMBED_MODEL`**, then **`all-minilm`**. |
+
+**Precedence** (URL): **`mosaic-seed -ollama`** (flag) → YAML **`ollama.base_url`** → **`MOSAIC_OLLAMA_URL`** → default. Same for model: **`-embed-model`** → **`ollama.embed_model`** → **`MOSAIC_EMBED_MODEL`** → default.
+
+**`mosaic-mcp`** uses YAML → env → default (no Ollama CLI flags). The [Makefile](../../Makefile) commonly sets **`MOSAIC_OLLAMA_*`**; **`ollama:`** in policy YAML overrides those when the corresponding YAML field is non-empty.
 
 ---
 

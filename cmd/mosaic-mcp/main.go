@@ -55,10 +55,6 @@ func run(log *slog.Logger) error {
 		return fmt.Errorf("config: %w", err)
 	}
 	dbCfg := config.DB{Path: dbPath}
-	ollamaCfg, err := config.LoadOllamaFromEnv()
-	if err != nil {
-		return fmt.Errorf("config ollama: %w", err)
-	}
 
 	configPath := config.ResolveMosaicConfigPath(*policyFlag)
 	mosaicLoaded := config.DefaultMosaicConfig()
@@ -72,6 +68,15 @@ func run(log *slog.Logger) error {
 	} else {
 		configPathUsed = ""
 	}
+
+	ollamaCfg, err := config.ResolveOllama(config.OllamaResolveInput{
+		YAMLBaseURL:    mosaicLoaded.OllamaBaseURL,
+		YAMLEmbedModel: mosaicLoaded.OllamaEmbedModel,
+	})
+	if err != nil {
+		return fmt.Errorf("config ollama: %w", err)
+	}
+
 	log.Info("mosaic config",
 		"capture_mode", mosaicLoaded.Retention.CaptureMode,
 		"enforcement_enabled", mosaicLoaded.Retention.EnforcementEnabled(),
@@ -80,6 +85,8 @@ func run(log *slog.Logger) error {
 		"auto_maintain_after_cell_delete", mosaicLoaded.DeleteAutoMaintain.Enabled,
 		"post_delete_maintain_debounce_ms", mosaicLoaded.DeleteAutoMaintain.DebounceAfterDelete.Milliseconds(),
 		"mvcc_retain_commits_behind_head", mosaicLoaded.MVCCRetainCommitsBehindHead,
+		"ollama_base", ollamaCfg.Base.String(),
+		"ollama_embed_model", ollamaCfg.Model,
 		"config_file", configPathUsed)
 
 	retrievalBudget := mcpsrv.NewRetrievalBudgetTracker(mosaicLoaded.Retrieval)

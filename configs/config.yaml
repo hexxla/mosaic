@@ -1,5 +1,10 @@
 version: 1
 
+# Optional Ollama overrides (otherwise MOSAIC_OLLAMA_URL / MOSAIC_EMBED_MODEL or built-in defaults).
+# ollama:
+#   base_url: http://127.0.0.1:11434
+#   embed_model: all-minilm
+
 retention:
   capture_mode: save_all_turns
   enforcement: true

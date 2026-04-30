@@ -13,7 +13,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -25,23 +24,18 @@ import (
 	ollamac "github.com/sploitzberg/mosaic/internal/ollama"
 )
 
-// defaultOllamaURL is overridden by MOSAIC_OLLAMA_URL when -ollama is not set (after parsing).
-const defaultOllamaURL = "http://127.0.0.1:11434"
-
-const envOllamaURL = "MOSAIC_OLLAMA_URL"
-const envEmbedModel = "MOSAIC_EMBED_MODEL"
-
 func main() {
 	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
+	policyFlag := flag.String("policy", "", "path to Mosaic config YAML (optional ollama: base_url, embed_model — override "+config.EnvOllamaURL+" / "+config.EnvEmbedModel+" when CLI -ollama / -embed-model are empty)")
 	dbFlag := flag.String("db", "", "path to HexxlaDB file (overrides -name; default: "+config.EnvDBPath+", else "+config.MosaicDefaultRelDBFile+")")
 	nameFlag := flag.String("name", "", "base name for the file: <db-dir>/<name>.hexxla (mutually exclusive with -db; directory from -db-dir or "+config.EnvMosaicDBDir+")")
 	dbDirFlag := flag.String("db-dir", "", "parent directory when using -name (default: from "+config.EnvMosaicDBDir+" or .tmp)")
 	var replaceExisting bool
 	flag.BoolVar(&replaceExisting, "force", false, "replace existing file at the chosen path: delete it then seed")
 	flag.BoolVar(&replaceExisting, "replace", false, "same as -force")
-	ollamaFlag := flag.String("ollama", "", "Ollama base URL (empty: "+envOllamaURL+" or "+defaultOllamaURL+")")
-	embedModel := flag.String("embed-model", "", "Ollama embedding model (empty: "+envEmbedModel+" or all-minilm)")
+	ollamaFlag := flag.String("ollama", "", "Ollama base URL (overrides policy YAML then "+config.EnvOllamaURL+")")
+	embedModel := flag.String("embed-model", "", "embeddings model (overrides policy YAML then "+config.EnvEmbedModel+")")
 	dbPassphrase := flag.String("db-passphrase", "", "optional HexxlaDB encryption passphrase (overrides "+config.EnvDBPassphrase+")")
 
 	mvcc := flag.Bool("mvcc", true, "enable MVCC (format v2) for a new database")
@@ -61,8 +55,25 @@ func main() {
 		log.Error(err.Error())
 		os.Exit(2)
 	}
-	ollamaBase := resolveOllamaURL(*ollamaFlag)
-	model := resolveEmbedModel(*embedModel)
+	ollIn := config.OllamaResolveInput{
+		FlagBaseURL:    *ollamaFlag,
+		FlagEmbedModel: *embedModel,
+	}
+	configPath := config.ResolveMosaicConfigPath(*policyFlag)
+	if strings.TrimSpace(configPath) != "" {
+		loaded, err := config.LoadMosaicConfigFromFile(configPath)
+		if err != nil {
+			log.Error(err.Error())
+			os.Exit(2)
+		}
+		ollIn.YAMLBaseURL = loaded.OllamaBaseURL
+		ollIn.YAMLEmbedModel = loaded.OllamaEmbedModel
+	}
+	ollamaCfg, err := config.ResolveOllama(ollIn)
+	if err != nil {
+		log.Error(err.Error())
+		os.Exit(2)
+	}
 
 	layout, err := config.ParseMosaicDatabaseLayoutFromCLI(*mvcc, *pageSize, *maxVal, *embedDim, *metricStr)
 	if err != nil {
@@ -70,42 +81,13 @@ func main() {
 		os.Exit(2)
 	}
 
-	u, err := url.Parse(ollamaBase)
-	if err != nil {
-		log.Error("invalid Ollama URL", "err", err, "base", ollamaBase)
-		os.Exit(2)
-	}
-	oc := ollamac.NewClient(u, model)
+	oc := ollamac.NewClient(ollamaCfg.Base, ollamaCfg.Model)
 	oc.HTTP = &http.Client{Timeout: ollamac.DefaultEmbedTimeout}
 
 	if err := run(log, dbPath, replaceExisting, oc, *dbPassphrase, layout); err != nil {
 		log.Error(err.Error())
 		os.Exit(1)
 	}
-}
-
-func resolveOllamaURL(flagValue string) string {
-	p := strings.TrimSpace(flagValue)
-	if p != "" {
-		return p
-	}
-	p = strings.TrimSpace(os.Getenv(envOllamaURL))
-	if p != "" {
-		return p
-	}
-	return defaultOllamaURL
-}
-
-func resolveEmbedModel(flagValue string) string {
-	p := strings.TrimSpace(flagValue)
-	if p != "" {
-		return p
-	}
-	p = strings.TrimSpace(os.Getenv(envEmbedModel))
-	if p != "" {
-		return p
-	}
-	return "all-minilm"
 }
 
 func run(

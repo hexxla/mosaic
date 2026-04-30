@@ -25,6 +25,11 @@ type MosaicConfigLoaded struct {
 	// MVCCRetainCommitsBehindHead is forwarded into [hexxladb.Options.MVCCRetention] on each Mosaic open (including post-compact reopen).
 	MVCCRetainCommitsBehindHead uint64
 	DeleteAutoMaintain          DeleteAutoMaintainConfig
+
+	// OllamaBaseURL — trimmed from **`ollama.base_url`** when set ([ResolveOllama] applies after env).
+	OllamaBaseURL string
+	// OllamaEmbedModel — trimmed from **`ollama.embed_model`** when set.
+	OllamaEmbedModel string
 }
 
 // retentionYAMLFields is the retention subsection (capture_mode, enforcement, notes).
@@ -59,6 +64,12 @@ type retrievalYAMLFields struct {
 	BytesPerApproxToken      *float64 `yaml:"bytes_per_approx_token,omitempty"`
 }
 
+// ollamaYAMLFields is optional Ollama HTTP root and embedding model (see [ResolveOllama] precedence).
+type ollamaYAMLFields struct {
+	BaseURL    string `yaml:"base_url,omitempty"`
+	EmbedModel string `yaml:"embed_model,omitempty"`
+}
+
 // rawMosaicConfig is the top-level YAML document.
 type rawMosaicConfig struct {
 	Version int `yaml:"version"`
@@ -76,6 +87,7 @@ type rawMosaicConfig struct {
 	AllowDeleteCell *bool `yaml:"allow_delete_cell"`
 
 	Retrieval *retrievalYAMLFields `yaml:"retrieval,omitempty"`
+	Ollama    *ollamaYAMLFields    `yaml:"ollama,omitempty"`
 }
 
 // DefaultMosaicConfig is the in-process default when no file is loaded.
@@ -215,6 +227,12 @@ func ParseMosaicConfigYAML(data []byte) (MosaicConfigLoaded, error) {
 		}
 	}
 
+	ollURL, ollModel := "", ""
+	if raw.Ollama != nil {
+		ollURL = strings.TrimSpace(raw.Ollama.BaseURL)
+		ollModel = strings.TrimSpace(raw.Ollama.EmbedModel)
+	}
+
 	loaded := MosaicConfigLoaded{
 		Retention:                   rt,
 		AllowDeleteCell:             allowDelete,
@@ -222,6 +240,8 @@ func ParseMosaicConfigYAML(data []byte) (MosaicConfigLoaded, error) {
 		Retrieval:                   retrieval,
 		MVCCRetainCommitsBehindHead: mvccRetain,
 		DeleteAutoMaintain:          delMaintain,
+		OllamaBaseURL:               ollURL,
+		OllamaEmbedModel:            ollModel,
 	}
 	applyDeleteAutoMaintainDefaults(&loaded)
 	return loaded, nil

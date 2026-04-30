@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Policy YAML **`ollama:`** with **`base_url`** and **`embed_model`** — **`mosaic-mcp`** and **`mosaic-seed`** resolve Ollama settings with precedence: **`mosaic-seed`** CLI **`-ollama`** / **`-embed-model`** → YAML → **`MOSAIC_OLLAMA_URL`** / **`MOSAIC_EMBED_MODEL`** → defaults. **`mosaic-mcp`**: YAML → env → defaults. **[`config.ResolveOllama`](internal/config/embed.go)** centralizes resolution; **[`MOSAIC_POLICY_FILE`](internal/config/mosaic_yaml.go)** is forwarded from the [Makefile](Makefile) for **`seed`** / **`run-mosaic-mcp`** / **`create-db`** when set.
 - **`mosaic_hexxla_health`** — JSON includes **`disk`** (**`primary_path`**, **`primary_bytes`**, **`wal_bytes`**, **`total_bytes`**) and **`mvcc_retain_commits_behind_head`** (effective policy). See **`docs/mosaic/HEXXLA_TROUBLESHOOTING.md`**.
 - **`database.auto_maintain_after_cell_delete.debounce_after_delete_ms`** — coalesce rapid deletes into one prune/compact burst (**`0`** = maintain immediately after each delete; **omit** when **`enabled: true`** defaults to **2000** ms). **`mosaic-mcp`** flushes pending debounced maintenance on shutdown.
 

@@ -25,6 +25,8 @@ MOSAIC_MCP_ADDR      ?= 127.0.0.1:8787
 MOSAIC_MCP_PATH      ?= /mcp
 MOSAIC_OLLAMA_URL    ?= http://127.0.0.1:11434
 MOSAIC_EMBED_MODEL   ?= all-minilm
+# Optional: default policy path when commands omit -policy (see MOSAIC_POLICY_FILE). **ollama:** keys in YAML override MOSAIC_OLLAMA_* for URL/model resolution.
+MOSAIC_POLICY_FILE   ?=
 
 # Extra arguments appended to `go run` for Mosaic commands (quote when passing multiple flags).
 # Examples:
@@ -167,24 +169,29 @@ help:
 # Seed default MOSAIC_DB_PATH (`./mosaic.hexxla` unless overridden). Skips if the file already exists; use `make reseed`.
 seed run-mosaic-seed:
 	MOSAIC_DB_PATH="$(MOSAIC_DB_PATH)" MOSAIC_OLLAMA_URL="$(MOSAIC_OLLAMA_URL)" MOSAIC_EMBED_MODEL="$(MOSAIC_EMBED_MODEL)" \
+		MOSAIC_POLICY_FILE="$(MOSAIC_POLICY_FILE)" \
 		go run ./cmd/mosaic-seed -db "$(MOSAIC_DB_PATH)" $(MOSAIC_SEED_FLAGS)
 
 # Replace the DB and seed from scratch.
 reseed:
 	MOSAIC_DB_PATH="$(MOSAIC_DB_PATH)" MOSAIC_OLLAMA_URL="$(MOSAIC_OLLAMA_URL)" MOSAIC_EMBED_MODEL="$(MOSAIC_EMBED_MODEL)" \
+		MOSAIC_POLICY_FILE="$(MOSAIC_POLICY_FILE)" \
 		go run ./cmd/mosaic-seed -db "$(MOSAIC_DB_PATH)" -force $(MOSAIC_SEED_FLAGS)
 
 # Seed (if needed) then start mosaic-mcp until Ctrl+C.
 mosaic-dev: seed
 	MOSAIC_DB_PATH="$(MOSAIC_DB_PATH)" MOSAIC_MCP_ADDR="$(MOSAIC_MCP_ADDR)" MOSAIC_MCP_PATH="$(MOSAIC_MCP_PATH)" \
+		MOSAIC_POLICY_FILE="$(MOSAIC_POLICY_FILE)" \
 		go run ./cmd/mosaic-mcp $(MOSAIC_MCP_FLAGS)
 
 run-mosaic-mcp:
 	MOSAIC_DB_PATH="$(MOSAIC_DB_PATH)" MOSAIC_MCP_ADDR="$(MOSAIC_MCP_ADDR)" MOSAIC_MCP_PATH="$(MOSAIC_MCP_PATH)" \
+		MOSAIC_POLICY_FILE="$(MOSAIC_POLICY_FILE)" \
 		go run ./cmd/mosaic-mcp $(MOSAIC_MCP_FLAGS)
 
 run-mosaic-create-db create-db:
-	MOSAIC_DB_PATH="$(MOSAIC_DB_PATH)" go run ./cmd/mosaic-create-db -db "$(MOSAIC_DB_PATH)" $(MOSAIC_CREATE_DB_FLAGS)
+	MOSAIC_DB_PATH="$(MOSAIC_DB_PATH)" MOSAIC_POLICY_FILE="$(MOSAIC_POLICY_FILE)" \
+		go run ./cmd/mosaic-create-db -db "$(MOSAIC_DB_PATH)" $(MOSAIC_CREATE_DB_FLAGS)
 
 clean:
 	rm -rf bin
