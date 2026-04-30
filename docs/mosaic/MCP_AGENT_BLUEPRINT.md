@@ -89,6 +89,5 @@ Cursor / IDE **rules** and team **playbooks** should repeat the short chain: **r
 - [`../ROADMAP.md`](../ROADMAP.md) — roadmap themes; [`../../TODOS.md`](../../TODOS.md) — session scratchpad
 - [`AGENT_CLIENT_WORKFLOWS.md`](./AGENT_CLIENT_WORKFLOWS.md) — Windsurf workflows vs Cursor rules, committed paths, slash commands
 - [`PERSISTENCE_POLICY.md`](./PERSISTENCE_POLICY.md) — YAML `retention` / `allow_delete_cell` (startup file, `mosaic_hexxla_get_persistence_policy`)
-- [`IMPLEMENTATION_PLAN.md`](./IMPLEMENTATION_PLAN.md) — roadmap and shipped tools
-- [`HEXXLA_API_ROADMAP.md`](./HEXXLA_API_ROADMAP.md) — Hexxla API coverage
-- [`HYBRID_RETRIEVAL_PLAN.md`](./HYBRID_RETRIEVAL_PLAN.md) — hybrid **`embed_query_text`** backlog and token-budget pointers
+- [`IMPLEMENTATION_PLAN.md`](./IMPLEMENTATION_PLAN.md) — phased checklist, shipped tools, session log (includes hybrid **`embed_query_text`** notes)
+- [`HEXXLA_API_SURFACE_COVERAGE.md`](./HEXXLA_API_SURFACE_COVERAGE.md) — Hexxla ↔ MCP capability matrix

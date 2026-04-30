@@ -76,8 +76,9 @@ Thumbs.db
 
 # Tooling
 .golangci.yml.cache
-# Local HexxlaDB databases (upstream hexxladb demos use `.tmp/` under repo root; mosaic-seed: `.tmp/mosaic-seed.hexxla`).
+# Local HexxlaDB databases (upstream hexxladb demos use `.tmp/`; Mosaic CLI default file in cwd: `mosaic.hexxla`).
 .tmp/
+/mosaic.hexxla
 __debug_bin
 __debug_bin.exe
 

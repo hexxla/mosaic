@@ -4,6 +4,8 @@
 **Date:** April 2026
 **Project Name:** HexxlaVision
 
+> **Scope:** This document is an **aspirational** full *Hexxla runtime* vision. The **Mosaic** repository ships a narrower, production-shaped stack: **local MCP + HexxlaDB** ([`README.md`](../../README.md), [`MCP_AGENT_BLUEPRINT.md`](./MCP_AGENT_BLUEPRINT.md)). Treat the tooling tables below as **directional**, not a checklist of current binaries.
+
 Hexxla is a deterministic hexagonal lattice that serves as a spatial operating layer for long-term LLM memory. It combines a purpose-built embedded database (HexxlaDB) with a higher-level runtime that orchestrates seed selection, neighborhood expansion, explicit contradiction handling, and token-efficient context assembly.
 
 The system delivers inspectable organization, manageable knowledge conflicts, and reproducible memory retrieval. Semantic or lexical methods propose one or more seed coordinates; the lattice then governs all subsequent structure and loading behavior.

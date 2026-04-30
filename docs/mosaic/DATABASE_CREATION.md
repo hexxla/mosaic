@@ -1,6 +1,34 @@
 # Creating a Mosaic HexxlaDB file
 
-HexxlaDB creates the on-disk file when you call **`hexxladb.Open`** and the path does not exist yet. Mosaic wraps **`Open`** in two commands that apply the **same layout defaults** (MVCC, page size, embeddings — see [`internal/config/mosaic_hexxla_db.go`](../../internal/config/mosaic_hexxla_db.go)) and optionally **at-rest encryption** (see [PERSISTENCE_POLICY.md](./PERSISTENCE_POLICY.md)).
+HexxlaDB creates the on-disk file when you call **`hexxladb.Open`** and the path does not exist yet. Mosaic wraps **`Open`** in two commands that apply the **same layout defaults** (MVCC, page size, embeddings — see [`internal/config/mosaic_hexxla_db.go`](../../internal/config/mosaic_hexxla_db.go)) and optionally **at-rest encryption**.
+
+---
+
+## Encrypted database and MCP config (end-to-end)
+
+1. **Create** the file with a passphrase (pick **one** secret channel; same precedence when opening):
+
+   ```bash
+   go run ./cmd/mosaic-create-db -db "$HOME/mosaic/secret.hexxla" -db-passphrase "$MOSAIC_DB_PASSPHRASE"
+   ```
+
+   Prefer **`MOSAIC_DB_PASSPHRASE`** in the environment instead of **`-db-passphrase`** on the command line (avoids **`ps`** leakage); see [Encrypted database](#encrypted-database-passphrase-or-raw-key) below.
+
+2. **Open with `mosaic-mcp`** using the **same** credentials (**`-db-passphrase`** → **`MOSAIC_DB_PASSPHRASE`** → YAML **`database.passphrase`**):
+
+   ```bash
+   export MOSAIC_DB_PATH="$HOME/mosaic/secret.hexxla"
+   export MOSAIC_DB_PASSPHRASE='…'
+   go run ./cmd/mosaic-mcp -policy configs/config.yaml
+   ```
+
+   Optional: add **`database.passphrase`** under **`database:`** in policy YAML ([`MOSAIC_CONFIG.md`](./MOSAIC_CONFIG.md)) only if storing a hint on disk is acceptable — env is usually safer.
+
+3. **Align paths:** **`MOSAIC_DB_PATH`**, **`-db`**, or **`-name`** / **`MOSAIC_DB_DIR`** must resolve to the **same file** you created ([`ResolveMosaicDBPath`](../../internal/config/mosaic_db_path.go)).
+
+Further detail: **[`MOSAIC_CONFIG.md`](./MOSAIC_CONFIG.md)** (`database`), **[`PERSISTENCE_POLICY.md`](./PERSISTENCE_POLICY.md)** (encryption).
+
+---
 
 ### Naming the database file (`-name`, `-db`, env)
 
@@ -11,7 +39,7 @@ Path resolution is centralized in **`internal/config/mosaic_db_path.go`** ([**`R
 | 1 | **`-db`** — full path to the `.hexxla` file |
 | 2 | **`-name`** — writes **`<db-dir>/<name>.hexxla`** · **`db-dir`** from **`-db-dir`**, else **`MOSAIC_DB_DIR`**, else **`.tmp`** |
 | 3 | **`MOSAIC_DB_PATH`** |
-| 4 | Default **`.tmp/mosaic-seed.hexxla`** · *(create-db / seed only; MCP requires 1–3)* |
+| 4 | Default **`mosaic.hexxla`** in the **process working directory** (shell cwd) · *(create-db / seed only; MCP requires 1–3)* |
 
 **`-db`** and **`-name`** are mutually exclusive. **`mosaic-mcp`** accepts **`-db`** / **`-name`** / **`-db-dir`** the same way and no longer requires **`MOSAIC_DB_PATH`** when you pass **`-name`** or **`-db`**.
 
@@ -106,7 +134,7 @@ make run-mosaic-mcp MOSAIC_MCP_FLAGS='-policy configs/config.yaml -db-passphrase
 
 From the **repository root**, paths are stable relative to `configs/config.yaml`.
 
-### Empty DB at the default path (`.tmp/mosaic-seed.hexxla` or **`MOSAIC_DB_PATH`**)
+### Empty DB at the default path (`mosaic.hexxla` in cwd, or **`MOSAIC_DB_PATH`**)
 
 ```bash
 go run ./cmd/mosaic-create-db
@@ -125,20 +153,20 @@ See **[Encrypted database](#encrypted-database-passphrase-or-raw-key)** above (`
 ### Seed with defaults (Ollama must be up; **`MOSAIC_OLLAMA_URL`**, **`MOSAIC_EMBED_MODEL`**)
 
 ```bash
-export MOSAIC_DB_PATH="$PWD/.tmp/mosaic-seed.hexxla"
+export MOSAIC_DB_PATH="$PWD/mosaic.hexxla"
 go run ./cmd/mosaic-seed -db "$MOSAIC_DB_PATH"
 ```
 
 ### Reseed from scratch with non-default page size
 
 ```bash
-go run ./cmd/mosaic-seed -db ./.tmp/mosaic-seed.hexxla -force -page-size 4096
+go run ./cmd/mosaic-seed -db ./mosaic.hexxla -force -page-size 4096
 ```
 
 ### Run MCP against an existing DB + policy file
 
 ```bash
-export MOSAIC_DB_PATH="$PWD/.tmp/mosaic-seed.hexxla"
+export MOSAIC_DB_PATH="$PWD/mosaic.hexxla"
 go run ./cmd/mosaic-mcp -policy configs/config.yaml
 ```
 
@@ -148,7 +176,7 @@ Layout and encryption flags are documented on **`go run ./cmd/mosaic-create-db -
 
 ## Examples: Make
 
-The Makefile sets **`MOSAIC_DB_PATH`** (default `.tmp/mosaic-seed.hexxla`), Ollama URL/model for seed, and MCP listen options. Extra **`go run`** arguments are appended via:
+The Makefile sets **`MOSAIC_DB_PATH`** (default **`./mosaic.hexxla`** and passes it as **`-db`** to create-db/seed), Ollama URL/model for seed, and MCP listen options. Extra **`go run`** arguments are appended via:
 
 | Variable | Used by |
 | -------- | ------- |
@@ -166,7 +194,7 @@ make create-db
 make create-db MOSAIC_CREATE_DB_FLAGS='-force -policy configs/config.yaml'
 
 # Custom DB path + smaller pages for new file
-make create-db MOSAIC_DB_PATH=.tmp/custom.hexxla MOSAIC_CREATE_DB_FLAGS='-force -page-size 4096'
+make create-db MOSAIC_DB_PATH=./projects/custom.hexxla MOSAIC_CREATE_DB_FLAGS='-force -page-size 4096'
 
 # Seed (skips if DB exists unless you reseed)
 make seed

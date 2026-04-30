@@ -19,7 +19,7 @@
 
 ## Get started
 
-**You need:** [Go 1.26+](https://go.dev/dl/). **Optional:** [Ollama](https://ollama.com) running locally if you use **`mosaic-seed`** or **`mosaic_hexxla_search_embedding`** (queries are embedded via Ollama; defaults match the [Makefile](Makefile)).
+**You need:** [Go 1.26+](https://go.dev/dl/). **Run [Ollama](https://ollama.com)** on your machine (defaults match the [Makefile](Makefile): **`MOSAIC_OLLAMA_URL`**, **`MOSAIC_EMBED_MODEL`**). Mosaic calls it for **`mosaic_hexxla_search_embedding`**, hybrid **`embed_query_text`** on structured and lexical search tools, **`mosaic_hexxla_put_embedding`** when given text (not raw vectors), and for **`mosaic-seed`** embeddings.
 
 1. **Clone and enter the repo**
    ```bash
@@ -27,21 +27,26 @@
    cd mosaic
    ```
 
-2. **Create a database** (pick one)
-   - **Empty file** (fast):  
-     `make create-db MOSAIC_CREATE_DB_FLAGS='-name myworkspace'`  
-     → `.tmp/myworkspace.hexxla`
-   - **Demo corpus + embeddings** (needs Ollama; skips if the file already exists — use **`make reseed`** to replace):  
-     `make seed`
+2. **Create a database** — you choose where the **`.hexxla`** file lives:
+   - **`-db path/to/file.hexxla`** — full path (relative or absolute).
+   - **`-name myworkspace`** — writes **`<dir>/myworkspace.hexxla`**. **`<dir>`** is **`-db-dir`**, or **`MOSAIC_DB_DIR`**, or **`.tmp`** when you only pass **`-name`**.
+   - If you omit **`-db`**, **`-name`**, and **`MOSAIC_DB_PATH`**, **`mosaic-create-db`** and **`mosaic-seed`** create **`mosaic.hexxla` in the shell’s current working directory** (typically wherever you ran the command).
 
-3. **Start the MCP server** (same **`-name`** / path as step 2 so it opens that DB)
+   **Empty database (fast, no corpus):**  
+   `go run ./cmd/mosaic-create-db -name myworkspace`  
+   or **`make create-db`** (the Makefile sets **`MOSAIC_DB_PATH`** — override with **`MOSAIC_DB_PATH=/path/to/db.hexxla`**).
+
+   **Seed demo corpus** *(development samples only — fills a demo lattice + embeddings; requires Ollama)*:  
+   **`make seed`** skips if the DB file already exists; **`make reseed`** replaces it. Use **`MOSAIC_DB_PATH`** or **`go run ./cmd/mosaic-seed -db …`** to put the file wherever you want.
+
+3. **Start the MCP server** using the **same** path resolution (**`-db`**, **`-name`** / **`MOSAIC_DB_DIR`**, or **`MOSAIC_DB_PATH`**):
    ```bash
    make run-mosaic-mcp MOSAIC_MCP_FLAGS='-policy configs/config.yaml -name myworkspace'
    ```
 
 4. **Attach your MCP client** to **`http://127.0.0.1:8787/mcp`** (defaults from the [Makefile](Makefile): **`MOSAIC_MCP_ADDR`**, **`MOSAIC_MCP_PATH`**).
 
-**Policy file:** [configs/config.yaml](configs/config.yaml) is a minimal example. Full keys → **[docs/mosaic/MOSAIC_CONFIG.md](docs/mosaic/MOSAIC_CONFIG.md)**. Encrypted DBs, **`-replace`**, env vars → **[docs/mosaic/DATABASE_CREATION.md](docs/mosaic/DATABASE_CREATION.md)**.
+**Policy YAML:** [configs/config.yaml](configs/config.yaml) is a minimal example. All keys → **[docs/mosaic/MOSAIC_CONFIG.md](docs/mosaic/MOSAIC_CONFIG.md)**. Paths, **`MOSAIC_DB_*`**, **`-replace`**, **encrypted databases**, and matching **`mosaic-mcp`** config → **[docs/mosaic/DATABASE_CREATION.md](docs/mosaic/DATABASE_CREATION.md)**.
 
 ---
 
@@ -132,16 +137,19 @@ Make wrappers: **`make run-mosaic-mcp`**, **`make create-db`**, **`make seed`**,
 
 | Doc | Contents |
 | --- | -------- |
-| [docs/mosaic/MOSAIC_CONFIG.md](docs/mosaic/MOSAIC_CONFIG.md) | Policy YAML reference (all keys) |
+| [docs/mosaic/MOSAIC_CONFIG.md](docs/mosaic/MOSAIC_CONFIG.md) | Policy YAML reference (`retention`, **`database`** encryption hint, MVCC, post-delete maintenance) |
 | [configs/config.yaml](configs/config.yaml) | Minimal example policy |
-| [docs/mosaic/DATABASE_CREATION.md](docs/mosaic/DATABASE_CREATION.md) | Paths, encryption, **`-replace`**, Make flags |
-| [docs/mosaic/PERSISTENCE_POLICY.md](docs/mosaic/PERSISTENCE_POLICY.md) | Retention semantics, MCP policy tool |
+| [docs/mosaic/DATABASE_CREATION.md](docs/mosaic/DATABASE_CREATION.md) | DB paths (cwd default), **encrypted DB + MCP**, **`-replace`**, Make flags |
+| [docs/mosaic/PERSISTENCE_POLICY.md](docs/mosaic/PERSISTENCE_POLICY.md) | Retention semantics, **`mosaic_hexxla_get_persistence_policy`** |
 | [docs/mosaic/MCP_AGENT_BLUEPRINT.md](docs/mosaic/MCP_AGENT_BLUEPRINT.md) | Agent workflows, retrieval vs budgeting |
 | [docs/mosaic/HEXXLA_TROUBLESHOOTING.md](docs/mosaic/HEXXLA_TROUBLESHOOTING.md) | Deletes, **`integrity_ok`**, disk / MVCC |
-| [docs/mosaic/HEXXLA_API_SURFACE_COVERAGE.md](docs/mosaic/HEXXLA_API_SURFACE_COVERAGE.md) | Hexxla ↔ MCP mapping |
+| [docs/mosaic/HEXXLA_API_SURFACE_COVERAGE.md](docs/mosaic/HEXXLA_API_SURFACE_COVERAGE.md) | Hexxla ↔ MCP capability matrix |
+| [docs/mosaic/IMPLEMENTATION_PLAN.md](docs/mosaic/IMPLEMENTATION_PLAN.md) | Phased MCP exposure checklist + session log |
+| [docs/mosaic/MCP_BLUEPRINT.md](docs/mosaic/MCP_BLUEPRINT.md) | Local MCP server architecture (hexagonal) |
+| [docs/mosaic/MOSAIC.md](docs/mosaic/MOSAIC.md) | Broader lattice-memory vision (aspirational; shipped stack is MCP + HexxlaDB) |
 | [docs/mosaic/AGENT_CLIENT_WORKFLOWS.md](docs/mosaic/AGENT_CLIENT_WORKFLOWS.md) | Cursor, Windsurf, rules & workflows |
 | [README.md#reliable-tool-use-from-agents](#reliable-tool-use-from-agents) | Rules, **`retention.notes`**, best practices |
-| [AGENTS.md](AGENTS.md) | Contributor / assistant architecture guide |
+| [AGENTS.md](AGENTS.md) | Contributor architecture guide |
 | [CHANGELOG.md](CHANGELOG.md) | Shipped changes |
 | [docs/architecture/architecture.md](docs/architecture/architecture.md) | Dependency layout |
 

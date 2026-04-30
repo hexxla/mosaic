@@ -19,8 +19,8 @@ MOSAIC_SEED_BINARY := mosaic-seed
 MOSAIC_CREATE_DB_BINARY := mosaic-create-db
 VERSION     ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 
-# Local Mosaic/MCP defaults (repository-relative `./.tmp`, not system `/tmp`). Override when invoking make.
-MOSAIC_DB_PATH       ?= .tmp/mosaic-seed.hexxla
+# Local Mosaic/MCP defaults (repository-relative cwd file when CLI omits path; Make passes -db explicitly). Override when invoking make.
+MOSAIC_DB_PATH       ?= ./mosaic.hexxla
 MOSAIC_MCP_ADDR      ?= 127.0.0.1:8787
 MOSAIC_MCP_PATH      ?= /mcp
 MOSAIC_OLLAMA_URL    ?= http://127.0.0.1:11434
@@ -164,7 +164,7 @@ help:
 	@echo "  make tidy            go mod tidy"
 	@echo "  make llm-setup       Setup LLM tool configurations"
 
-# Seed `.tmp/mosaic-seed.hexxla` (or MOSAIC_DB_PATH). Skips if the file already exists; use `make reseed`.
+# Seed default MOSAIC_DB_PATH (`./mosaic.hexxla` unless overridden). Skips if the file already exists; use `make reseed`.
 seed run-mosaic-seed:
 	MOSAIC_DB_PATH="$(MOSAIC_DB_PATH)" MOSAIC_OLLAMA_URL="$(MOSAIC_OLLAMA_URL)" MOSAIC_EMBED_MODEL="$(MOSAIC_EMBED_MODEL)" \
 		go run ./cmd/mosaic-seed -db "$(MOSAIC_DB_PATH)" $(MOSAIC_SEED_FLAGS)

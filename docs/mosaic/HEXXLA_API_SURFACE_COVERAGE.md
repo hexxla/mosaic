@@ -2,7 +2,7 @@
 
 **Purpose:** Map [`github.com/hexxla/hexxladb`](https://pkg.go.dev/github.com/hexxla/hexxladb)’s public capabilities (summarized in upstream [`doc.go`](https://github.com/hexxla/hexxladb/blob/main/doc.go), [`docs/hexxladb/API_REFERENCE.md`](https://github.com/hexxla/hexxladb/blob/main/docs/hexxladb/API_REFERENCE.md)) to what **Mosaic** exposes through **`cmd/mosaic-mcp`** tools. Use this to spot gaps, avoid duplicating docs, and separate **LLM-callable** surfaces from **operator-only** operations.
 
-**Companion:** [HEXXLA_API_ROADMAP.md](./HEXXLA_API_ROADMAP.md) (priority / shipped checklist), [HEXXLADB_API_NOTES.md](./HEXXLADB_API_NOTES.md) (layers).
+**Companion:** [IMPLEMENTATION_PLAN.md](./IMPLEMENTATION_PLAN.md) (phases / session log), [HEXXLADB_API_NOTES.md](./HEXXLADB_API_NOTES.md) (hexagonal mapping).
 
 ---
 
@@ -110,5 +110,5 @@ Planned “operator / advanced” items ([`IMPLEMENTATION_PLAN.md`](./IMPLEMENTA
 When Hexxla adds exported APIs or Mosaic ships new MCP tools, update:
 
 1. This table (accuracy).
-2. [HEXXLA_API_ROADMAP.md](./HEXXLA_API_ROADMAP.md) **Done** section.
+2. [IMPLEMENTATION_PLAN.md](./IMPLEMENTATION_PLAN.md) session log when adding tools.
 3. [`.cursor/rules/mosaic-mcp-agent.mdc`](../../.cursor/rules/mosaic-mcp-agent.mdc) tool table (agent workflow).

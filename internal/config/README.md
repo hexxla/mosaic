@@ -4,7 +4,7 @@ Centralized configuration structures and loading logic.
 
 **MCP (Streamable HTTP):** `LoadMCPFromEnv` reads `MOSAIC_MCP_ADDR` (default `127.0.0.1:8787`) and `MOSAIC_MCP_PATH` (default `/mcp`). Only loopback listen addresses are accepted.
 
-**Database paths:** **`ResolveMosaicDBPath`** (`mosaic_db_path.go`) resolves **`MOSAIC_DB_PATH`**, optional flags **`-db`**, **`-name`**, **`-db-dir`**, and **`MOSAIC_DB_DIR`**. **`LoadDBFromEnv`** still reads only **`MOSAIC_DB_PATH`** (tests and simple env-only use). **`cmd/mosaic-mcp`** uses **`ResolveMosaicDBPath`** so **`MOSAIC_DB_PATH`** is optional when **`-name`** or **`-db`** is set.
+**Database paths:** **`ResolveMosaicDBPath`** (`mosaic_db_path.go`) resolves **`MOSAIC_DB_PATH`**, optional flags **`-db`**, **`-name`**, **`-db-dir`**, and **`MOSAIC_DB_DIR`**. With **`defaultWhenUnset`** ( **`mosaic-create-db`** / **`mosaic-seed`** only), if nothing selects a path, the default file is **`mosaic.hexxla`** in the process working directory. **`LoadDBFromEnv`** still reads only **`MOSAIC_DB_PATH`** (tests and simple env-only use). **`cmd/mosaic-mcp`** uses **`ResolveMosaicDBPath`** so **`MOSAIC_DB_PATH`** is optional when **`-name`** or **`-db`** is set.
 
 ## Best Practices
 

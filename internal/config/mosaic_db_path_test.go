@@ -71,8 +71,9 @@ func TestResolveMosaicDBPath_defaultWhenUnset(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p != config.MosaicDefaultRelDBFile {
-		t.Fatalf("got %q", p)
+	want := filepath.Clean(config.MosaicDefaultRelDBFile)
+	if p != want {
+		t.Fatalf("got %q want %q", p, want)
 	}
 }
 

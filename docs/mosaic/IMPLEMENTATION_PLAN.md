@@ -2,7 +2,7 @@
 
 **Purpose:** Single working checklist for exposing HexxlaDB through Mosaic’s hexagonal stack and MCP tools. Update this file as slices land so sessions stay aligned.
 
-**Companion docs:** [HEXXLA_API_ROADMAP.md](./HEXXLA_API_ROADMAP.md) (priority overview), [HEXXLADB_API_NOTES.md](./HEXXLADB_API_NOTES.md), [MCP_BLUEPRINT.md](./MCP_BLUEPRINT.md), [MCP_AGENT_BLUEPRINT.md](./MCP_AGENT_BLUEPRINT.md) (agent/tool chaining), [HYBRID_RETRIEVAL_PLAN.md](./HYBRID_RETRIEVAL_PLAN.md) (hybrid **`embed_query_text`**, retrieval backlog, token-budget pointers).
+**Companion docs:** [HEXXLA_API_SURFACE_COVERAGE.md](./HEXXLA_API_SURFACE_COVERAGE.md) (capability matrix), [HEXXLADB_API_NOTES.md](./HEXXLADB_API_NOTES.md) (hexagonal mapping), [MCP_BLUEPRINT.md](./MCP_BLUEPRINT.md) (MCP server architecture), [MCP_AGENT_BLUEPRINT.md](./MCP_AGENT_BLUEPRINT.md) (agent workflows; hybrid **`embed_query_text`**).
 
 ---
 
@@ -56,12 +56,12 @@ Foundation already in the repo; keep these stable when adding phases.
 
 - [x] **`mosaic_hexxla_query_cells`** → `QueryCells` (tags, time RFC3339, spatial center+radius, sort, explain, max_scan_rows)
 - [x] **`mosaic_hexxla_search_cells`** → `SearchCells` (lexical relevance + filters, max_scan_radius)
-- [x] Documented in [HEXXLA_API_ROADMAP.md](./HEXXLA_API_ROADMAP.md)
+- [x] Documented in [HEXXLA_API_SURFACE_COVERAGE.md](./HEXXLA_API_SURFACE_COVERAGE.md)
 
 ### Quality
 
 - [x] Service tests with stub `CellReader`; MCP helpers tested (`cell_time_test.go`); `make ci` green
-- [x] Roadmap **Done** table updated
+- [x] **HEXXLA_API_SURFACE_COVERAGE** matrix updated
 - [x] Changelog `[Unreleased]` updated
 
 **Phase 1 exit criteria:** At least one MCP read path exercises **non-embedding** cell discovery against the seeded DB; `make ci` green.
@@ -138,7 +138,7 @@ Append a line per focused session:
 
 | Date | Focus | Outcome |
 | --- | --- | --- |
-| 2026-04-29 | Planning | Added this tracker, linked from [HEXXLA_API_ROADMAP.md](./HEXXLA_API_ROADMAP.md); **Active phase** = Phase 1 (reads) |
+| 2026-04-29 | Planning | Added this tracker; **Active phase** = Phase 1 (reads) |
 | 2026-04-29 | Phase 1 reads | `mosaic_hexxla_query_cells`, `mosaic_hexxla_search_cells`; ports/adapters/services wired in `cmd/mosaic-mcp`; **Active phase** → Phase 2 |
 | 2026-04-29 | Phase 2 context + UX | `mosaic_hexxla_load_context_pack`; `retrieval_hint` on embed/query/search JSON; tool descriptions steer chaining |
 | 2026-04-29 | Phase 3 writes | `mosaic_hexxla_put_cell`, `mosaic_hexxla_put_embedding`, `mosaic_hexxla_delete_cell`; `CellMutationService` + `CellWriterAdapter`; **Active phase** → Phase 4 |
@@ -146,7 +146,7 @@ Append a line per focused session:
 | 2026-04-29 | Phase 5 facets / edges | `mosaic_hexxla_put_facet`, `mosaic_hexxla_link_cells`; **`go.mod`** pinned **`hexxladb v0.3.0`** (no **`replace`**); **Active phase** → Phase 6 |
 | 2026-04-29 | Tag discovery + audit | **`mosaic_hexxla_list_tags`**, **`mosaic_hexxla_tag_counts`**; [HEXXLA_API_SURFACE_COVERAGE.md](./HEXXLA_API_SURFACE_COVERAGE.md); Phase 6 narrowed to operator-only ops (Compaction / prune / changelog) |
 | 2026-04-29 | Facet / edge reads | **`mosaic_hexxla_get_facet`**, **`mosaic_hexxla_list_facets`**, **`mosaic_hexxla_get_edge`**, **`mosaic_hexxla_list_edges_from`** (+ Hexxla **`FacetWalkRecord`** / **`EdgeWalkRecord`**) |
-| 2026-04-29 | Hybrid retrieval | **`embed_query_text`** on **`mosaic_hexxla_query_cells`** / **`mosaic_hexxla_search_cells`** → **`CellQuery.Embedding`** / **`CellSearchConfig.Embedding`**; [HYBRID_RETRIEVAL_PLAN.md](./HYBRID_RETRIEVAL_PLAN.md) |
+| 2026-04-29 | Hybrid retrieval | **`embed_query_text`** on **`mosaic_hexxla_query_cells`** / **`mosaic_hexxla_search_cells`** → **`CellQuery.Embedding`** / **`CellSearchConfig.Embedding`**; see [MCP_AGENT_BLUEPRINT.md](./MCP_AGENT_BLUEPRINT.md) |
 
 ---
 

@@ -120,13 +120,13 @@ Keep a single, validated struct in `internal/config`, loaded at startup in `cmd`
 
 See **[HEXXLADB_API_NOTES.md](./HEXXLADB_API_NOTES.md)** for a concise map from HexxlaDB’s public surface (`Open`, `Tx`, cells, seams, context, queries) to domain / ports / secondary adapter boundaries.
 
-Longer-term coverage plan: **[HEXXLA_API_ROADMAP.md](./HEXXLA_API_ROADMAP.md)** (embedding search shipped; next: structured reads / context / writes / seams).
+Implementation tracker and coverage matrix: **[IMPLEMENTATION_PLAN.md](./IMPLEMENTATION_PLAN.md)** · **[HEXXLA_API_SURFACE_COVERAGE.md](./HEXXLA_API_SURFACE_COVERAGE.md)**.
 
 ---
 
 ## Local run (seed + MCP for LM clients)
 
-Seed uses **Ollama** for **`all-minilm`** embeddings (384‑dim) plus **`PutCell`** on each turn—the same ingestion idea as **`examples/llm_context_engine`**. Defaults: **`./.tmp/mosaic-seed.hexxla`** under the repo root (gitignored **`./.tmp`**), **`MOSAIC_OLLAMA_URL=http://127.0.0.1:11434`**.
+Seed uses **Ollama** for **`all-minilm`** embeddings (384‑dim) plus **`PutCell`** on each turn—the same ingestion idea as **`examples/llm_context_engine`**. Defaults: **`./mosaic.hexxla`** in the working directory unless **`MOSAIC_DB_PATH`** / **`-db`** override (gitignored **`./mosaic.hexxla`** at repo root when using defaults there), **`MOSAIC_OLLAMA_URL=http://127.0.0.1:11434`**.
 
 Ensure **`ollama serve`** is running and **`ollama pull all-minilm`** has been executed once.
 
@@ -143,13 +143,13 @@ Or step by step (`make seed` then `make run-mosaic-mcp`), or:
 export MOSAIC_OLLAMA_URL=http://127.0.0.1:11434
 export MOSAIC_EMBED_MODEL=all-minilm
 go run ./cmd/mosaic-seed
-export MOSAIC_DB_PATH=.tmp/mosaic-seed.hexxla
+export MOSAIC_DB_PATH=./mosaic.hexxla
 export MOSAIC_MCP_ADDR=127.0.0.1:8787
 export MOSAIC_MCP_PATH=/mcp
 go run ./cmd/mosaic-mcp
 ```
 
-Overrides: **`make mosaic-dev MOSAIC_DB_PATH=.tmp/other.hexxla MOSAIC_OLLAMA_URL=http://127.0.0.1:11434`**.
+Overrides: **`make mosaic-dev MOSAIC_DB_PATH=./other.hexxla MOSAIC_OLLAMA_URL=http://127.0.0.1:11434`**.
 
 Configure your LM client MCP entry to **`http://127.0.0.1:8787/mcp`**, then call **`mosaic_hexxla_health`**. Replace the seeded file with **`go run ./cmd/mosaic-seed -force`**.
 

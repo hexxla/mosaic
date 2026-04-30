@@ -20,7 +20,7 @@ Architecture rule from hexxladb: outbound code calls **`package hexxladb` only**
 | **Context assembly** | `LoadContext`, `LoadContextAt`; budgeting / `LoadContextPack*` variants in API ref | Fits `search_and_load_context` and token caps in [MOSAIC.md](./MOSAIC.md)—orchestration in **services**. |
 | **Seams** | `PutSeam`, `FindSeams`, `FindSeamsAt`, `ResolveSeam`, `MarkConflict`, supersession helpers | Mosaic MCP exposes `FindSeams`, `MarkConflict`, `MarkSupersedes`, `ResolveSeam` ([seam_tools.go](../../internal/adapter/primary/mcpsrv/seam_tools.go)); validation in `SeamLifecycleService`. |
 | **Facets & edges** | `PutFacet`, `PutEdge`, `LinkCells`, reads: `GetFacet`, `AscendFacetsForCell`, `GetEdge`, `AscendEdgesFrom` | Writes: `mosaic_hexxla_put_facet`, `mosaic_hexxla_link_cells` ([facet_edge_tools.go](../../internal/adapter/primary/mcpsrv/facet_edge_tools.go)); reads: `mosaic_hexxla_get_facet`, `mosaic_hexxla_list_facets`, `mosaic_hexxla_get_edge`, `mosaic_hexxla_list_edges_from` ([facet_edge_read_tools.go](../../internal/adapter/primary/mcpsrv/facet_edge_read_tools.go)); **`NewFacetDerived`** / **`NewProvenanceWire`** ([templates.go](https://github.com/hexxla/hexxladb/blob/main/templates.go)). |
-| **Query / search** | `QueryCells`, `SearchCells`, tag/source/time scans; embeddings + `SearchByEmbedding` when enabled | MCP **`mosaic_hexxla_query_cells`**, **`mosaic_hexxla_search_cells`**, **`mosaic_hexxla_search_embedding`** ([roadmap](./HEXXLA_API_ROADMAP.md)). |
+| **Query / search** | `QueryCells`, `SearchCells`, tag/source/time scans; embeddings + `SearchByEmbedding` when enabled | MCP **`mosaic_hexxla_query_cells`**, **`mosaic_hexxla_search_cells`**, **`mosaic_hexxla_search_embedding`** ([coverage](./HEXXLA_API_SURFACE_COVERAGE.md)). |
 | **Tags (analytics)** | `ListExistingTopics`, `TagCounts` (`View`) | MCP **`mosaic_hexxla_list_tags`**, **`mosaic_hexxla_tag_counts`** ([`tag_tools.go`](../../internal/adapter/primary/mcpsrv/tag_tools.go)). |
 | **Ops / observability** | `HealthCheck`, `StatsMVCC`, changelog readers, prune | Good first **ping**/health vertical slice. The MCP tool **`mosaic_hexxla_health`** returns the full `HealthCheck` report **and** header-derived **`PageSize` / `MaxValueBytes` / `EmbeddingDimension`** for operators. |
 | **Raw KV** | `Tx.Get` / `Put` / `AscendRange` | Prefer lattice primitives unless you intentionally bypass them. |
@@ -75,14 +75,14 @@ Requirements: **Ollama** running (e.g. `ollama pull all-minilm`). The database i
 **Typical flow** (run from **repository root**):
 
 1. **`MOSAIC_OLLAMA_URL`** (default `http://127.0.0.1:11434`) and **`MOSAIC_EMBED_MODEL`** (default `all-minilm`) configure Ollama. Override with **`MOSAIC_OLLAMA_URL`**, **`MOSAIC_EMBED_MODEL`**, or flags **`-ollama`**, **`-embed-model`**.
-2. **`MOSAIC_DB_PATH`** / **`-db`** select the Hexxla file (**`.tmp/mosaic-seed.hexxla`** if unset).
-3. First successful run creates `.tmp/` and the DB file. Re-runs **skip** unless **`-force`**.
+2. **`MOSAIC_DB_PATH`** / **`-db`** select the Hexxla file (**`mosaic.hexxla`** in the shell cwd if unset for create/seed).
+3. First successful run creates parent dirs and the DB file. Re-runs **skip** unless **`-force`**.
 
 ```bash
 cd /path/to/mosaic
 ollama pull all-minilm   # once
 go run ./cmd/mosaic-seed
-export MOSAIC_DB_PATH=.tmp/mosaic-seed.hexxla
+export MOSAIC_DB_PATH=./mosaic.hexxla
 go run ./cmd/mosaic-mcp
 ```
 

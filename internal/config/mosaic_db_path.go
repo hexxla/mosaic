@@ -14,8 +14,8 @@ import (
 const EnvMosaicDBDir = "MOSAIC_DB_DIR" //nolint:gosec // G101: environment variable name, not a secret value
 
 // MosaicDefaultRelDBFile is the default HexxlaDB path when no -db, -name, or MOSAIC_DB_PATH is set
-// (create-db / mosaic-seed only).
-const MosaicDefaultRelDBFile = ".tmp/mosaic-seed.hexxla"
+// (create-db / mosaic-seed only). It is resolved relative to the process working directory (shell cwd).
+const MosaicDefaultRelDBFile = "mosaic.hexxla"
 
 var mosaicDBBaseNameRe = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$`)
 
