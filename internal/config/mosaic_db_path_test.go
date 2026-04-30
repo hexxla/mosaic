@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/sploitzberg/go-llm-project-structure/internal/config"
+	"github.com/sploitzberg/mosaic/internal/config"
 )
 
 func TestResolveMosaicDBPath_dbFlag(t *testing.T) {

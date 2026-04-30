@@ -3,7 +3,7 @@ package config_test
 import (
 	"testing"
 
-	"github.com/sploitzberg/go-llm-project-structure/internal/config"
+	"github.com/sploitzberg/mosaic/internal/config"
 )
 
 func TestDefaultMosaicConfig_llm_curates_and_gates(t *testing.T) {

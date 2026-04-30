@@ -43,7 +43,7 @@ Hexxla also exposes **`Tx.LoadContext`** and **`Tx.LoadContextAt`** — simpler 
 
 ## Session retrieval budget & metering (optional)
 
-Configured in Mosaic YAML under **`retrieval`** (see [`configs/config.yaml`](../../configs/config.yaml)).
+Configured in Mosaic YAML under **`retrieval`** — see **[`MOSAIC_CONFIG.md`](./MOSAIC_CONFIG.md)** (`retrieval` section); example values-only file [`configs/config.yaml`](../../configs/config.yaml).
 
 - **Per-call shaping (relevance / waste)** — Use **small rings**, **`max_results` / `max_cells`**, and **byte or approximate-token budgets** on **`mosaic_hexxla_load_context_pack`** (and related read tools) so each response stays tight. That is the primary lever for “don’t pull irrelevant bulk.”
 - **Cumulative session cap (egress / runaway)** — **`retrieval.session_approx_token_budget`** (when **> 0**) limits **total approximate JSON output** metered per MCP **session** over the life of the server process (until reconnect/restart or a new session id). It is an **egress and runaway-loop brake**, **not** a relevance filter and **not** a substitute for per-call budgets.
@@ -85,6 +85,7 @@ Cursor / IDE **rules** and team **playbooks** should repeat the short chain: **r
 
 ## See also
 
+- [`HEXXLA_TROUBLESHOOTING.md`](./HEXXLA_TROUBLESHOOTING.md) — MCP deletes, **`mosaic_hexxla_health`** / **`integrity_ok`**, MVCC index semantics
 - [`../ROADMAP.md`](../ROADMAP.md) — roadmap themes; [`../../TODOS.md`](../../TODOS.md) — session scratchpad
 - [`AGENT_CLIENT_WORKFLOWS.md`](./AGENT_CLIENT_WORKFLOWS.md) — Windsurf workflows vs Cursor rules, committed paths, slash commands
 - [`PERSISTENCE_POLICY.md`](./PERSISTENCE_POLICY.md) — YAML `retention` / `allow_delete_cell` (startup file, `mosaic_hexxla_get_persistence_policy`)

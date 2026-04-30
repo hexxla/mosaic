@@ -1,7 +1,7 @@
 # .goreleaser.yml
 # GoReleaser configuration for automated releases
 
-project_name: go-llm-project-structure
+project_name: mosaic
 
 before:
   hooks:
@@ -20,7 +20,7 @@ builds:
       - arm64
     ldflags:
       - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
-    main: ./cmd/go-llm-project-structure
+    main: ./cmd/mosaic-mcp
 
 archives:
   - format: tar.gz

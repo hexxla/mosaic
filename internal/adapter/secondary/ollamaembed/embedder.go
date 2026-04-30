@@ -3,8 +3,8 @@ package ollamaembed
 import (
 	"context"
 
-	"github.com/sploitzberg/go-llm-project-structure/internal/core/ports/secondary"
-	ollamac "github.com/sploitzberg/go-llm-project-structure/internal/ollama"
+	"github.com/sploitzberg/mosaic/internal/core/ports/secondary"
+	ollamac "github.com/sploitzberg/mosaic/internal/ollama"
 )
 
 type textEmbedder struct {

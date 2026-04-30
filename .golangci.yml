@@ -28,7 +28,7 @@ linters:
             - internal/core/domain/**/*.go
           deny:
             - pkg:
-                "github.com/sploitzberg/go-llm-project-structure/internal/(adapt\
+                "github.com/sploitzberg/mosaic/internal/(adapt\
                 er|core/services|core/ports)"
               desc: "core/domain/ must not depend on adapter, services, or ports (hexagonal rule)"
 
@@ -38,7 +38,7 @@ linters:
             - internal/core/services/**/*.go
           deny:
             - pkg:
-                "github.com/sploitzberg/go-llm-project-structure/internal/adapte\
+                "github.com/sploitzberg/mosaic/internal/adapte\
                 r"
               desc: "core/services/ must not depend on adapter/ (use ports instead)"
 
@@ -48,7 +48,7 @@ linters:
             - internal/core/ports/**/*.go
           deny:
             - pkg:
-                "github.com/sploitzberg/go-llm-project-structure/internal/(adapt\
+                "github.com/sploitzberg/mosaic/internal/(adapt\
                 er|core/services)"
               desc: "core/ports/ must not depend on adapter or services"
 
@@ -58,7 +58,7 @@ linters:
             - internal/adapter/primary/**/*.go
           deny:
             - pkg:
-                "github.com/sploitzberg/go-llm-project-structure/internal/(core/servi\
+                "github.com/sploitzberg/mosaic/internal/(core/servi\
                 ces|adapter/secondary)"
               desc: "primary adapters should only depend on core/domain and core/ports"
 
@@ -68,7 +68,7 @@ linters:
             - internal/adapter/secondary/**/*.go
           deny:
             - pkg:
-                "github.com/sploitzberg/go-llm-project-structure/internal/adapte\
+                "github.com/sploitzberg/mosaic/internal/adapte\
                 r/primary"
               desc: "secondary adapters should not depend on primary adapters"
 
@@ -91,7 +91,7 @@ formatters:
   settings:
     goimports:
       local-prefixes:
-        - github.com/sploitzberg/go-llm-project-structure
+        - github.com/sploitzberg/mosaic
 
 issues:
   max-issues-per-linter: 0

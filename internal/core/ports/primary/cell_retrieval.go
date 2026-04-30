@@ -3,7 +3,7 @@ package primary
 import (
 	"context"
 
-	"github.com/sploitzberg/go-llm-project-structure/internal/core/domain"
+	"github.com/sploitzberg/mosaic/internal/core/domain"
 )
 
 // CellRetrieval exposes structured cell reads for MCP tools (QueryCells / SearchCells).

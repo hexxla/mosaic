@@ -3,7 +3,7 @@ package primary
 import (
 	"context"
 
-	"github.com/sploitzberg/go-llm-project-structure/internal/core/domain"
+	"github.com/sploitzberg/mosaic/internal/core/domain"
 )
 
 // Health is the driving port for retrieving a database health summary (MCP tools call into this).

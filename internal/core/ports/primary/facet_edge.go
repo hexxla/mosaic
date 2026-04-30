@@ -3,7 +3,7 @@ package primary
 import (
 	"context"
 
-	"github.com/sploitzberg/go-llm-project-structure/internal/core/domain"
+	"github.com/sploitzberg/mosaic/internal/core/domain"
 )
 
 // FacetEdge exposes facet slot and inter-cell edge writes for MCP tools.

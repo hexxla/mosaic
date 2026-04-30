@@ -1,0 +1,12 @@
+---
+description: Core Hexagonal Architecture Rules
+globs: ["**/*.go"]
+alwaysApply: true
+---
+
+# Core Hexagonal Architecture Rules (Always Apply)
+
+- `internal/core/domain/` must have **zero** internal imports
+- `core/services/` may only depend on `core/domain/` and `core/ports/`
+- Never import from `adapter/` in core layers
+- All infrastructure belongs in `adapter/`

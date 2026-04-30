@@ -3,7 +3,7 @@ package primary
 import (
 	"context"
 
-	"github.com/sploitzberg/go-llm-project-structure/internal/core/domain"
+	"github.com/sploitzberg/mosaic/internal/core/domain"
 )
 
 // SeamLifecycle exposes seam discovery and mutation for MCP tools.

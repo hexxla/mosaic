@@ -21,8 +21,8 @@ import (
 
 	"github.com/hexxla/hexxladb"
 
-	"github.com/sploitzberg/go-llm-project-structure/internal/config"
-	ollamac "github.com/sploitzberg/go-llm-project-structure/internal/ollama"
+	"github.com/sploitzberg/mosaic/internal/config"
+	ollamac "github.com/sploitzberg/mosaic/internal/ollama"
 )
 
 // defaultOllamaURL is overridden by MOSAIC_OLLAMA_URL when -ollama is not set (after parsing).

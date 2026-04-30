@@ -23,7 +23,7 @@
 | `Open`, `Options`, `DB.Close` | Composition root [`cmd/mosaic-mcp/main.go`](../../cmd/mosaic-mcp/main.go); env **`MOSAIC_DB_PATH`** |
 | `Compact`, `CompactTo` | *(not exposed)* — **Operator / risk** (I/O heavy, maintenance window) |
 | `HealthCheck` | `mosaic_hexxla_health` |
-| `DB` layout readers (`PageSize`, `MaxValueBytes`, `EmbeddingDimension`, embedding metric, etc.) | Embedded in **`mosaic_hexxla_health`** JSON (`database_layout`, full report fields) |
+| `DB` layout readers (`PageSize`, `MaxValueBytes`, `EmbeddingDimension`, embedding metric, etc.) | Embedded in **`mosaic_hexxla_health`** JSON (`database_layout`, **`disk`** primary/WAL sizes, **`mvcc_retain_commits_behind_head`**, full report fields) |
 
 ---
 

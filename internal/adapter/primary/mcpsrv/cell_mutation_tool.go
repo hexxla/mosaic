@@ -8,9 +8,9 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/sploitzberg/go-llm-project-structure/internal/config"
-	"github.com/sploitzberg/go-llm-project-structure/internal/core/domain"
-	"github.com/sploitzberg/go-llm-project-structure/internal/core/ports/primary"
+	"github.com/sploitzberg/mosaic/internal/config"
+	"github.com/sploitzberg/mosaic/internal/core/domain"
+	"github.com/sploitzberg/mosaic/internal/core/ports/primary"
 )
 
 // RegisterCellMutationTools registers write tools: mosaic_hexxla_put_cell, mosaic_hexxla_put_embedding, mosaic_hexxla_delete_cell.
@@ -95,21 +95,23 @@ func registerDeleteCellTool(server *mcp.Server, svc primary.CellMutation, gates 
 	}
 
 	mcp.AddTool(server, &mcp.Tool{
-		Name:        "mosaic_hexxla_delete_cell",
-		Description: "Delete the cell at axial (q,r) via HexxlaDB Tx.DeleteCell (MVCC tombstone semantics on v2 databases).",
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, in deleteCellInput) (*mcp.CallToolResult, domain.MutationOK, error) {
+		Name: "mosaic_hexxla_delete_cell",
+		Description: "Delete the cell at axial (q,r) via HexxlaDB Tx.DeleteCell (MVCC tombstone semantics on v2 databases). " +
+			"Successful response includes cell_removed: true only when a visible cell existed and was removed; " +
+			"false means the coordinate had no live cell (already deleted, wrong coords, or never written) — not an error.",
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in deleteCellInput) (*mcp.CallToolResult, domain.DeleteCellMutationResult, error) {
 		if log != nil {
 			log.DebugContext(ctx, "mosaic_hexxla_delete_cell invoked", "q", in.Q, "r", in.R)
 		}
 		if err := gates.DeleteCellDenied(); err != nil {
-			return nil, domain.MutationOK{}, fmt.Errorf("mosaic_hexxla_delete_cell: %w", err)
+			return nil, domain.DeleteCellMutationResult{}, fmt.Errorf("mosaic_hexxla_delete_cell: %w", err)
 		}
-		err := svc.DeleteCell(ctx, &domain.DeleteCellCommand{
+		removed, err := svc.DeleteCell(ctx, &domain.DeleteCellCommand{
 			Coord: domain.AxialCoord{Q: in.Q, R: in.R},
 		})
 		if err != nil {
-			return nil, domain.MutationOK{}, err
+			return nil, domain.DeleteCellMutationResult{}, err
 		}
-		return nil, domain.MutationOK{OK: true}, nil
+		return nil, domain.DeleteCellMutationResult{OK: true, CellRemoved: removed}, nil
 	})
 }

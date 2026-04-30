@@ -5,7 +5,7 @@ import (
 
 	"github.com/hexxla/hexxladb"
 
-	"github.com/sploitzberg/go-llm-project-structure/internal/config"
+	"github.com/sploitzberg/mosaic/internal/config"
 )
 
 func TestBuildHexxlaOpenOptions_empty(t *testing.T) {

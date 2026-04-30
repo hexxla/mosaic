@@ -28,7 +28,7 @@ for file in $go_files; do
 
 	# When both MCP SDK and this repo's internal/ packages appear, MCP SDK imports must come first.
 	mpc_line=$(echo "$import_block" | grep -n "github.com/modelcontextprotocol" | head -1 | cut -d: -f1 || true)
-	mod_line=$(echo "$import_block" | grep -n "github.com/sploitzberg/go-llm-project-structure/internal" | head -1 | cut -d: -f1 || true)
+	mod_line=$(echo "$import_block" | grep -n "github.com/sploitzberg/mosaic/internal" | head -1 | cut -d: -f1 || true)
 	if [[ -n "$mpc_line" && -n "$mod_line" && "$mpc_line" -gt "$mod_line" ]]; then
 		echo -e "${RED}error:${NC} $file: github.com/modelcontextprotocol imports must precede module internal imports"
 		((errors++))

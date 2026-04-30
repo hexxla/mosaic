@@ -8,6 +8,12 @@ type HealthSummary struct {
 	// DatabaseLayout is read from the open file header (not from the HealthCheck scan).
 	DatabaseLayout DatabaseLayout `json:"database_layout" jsonschema:"page size, value cap, embedding config"`
 
+	// Disk reports primary and WAL file sizes on disk (extend-only engine: large primary may hold reusable slack).
+	Disk DiskFootprint `json:"disk" jsonschema:"primary and WAL byte sizes"`
+
+	// MVCCRetainCommitsBehindHead is the effective Mosaic policy value forwarded into Hexxla open options (0 if unset).
+	MVCCRetainCommitsBehindHead uint64 `json:"mvcc_retain_commits_behind_head,omitempty" jsonschema:"MVCC retention commits behind head from Mosaic config"`
+
 	// IntegrityOK is true when the health scan reported no tag/source index errors and no orphan seams.
 	IntegrityOK bool `json:"integrity_ok" jsonschema:"true if index and seam reference checks are clean"`
 
@@ -23,6 +29,14 @@ type HealthSummary struct {
 
 	// Warnings lists non-fatal diagnostic messages from the engine.
 	Warnings []string `json:"warnings,omitempty" jsonschema:"human-readable warnings"`
+}
+
+// DiskFootprint is best-effort os.Stat of the Hexxla primary file and its WAL sibling.
+type DiskFootprint struct {
+	PrimaryPath  string `json:"primary_path,omitempty" jsonschema:"absolute or resolved DB path"`
+	PrimaryBytes int64  `json:"primary_bytes" jsonschema:"primary file length in bytes"`
+	WALBytes     int64  `json:"wal_bytes" jsonschema:"{primary}-wal length if present"`
+	TotalBytes   int64  `json:"total_bytes" jsonschema:"primary_bytes + wal_bytes"`
 }
 
 // MVCCSnapshot mirrors engine MVCC counters relevant to operators.

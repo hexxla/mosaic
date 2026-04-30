@@ -41,3 +41,9 @@ type DeleteCellCommand struct {
 type MutationOK struct {
 	OK bool `json:"ok"`
 }
+
+// DeleteCellMutationResult is returned by mosaic_hexxla_delete_cell.
+type DeleteCellMutationResult struct {
+	OK          bool `json:"ok"`
+	CellRemoved bool `json:"cell_removed"`
+}

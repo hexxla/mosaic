@@ -4,21 +4,27 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/sploitzberg/go-llm-project-structure/internal/core/domain"
-	"github.com/sploitzberg/go-llm-project-structure/internal/core/ports/primary"
-	"github.com/sploitzberg/go-llm-project-structure/internal/core/ports/secondary"
+	"github.com/sploitzberg/mosaic/internal/core/domain"
+	"github.com/sploitzberg/mosaic/internal/core/ports/primary"
+	"github.com/sploitzberg/mosaic/internal/core/ports/secondary"
 )
 
 // HealthService implements primary.Health by delegating to secondary.EngineHealth.
 type HealthService struct {
-	engine  secondary.EngineHealth
-	version string
+	engine                      secondary.EngineHealth
+	version                     string
+	mvccRetainCommitsBehindHead uint64
 }
 
 // NewHealthService constructs a HealthService. version is the mosaic binary version string
 // included in [domain.HealthSummary.MosaicVersion].
-func NewHealthService(engine secondary.EngineHealth, version string) *HealthService {
-	return &HealthService{engine: engine, version: version}
+// mvccRetainCommitsBehindHead is the effective Mosaic YAML/database retention forwarded at open (including injected defaults).
+func NewHealthService(engine secondary.EngineHealth, version string, mvccRetainCommitsBehindHead uint64) *HealthService {
+	return &HealthService{
+		engine:                      engine,
+		version:                     version,
+		mvccRetainCommitsBehindHead: mvccRetainCommitsBehindHead,
+	}
 }
 
 // Status implements [primary.Health].
@@ -31,6 +37,7 @@ func (s *HealthService) Status(ctx context.Context) (domain.HealthSummary, error
 		return domain.HealthSummary{}, fmt.Errorf("health: %w", err)
 	}
 	summary.MosaicVersion = s.version
+	summary.MVCCRetainCommitsBehindHead = s.mvccRetainCommitsBehindHead
 	return summary, nil
 }
 

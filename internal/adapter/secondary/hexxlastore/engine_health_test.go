@@ -21,12 +21,21 @@ func TestEngineHealthAdapter_Check_includes_layout_and_integrity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = db.Close() })
-
-	ad := NewEngineHealthAdapter(db)
+	live := NewLiveDB(db)
+	t.Cleanup(func() { _ = live.Close() })
+	ad := NewEngineHealthAdapter(live, path)
 	summary, err := ad.Check(t.Context())
 	if err != nil {
 		t.Fatal(err)
+	}
+	if summary.Disk.PrimaryPath != path {
+		t.Fatalf("Disk.PrimaryPath: got %q want %q", summary.Disk.PrimaryPath, path)
+	}
+	if summary.Disk.PrimaryBytes <= 0 {
+		t.Fatalf("Disk.PrimaryBytes: want > 0 for new DB file")
+	}
+	if summary.Disk.TotalBytes != summary.Disk.PrimaryBytes+summary.Disk.WALBytes {
+		t.Fatalf("Disk.TotalBytes inconsistent")
 	}
 	if summary.DatabaseLayout.PageSize != db.PageSize() {
 		t.Fatalf("PageSize: got %d want %d", summary.DatabaseLayout.PageSize, db.PageSize())

@@ -3,7 +3,7 @@ package secondary
 import (
 	"context"
 
-	"github.com/sploitzberg/go-llm-project-structure/internal/core/domain"
+	"github.com/sploitzberg/mosaic/internal/core/domain"
 )
 
 // ContextPackLoader runs HexxlaDB Tx.LoadContextPackFrom inside a View.

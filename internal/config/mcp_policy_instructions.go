@@ -32,6 +32,7 @@ func MCPPolicyInstructions(rt MosaicRuntimeConfig, configFilePath string) string
 
 	if rt.AllowDeleteCell {
 		b.WriteString("Delete cells: mosaic_hexxla_delete_cell is allowed (allow_delete_cell: true).\n")
+		b.WriteString("Successful delete_cell responses include cell_removed: true only when a live cell existed; cell_removed:false with ok:true means no visible cell was at that coord (already deleted or wrong axial q,r), not an error.\n")
 	} else {
 		b.WriteString("Delete cells: mosaic_hexxla_delete_cell is not allowed (allow_delete_cell defaults to false without an explicit true in config).\n")
 	}

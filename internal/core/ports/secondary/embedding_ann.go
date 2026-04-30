@@ -3,7 +3,7 @@ package secondary
 import (
 	"context"
 
-	"github.com/sploitzberg/go-llm-project-structure/internal/core/domain"
+	"github.com/sploitzberg/mosaic/internal/core/domain"
 )
 
 // EmbeddingANN performs query embedding + [Tx.SearchByEmbedding]-style retrieval against the engine.

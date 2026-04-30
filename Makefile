@@ -1,6 +1,6 @@
-# Makefile for LLM Folder Bootstrap CLI
+# Makefile for Mosaic (MCP server + tooling)
 
-.PHONY: help build build-mosaic-mcp build-mosaic-seed build-mosaic-create-db test test-all integration lint fmt ci clean install install-mosaic-mcp install-mosaic-seed install-mosaic-create-db seed reseed mosaic-dev run run-mosaic-mcp run-mosaic-seed run-mosaic-create-db create-db tidy vet update govulncheck \
+.PHONY: help build build-mosaic-mcp build-mosaic-seed build-mosaic-create-db test test-all integration lint fmt ci clean install install-mosaic-mcp install-mosaic-seed install-mosaic-create-db seed reseed mosaic-dev run-mosaic-mcp run-mosaic-seed run-mosaic-create-db create-db tidy vet update govulncheck \
 	build-linux build-darwin build-windows build-all
 
 # Bare `make` runs the full CI pipeline (same as `make ci`). Use `make help` to list targets.
@@ -14,7 +14,6 @@ BINDIR  = bin/$(GOOS)-$(GOARCH)
 EXE     = $(if $(filter windows,$(GOOS)),.exe,)
 
 # Build settings
-BINARY_NAME := go-llm-project-structure
 MOSAIC_BINARY := mosaic-mcp
 MOSAIC_SEED_BINARY := mosaic-seed
 MOSAIC_CREATE_DB_BINARY := mosaic-create-db
@@ -36,12 +35,8 @@ MOSAIC_CREATE_DB_FLAGS ?=
 MOSAIC_SEED_FLAGS      ?=
 MOSAIC_MCP_FLAGS       ?=
 
-# Build for the host OS/arch.
-build:
-	@mkdir -p $(BINDIR)
-	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -ldflags="-s -w -X main.version=$(VERSION)" \
-		-o $(BINDIR)/$(BINARY_NAME)$(EXE) ./cmd/go-llm-project-structure
-	@echo "  → $(BINDIR)/$(BINARY_NAME)$(EXE)"
+# Default build artifact is mosaic-mcp (used by build-linux/darwin/windows helpers).
+build: build-mosaic-mcp
 
 build-mosaic-mcp:
 	@mkdir -p $(BINDIR)
@@ -128,7 +123,7 @@ clean-llm: clean-llm-all
 clean-llm: clean-llm-all
 
 install:
-	go install ./cmd/go-llm-project-structure
+	go install ./cmd/mosaic-mcp
 
 install-mosaic-mcp:
 	go install ./cmd/mosaic-mcp
@@ -142,7 +137,7 @@ install-mosaic-create-db:
 help:
 	@echo "Available targets:"
 	@echo "  make ci              Full pipeline (same as GitHub Actions: ./scripts/ci/ci.sh)"
-	@echo "  make build           Build the CLI binary for host OS"
+	@echo "  make build           Build mosaic-mcp for host OS (same as build-mosaic-mcp)"
 	@echo "  make build-mosaic-mcp  Build mosaic-mcp (local MCP Streamable HTTP server)"
 	@echo "  make build-mosaic-seed Build mosaic-seed (HexxlaDB file with demo corpus)"
 	@echo "  make build-mosaic-create-db Build mosaic-create-db (empty Mosaic-compatible HexxlaDB file)"
@@ -156,11 +151,10 @@ help:
 	@echo "  make lint            Run golangci-lint"
 	@echo "  make fmt             Format code"
 	@echo "  make govulncheck     Vulnerability scan only"
-	@echo "  make install         Install the CLI locally"
+	@echo "  make install         Install mosaic-mcp to GOPATH/bin (same as install-mosaic-mcp)"
 	@echo "  make install-mosaic-mcp Install mosaic-mcp to GOPATH/bin"
 	@echo "  make install-mosaic-seed Install mosaic-seed to GOPATH/bin"
 	@echo "  make install-mosaic-create-db Install mosaic-create-db to GOPATH/bin"
-	@echo "  make run             Run the CLI via go run"
 	@echo "  make seed            Seed HexxlaDB (+ Ollama; MOSAIC_* ; optional MOSAIC_SEED_FLAGS)"
 	@echo "  make reseed          Seed with -force (optional MOSAIC_SEED_FLAGS)"
 	@echo "  make mosaic-dev      seed then run mosaic-mcp (optional MOSAIC_SEED_FLAGS / MOSAIC_MCP_FLAGS)"
@@ -169,9 +163,6 @@ help:
 	@echo "  make clean           Remove build artifacts"
 	@echo "  make tidy            go mod tidy"
 	@echo "  make llm-setup       Setup LLM tool configurations"
-
-run:
-	go run ./cmd/go-llm-project-structure
 
 # Seed `.tmp/mosaic-seed.hexxla` (or MOSAIC_DB_PATH). Skips if the file already exists; use `make reseed`.
 seed run-mosaic-seed:

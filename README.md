@@ -4,12 +4,12 @@
 
 # Mosaic
 
-**The memory and context layer your agent deserves — not a vector dump, a real orchestration surface.**
+**Local MCP server for structured agent memory — hex lattice, hybrid retrieval, governed writes, and budgeted context — backed by [HexxlaDB](https://github.com/hexxla/hexxladb).**
 
-[![CI](https://github.com/sploitzberg/go-llm-project-structure/actions/workflows/ci.yml/badge.svg)](https://github.com/sploitzberg/go-llm-project-structure/actions/workflows/ci.yml)
-[![Integration](https://github.com/sploitzberg/go-llm-project-structure/actions/workflows/integration.yml/badge.svg)](https://github.com/sploitzberg/go-llm-project-structure/actions/workflows/integration.yml)
-[![Go Reference](https://pkg.go.dev/badge/github.com/sploitzberg/go-llm-project-structure.svg)](https://pkg.go.dev/github.com/sploitzberg/go-llm-project-structure)
-[![Go Report Card](https://goreportcard.com/badge/github.com/sploitzberg/go-llm-project-structure)](https://goreportcard.com/report/github.com/sploitzberg/go-llm-project-structure)
+[![CI](https://github.com/sploitzberg/mosaic/actions/workflows/ci.yml/badge.svg)](https://github.com/sploitzberg/mosaic/actions/workflows/ci.yml)
+[![Integration](https://github.com/sploitzberg/mosaic/actions/workflows/integration.yml/badge.svg)](https://github.com/sploitzberg/mosaic/actions/workflows/integration.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/sploitzberg/mosaic.svg)](https://pkg.go.dev/github.com/sploitzberg/mosaic)
+[![Go Report Card](https://goreportcard.com/badge/github.com/sploitzberg/mosaic)](https://goreportcard.com/report/github.com/sploitzberg/mosaic)
 [![Go 1.26](https://img.shields.io/badge/go-1.26-00ADD8?logo=go)](https://go.dev/doc/go1.26)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
@@ -17,73 +17,114 @@
 
 ---
 
-## Why Mosaic
+## Get started
 
-Agents drown in **stateless** calls and **flat** similarity search. Real work needs **durable** memory, **governed** writes, and **orchestrated** context: what to retrieve, how to expand, when to pack a prompt, and what the operator allows to touch disk.
+**You need:** [Go 1.26+](https://go.dev/dl/). **Optional:** [Ollama](https://ollama.com) running locally if you use **`mosaic-seed`** or **`mosaic_hexxla_search_embedding`** (queries are embedded via Ollama; defaults match the [Makefile](Makefile)).
 
-**Mosaic** is a **local MCP server** that sits between your agent and **[HexxlaDB](https://github.com/hexxla/hexxladb)** — an embedded engine built for **structured** memory on a **hex grid**: spatial ring walks, **hybrid** semantic + lexical + tag filters, **token- or byte-budgeted** context packs, explicit **seams** for contradictions, **facets** and **edges** for relationships, and **MVCC** when you need honest snapshots.
+1. **Clone and enter the repo**
+   ```bash
+   git clone https://github.com/sploitzberg/mosaic.git
+   cd mosaic
+   ```
 
-You get **one** coherent layer:
+2. **Create a database** (pick one)
+   - **Empty file** (fast):  
+     `make create-db MOSAIC_CREATE_DB_FLAGS='-name myworkspace'`  
+     → `.tmp/myworkspace.hexxla`
+   - **Demo corpus + embeddings** (needs Ollama; skips if the file already exists — use **`make reseed`** to replace):  
+     `make seed`
 
-| Capability | What it means for your agent |
-| ---------- | ------------------------------ |
-| **Orchestrated retrieval** | Embedding search, structured queries, and lexical search — composed, not three unrelated APIs |
-| **Context packs** | Expand from seed coordinates on the lattice inside a **budget** — not blind top‑K truncation |
-| **Operator policy** | YAML at startup: **what** chat turns may be persisted, **whether** enforcement blocks bad writes, **whether** deletes are allowed |
-| **Retrieval metering (optional cap)** | Per-call **rings and byte budgets** shape each answer; optional YAML **`retrieval`** adds a **cumulative session egress** ceiling plus **`mosaic_hexxla_retrieval_budget_status`** for observability — see [MCP_AGENT_BLUEPRINT.md](docs/mosaic/MCP_AGENT_BLUEPRINT.md) *(session cap is a runaway brake, not a relevance filter)* |
-| **Contradiction-aware memory** | Seams surface disagreement; supersession chains evolve preferences without silent overwrite |
-| **Privacy-first deployment** | Runs **localhost** MCP over **your** file; optional **AES‑XTS** encryption for the database |
-| **Open protocol** | **[Model Context Protocol](https://modelcontextprotocol.io/)** — wire your favorite MCP-capable client |
+3. **Start the MCP server** (same **`-name`** / path as step 2 so it opens that DB)
+   ```bash
+   make run-mosaic-mcp MOSAIC_MCP_FLAGS='-policy configs/config.yaml -name myworkspace'
+   ```
 
-Mosaic is opinionated: **memory is not “whatever embeddings matched.”** It is **placement**, **provenance**, **policy**, and **assembly** — the same ideas serious retrieval stacks use, packaged so **agents** can call tools instead of reinventing glue code.
+4. **Attach your MCP client** to **`http://127.0.0.1:8787/mcp`** (defaults from the [Makefile](Makefile): **`MOSAIC_MCP_ADDR`**, **`MOSAIC_MCP_PATH`**).
+
+**Policy file:** [configs/config.yaml](configs/config.yaml) is a minimal example. Full keys → **[docs/mosaic/MOSAIC_CONFIG.md](docs/mosaic/MOSAIC_CONFIG.md)**. Encrypted DBs, **`-replace`**, env vars → **[docs/mosaic/DATABASE_CREATION.md](docs/mosaic/DATABASE_CREATION.md)**.
 
 ---
 
-## The contrast
+## Features
+
+| Area | What Mosaic does |
+| ---- | ---------------- |
+| **Hex lattice memory** | Cells live on axial coordinates **{q,r}**; retrieve by walking **rings** and neighbourhoods, not only flat nearest-neighbour vectors. |
+| **Hybrid retrieval** | **Semantic** (**`mosaic_hexxla_search_embedding`**), **structured filters** (**`mosaic_hexxla_query_cells`**), **lexical** (**`mosaic_hexxla_search_cells`**) — compose discovery before expanding context. |
+| **Context packs** | **`mosaic_hexxla_load_context_pack`** expands from **seed** coords under a **byte or token budget** — structured neighbourhoods + optional seams, not blind top‑K truncation. |
+| **Persistence policy** | YAML **`retention`** (what turn kinds to save, **enforcement**, agent-facing **`notes`**) loaded at boot; **`mosaic_hexxla_get_persistence_policy`** exposes it to the model. |
+| **Writes & embeddings** | **`mosaic_hexxla_put_cell`**, **`mosaic_hexxla_put_embedding`**; optional **`allow_delete_cell`** + **`mosaic_hexxla_delete_cell`**. |
+| **MVCC & disk hygiene** | HexxlaDB **MVCC** for honest versioning; optional **`database.auto_maintain_after_cell_delete`** (prune + compact, debounced) + shallow **`mvcc_retain_commits_behind_head`** — see [MOSAIC_CONFIG.md](docs/mosaic/MOSAIC_CONFIG.md). |
+| **Health & footprint** | **`mosaic_hexxla_health`** — cells, seams, index checks, **`mvcc`** stats, **`disk`** (primary + WAL bytes), effective **`mvcc_retain_commits_behind_head`**. |
+| **Contradictions** | **Seams**: **`mosaic_hexxla_find_seams`**, **`mosaic_hexxla_mark_conflict`**, **`mosaic_hexxla_mark_supersedes`**, **`mosaic_hexxla_resolve_seam`** — disagreements stay explicit. |
+| **Facets & edges** | **`mosaic_hexxla_put_facet`**, **`mosaic_hexxla_link_cells`**, reads **`get_facet`**, **`list_facets`**, **`get_edge`**, **`list_edges_from`** — lightweight graph over cells. |
+| **Tags** | **`mosaic_hexxla_list_tags`**, **`mosaic_hexxla_tag_counts`** for taxonomy-aware writes. |
+| **Retrieval metering** | Optional YAML **`retrieval`** session cap + **`mosaic_hexxla_retrieval_budget_status`** (egress brake, not a relevance filter — see [MCP_AGENT_BLUEPRINT.md](docs/mosaic/MCP_AGENT_BLUEPRINT.md)). |
+| **Privacy** | Runs **localhost** [MCP](https://modelcontextprotocol.io); optional **AES‑XTS**-style encryption for the DB (passphrase / env — [DATABASE_CREATION](docs/mosaic/DATABASE_CREATION.md)). |
+| **Budget helper** | **`mosaic_hexxla_estimate_context_budget_bytes`** for planning pack sizes. |
+
+Under the hood: **[HexxlaDB](https://github.com/hexxla/hexxladb)** — embedded store with **B+tree**, optional **HNSW** for embeddings, **MVCC**, **DEFLATE** for large values.
+
+---
+
+## MCP tools (quick map)
+
+| Cluster | Tools |
+| ------- | ----- |
+| **Reads** | **`mosaic_hexxla_health`**, **`mosaic_hexxla_query_cells`**, **`mosaic_hexxla_search_cells`**, **`mosaic_hexxla_search_embedding`**, **`mosaic_hexxla_load_context_pack`**, **`mosaic_hexxla_estimate_context_budget_bytes`**, **`mosaic_hexxla_retrieval_budget_status`** |
+| **Writes** | **`mosaic_hexxla_put_cell`**, **`mosaic_hexxla_put_embedding`**, **`mosaic_hexxla_delete_cell`** |
+| **Policy** | **`mosaic_hexxla_get_persistence_policy`** |
+| **Seams** | **`mosaic_hexxla_find_seams`**, **`mosaic_hexxla_mark_conflict`**, **`mosaic_hexxla_mark_supersedes`**, **`mosaic_hexxla_resolve_seam`** |
+| **Facets / edges** | **`mosaic_hexxla_put_facet`**, **`mosaic_hexxla_link_cells`**, **`mosaic_hexxla_get_facet`**, **`mosaic_hexxla_list_facets`**, **`mosaic_hexxla_get_edge`**, **`mosaic_hexxla_list_edges_from`** |
+| **Tags** | **`mosaic_hexxla_list_tags`**, **`mosaic_hexxla_tag_counts`** |
+
+Full wiring and agent narrative → **[docs/mosaic/MCP_AGENT_BLUEPRINT.md](docs/mosaic/MCP_AGENT_BLUEPRINT.md)** · API ↔ coverage → **[docs/mosaic/HEXXLA_API_SURFACE_COVERAGE.md](docs/mosaic/HEXXLA_API_SURFACE_COVERAGE.md)**
+
+---
+
+## Why Mosaic
+
+Agents often get **stateless** tool loops and **flat** similarity search. Mosaic is **opinionated**: memory is **placement** on a lattice, **provenance**, **operator policy**, and **assembled** context — not “whatever vectors matched.” Same ideas as serious retrieval stacks, exposed as **[Model Context Protocol](https://modelcontextprotocol.io/)** tools so agents call one coherent layer instead of bespoke glue.
+
+---
+
+## Compared to “RAG only”
 
 | Without a layer like Mosaic | With Mosaic |
 | --------------------------- | ----------- |
-| RAG = nearest vectors only | **Hybrid** retrieval + filters + ring-shaped context expansion |
-| No contract for what may be written | **Policy** at boot: capture mode, enforcement, delete gates |
-| Context = cut at N tokens | **Budgeted** packs with seeds from real hits |
-| Conflicts vanish in the next embed | **Seams** and **supersession** stay visible to the model |
-| Secrets in chat | **Passphrase / env / encrypted file** options for the DB |
+| Nearest vectors only | **Hybrid** semantic + structured query + lexical search |
+| No contract for writes | **YAML policy**: capture mode, enforcement, delete gates |
+| Truncate context at N tokens | **Budgeted** packs from **seed** coordinates |
+| Conflicts disappear on re-embed | **Seams** + **supersession** stay visible |
+| Secrets only in chat | **Passphrase / env / encrypted DB** options |
 
 ---
 
-## Quick start
+## Configuration
 
-**Requirements:** Go **1.26+**, and **Ollama** if you use embedding-heavy tools or **`mosaic-seed`**.
+Load optional policy YAML at **`mosaic-mcp`** startup: **`-policy PATH`** or **`MOSAIC_POLICY_FILE`**. **`version:`** must be **`1`**.
 
-```bash
-git clone https://github.com/sploitzberg/go-llm-project-structure.git
-cd go-llm-project-structure
+**Keys:** **`retention`**, **`allow_delete_cell`**, optional **`retrieval`**, optional **`database`** (encryption hint, MVCC retention, post-delete maintenance).
 
-# Optional: empty HexxlaDB — default path .tmp/mosaic-seed.hexxla, or name it:
-make create-db MOSAIC_CREATE_DB_FLAGS='-name myworkspace'
-
-# Or seed demo data (needs Ollama; skips if that file exists — `make reseed` replaces it)
-make seed
-
-# Run MCP — use the same -name / MOSAIC_DB_PATH as create-db so the client opens that file:
-make run-mosaic-mcp MOSAIC_MCP_FLAGS='-policy configs/config.yaml -name myworkspace'
-```
-
-Point your MCP client at **`http://127.0.0.1:8787/mcp`** (defaults from the Makefile). **[configs/config.yaml](configs/config.yaml)** is an example policy file: **`retention`** (capture mode / enforcement / deletes), optional **`database.passphrase`**, and optional **`retrieval`** (session metering — commented defaults leave the hard cap **off**).
-
-See **[docs/mosaic/DATABASE_CREATION.md](docs/mosaic/DATABASE_CREATION.md)** for encrypted databases, **`-replace`** / **`-force`**, and **`MOSAIC_CREATE_DB_FLAGS`**, **`MOSAIC_SEED_FLAGS`**, **`MOSAIC_MCP_FLAGS`**.
+**References:** **[docs/mosaic/MOSAIC_CONFIG.md](docs/mosaic/MOSAIC_CONFIG.md)** · **[docs/mosaic/PERSISTENCE_POLICY.md](docs/mosaic/PERSISTENCE_POLICY.md)** · **[configs/config.yaml](configs/config.yaml)**
 
 ---
 
-## Commands (overview)
+## Commands
 
 | Binary | Role |
 | ------ | ---- |
-| **`mosaic-mcp`** | Serve MCP tools; DB path via **`MOSAIC_DB_PATH`** or **`-db`** / **`-name`**; **`-policy`** / **`MOSAIC_POLICY_FILE`** for YAML |
-| **`mosaic-create-db`** | Create empty DB (layout flags + optional encryption) |
-| **`mosaic-seed`** | Create + optional demo corpus + Ollama embeddings |
+| **`mosaic-mcp`** | MCP server — DB via **`MOSAIC_DB_PATH`** or **`-db`** / **`-name`**; policy via **`-policy`** / **`MOSAIC_POLICY_FILE`** |
+| **`mosaic-create-db`** | Create empty HexxlaDB (layout + optional encryption) |
+| **`mosaic-seed`** | Create DB + optional seeded corpus + Ollama embeddings |
 
-Full CLI flags: **`go run ./cmd/<name> -help`**.
+```bash
+go run ./cmd/mosaic-mcp -help
+go run ./cmd/mosaic-create-db -help
+go run ./cmd/mosaic-seed -help
+```
+
+Make wrappers: **`make run-mosaic-mcp`**, **`make create-db`**, **`make seed`**, **`make ci`**.
 
 ---
 
@@ -91,42 +132,24 @@ Full CLI flags: **`go run ./cmd/<name> -help`**.
 
 | Doc | Contents |
 | --- | -------- |
-| [docs/mosaic/DATABASE_CREATION.md](docs/mosaic/DATABASE_CREATION.md) | Creating DBs, encryption, Make wrappers |
-| [docs/mosaic/PERSISTENCE_POLICY.md](docs/mosaic/PERSISTENCE_POLICY.md) | YAML retention, MCP policy tool |
-| [docs/mosaic/MCP_AGENT_BLUEPRINT.md](docs/mosaic/MCP_AGENT_BLUEPRINT.md) | Agent workflow, context packs, optional retrieval budgeting |
-| [README.md#usage-reinforcement](#usage-reinforcement) | Why models skip tools; rules, **`AGENTS.md`**, YAML **`retention.notes`**; quick best practices |
-| [docs/mosaic/AGENT_CLIENT_WORKFLOWS.md](docs/mosaic/AGENT_CLIENT_WORKFLOWS.md) | Cursor vs Windsurf vs others — rules, slash workflows, MCP; repo paths |
-| [configs/config.yaml](configs/config.yaml) | Example **`retention`** / **`retrieval`** / **`allow_delete_cell`** (comments inline) |
-| [AGENTS.md](AGENTS.md) | Instructions for AI coding assistants (architecture, CI, doc index) |
-| [TODOS.md](TODOS.md) | Active / pending session notes |
-| [docs/ROADMAP.md](docs/ROADMAP.md) | Roadmap themes and out-of-scope boundaries |
-| [CHANGELOG.md](CHANGELOG.md) | Notable shipped changes |
-| [docs/architecture/architecture.md](docs/architecture/architecture.md) | Dependency layout and design overview |
+| [docs/mosaic/MOSAIC_CONFIG.md](docs/mosaic/MOSAIC_CONFIG.md) | Policy YAML reference (all keys) |
+| [configs/config.yaml](configs/config.yaml) | Minimal example policy |
+| [docs/mosaic/DATABASE_CREATION.md](docs/mosaic/DATABASE_CREATION.md) | Paths, encryption, **`-replace`**, Make flags |
+| [docs/mosaic/PERSISTENCE_POLICY.md](docs/mosaic/PERSISTENCE_POLICY.md) | Retention semantics, MCP policy tool |
+| [docs/mosaic/MCP_AGENT_BLUEPRINT.md](docs/mosaic/MCP_AGENT_BLUEPRINT.md) | Agent workflows, retrieval vs budgeting |
+| [docs/mosaic/HEXXLA_TROUBLESHOOTING.md](docs/mosaic/HEXXLA_TROUBLESHOOTING.md) | Deletes, **`integrity_ok`**, disk / MVCC |
+| [docs/mosaic/HEXXLA_API_SURFACE_COVERAGE.md](docs/mosaic/HEXXLA_API_SURFACE_COVERAGE.md) | Hexxla ↔ MCP mapping |
+| [docs/mosaic/AGENT_CLIENT_WORKFLOWS.md](docs/mosaic/AGENT_CLIENT_WORKFLOWS.md) | Cursor, Windsurf, rules & workflows |
+| [README.md#reliable-tool-use-from-agents](#reliable-tool-use-from-agents) | Rules, **`retention.notes`**, best practices |
+| [AGENTS.md](AGENTS.md) | Contributor / assistant architecture guide |
+| [CHANGELOG.md](CHANGELOG.md) | Shipped changes |
+| [docs/architecture/architecture.md](docs/architecture/architecture.md) | Dependency layout |
 
 ---
 
-## Usage reinforcement
+## Reliable tool use from agents
 
-Mosaic exposes many MCP tools, but **nothing forces the model to call them**—**tool use is best-effort**, not guaranteed across clients. Reasoning models may answer from the chat alone, forget to chain **embedding search → `load_context_pack`**, skip **`list_tags`** before writes, or omit **`put_cell`** for turns even when your policy expects it. Reliability varies by model, system prompt, context length, and how clearly tools are described—treat **explicit project instructions** as part of the product, not an afterthought.
-
-**Reinforce behavior when your client allows it**
-
-| Layer | What to use |
-| ----- | ----------- |
-| **Project rules** | This repo’s **[`.cursor/rules/mosaic-mcp-agent.mdc`](.cursor/rules/mosaic-mcp-agent.mdc)** (Cursor; `alwaysApply`); similar files under **`.windsurf/rules/`** for Windsurf. Copy the intent into any “project rules” or team playbook your host supports. |
-| **Repository instructions** | **[`AGENTS.md`](AGENTS.md)** — how assistants should work in *this* codebase; add Mosaic-specific bullets there if your team uses a single entry point. |
-| **MCP / server text** | Policy YAML **`retention.notes`** (and related fields) is injected into **MCP server instructions** at startup—use it to restate capture mode and “must call `put_cell` for every turn” when that is operator policy. See [`configs/config.yaml`](configs/config.yaml) and [PERSISTENCE_POLICY.md](docs/mosaic/PERSISTENCE_POLICY.md). |
-| **Deep reference** | **[`docs/mosaic/MCP_AGENT_BLUEPRINT.md`](docs/mosaic/MCP_AGENT_BLUEPRINT.md)** — full retrieval and persistence narrative. |
-| **Slash / playbook workflows** | **[`docs/mosaic/AGENT_CLIENT_WORKFLOWS.md`](docs/mosaic/AGENT_CLIENT_WORKFLOWS.md)** — how **Windsurf** (`.windsurf/workflows/`, e.g. **`/mosaic-save-turns`**) differs from **Cursor** (rules + Plan mode + repo checklists). |
-
-**Best practices (short)**
-
-- Prefer **structured discovery** then **local expansion**: seeds from **`mosaic_hexxla_search_embedding`** or **`query_cells` / `search_cells`**, then **`mosaic_hexxla_load_context_pack`** with modest ring/budget first; increase only if the answer is still thin.
-- Before **`put_cell`**, use **`list_tags` / `tag_counts`** when taxonomy is unknown so you **reuse** tags instead of fragmenting vocabulary.
-- If writes are policy-sensitive, call **`mosaic_hexxla_get_persistence_policy`**; for full thread capture, follow the **user message → `put_cell` → reply → `put_cell` assistant** sequence described in the blueprint and rules when **`save_all_turns`** (or equivalent) applies.
-- Optional: **`mosaic_hexxla_health`** when embedding dimension or DB state is uncertain.
-
-None of this replaces good **operator** choices (PII, retention, localhost-only); it only helps **agents** use the tools you already enabled.
+MCP **does not force** models to call tools — reinforce with **project rules**, **`retention.notes`** in YAML (injected into server instructions), and **[`.cursor/rules/mosaic-mcp-agent.mdc`](.cursor/rules/mosaic-mcp-agent.mdc)** or **[docs/mosaic/AGENT_CLIENT_WORKFLOWS.md](docs/mosaic/AGENT_CLIENT_WORKFLOWS.md)**. Typical flow: discover with **`search_embedding`** / **`query_cells`** → expand **`load_context_pack`** → **`put_cell`** when policy requires persistence.
 
 ---
 
@@ -138,13 +161,11 @@ make test        # unit tests
 make integration # tagged integration tests
 ```
 
-Quality checks (tests, lint, dependency policy) run in CI — same targets locally via **`make ci`**.
-
 ---
 
-## Roadmap and rough edges
+## Roadmap
 
-Exploration items and known limitations (e.g. **oversized one-shot** under session cap, meter lifetime) are tracked in **[TODOS.md](TODOS.md)**; higher-level themes live in **[docs/ROADMAP.md](docs/ROADMAP.md)**.
+Exploration and limits → **[TODOS.md](TODOS.md)** · themes → **[docs/ROADMAP.md](docs/ROADMAP.md)**
 
 ---
 

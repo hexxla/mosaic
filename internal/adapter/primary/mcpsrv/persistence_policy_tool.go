@@ -6,7 +6,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/sploitzberg/go-llm-project-structure/internal/config"
+	"github.com/sploitzberg/mosaic/internal/config"
 )
 
 // MosaicConfigPolicyResponse is the MCP JSON payload for mosaic_hexxla_get_persistence_policy.

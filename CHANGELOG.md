@@ -7,8 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`mosaic_hexxla_health`** — JSON includes **`disk`** (**`primary_path`**, **`primary_bytes`**, **`wal_bytes`**, **`total_bytes`**) and **`mvcc_retain_commits_behind_head`** (effective policy). See **`docs/mosaic/HEXXLA_TROUBLESHOOTING.md`**.
+- **`database.auto_maintain_after_cell_delete.debounce_after_delete_ms`** — coalesce rapid deletes into one prune/compact burst (**`0`** = maintain immediately after each delete; **omit** when **`enabled: true`** defaults to **2000** ms). **`mosaic-mcp`** flushes pending debounced maintenance on shutdown.
+
+- **Post-delete MVCC prune + compact (optional)** — YAML **`database.auto_maintain_after_cell_delete`** (**`enabled`**, **`prune`**, **`compact`**, optional **`prune_profile`**, **`max_prune_rounds_per_delete`**, **`debounce_after_delete_ms`**). After a **`cell_removed: true`** delete (or after the debounce window), Mosaic runs bounded **`PruneScheduler.Tick`** and/or **`(*hexxladb.DB).Compact`**, swapping the DB handle behind **`LiveDB`** in **`internal/adapter/secondary/hexxlastore`**. Default injected **`mvcc_retain_commits_behind_head`** when pruning is on and YAML omits it is **`8`** — shallow **`ViewAt`** history, tighter disk vs cell count once prune runs — see **`configs/config.yaml`** and **`docs/hexxladb/OPERATIONS.md`** (while **`CommitSeq` ≤ retain**, suggested prune is ineffective).
+
 ### Changed
 
+- **Breaking:** Go module path is **`github.com/sploitzberg/mosaic`** (was `github.com/sploitzberg/go-llm-project-structure`). Update imports and **`go.mod`** `replace` directives. Bootstrap **`cmd/go-llm-project-structure`** removed — use **`mosaic-mcp`**, **`mosaic-seed`**, **`mosaic-create-db`**.
+- **Documentation** — **[`docs/mosaic/MOSAIC_CONFIG.md`](docs/mosaic/MOSAIC_CONFIG.md)** documents every policy YAML key; **[`configs/config.yaml`](configs/config.yaml)** is values-only (comments removed); **[`README.md`](README.md)** restructured (**Get started** first, feature matrix, MCP tool map).
+
+- **`mosaic_hexxla_delete_cell`** — tool result is **`DeleteCellMutationResult`**: **`ok`** plus **`cell_removed`** (**`true`** only when a live cell existed and was removed; **`false`** with **`ok`** means empty coord / typo / duplicate delete, not an error). Implemented with **`Tx.GetCell` + `Tx.DeleteCell`** in one **`DB.Update`** (same transactional visibility as a single-delete round-trip).
 - **[README.md](README.md)** — Retrieval metering row, **`configs/config.yaml`** callout in Quick start, expanded documentation index (**`TODOS.md`**, **`docs/ROADMAP.md`**, **`CHANGELOG.md`**), and **Roadmap and rough edges** pointer.
 - **[`docs/ROADMAP.md`](docs/ROADMAP.md)** — Near-term echoes **[`TODOS.md`](TODOS.md)** pending items (oversized one-shot, meter lifetime, approximate vs tokenizer).
 - **[`docs/mosaic/MCP_AGENT_BLUEPRINT.md`](docs/mosaic/MCP_AGENT_BLUEPRINT.md)** and **[`.cursor/rules/mosaic-mcp-agent.mdc`](.cursor/rules/mosaic-mcp-agent.mdc)** — document that the optional **cumulative session retrieval cap** is an **egress / runaway** control, not a **relevance** mechanism (per-call rings and byte budgets remain primary).
@@ -21,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **[`docs/mosaic/HEXXLA_TROUBLESHOOTING.md`](docs/mosaic/HEXXLA_TROUBLESHOOTING.md)** — MCP iterative deletes (`allow_delete_cell`, policy reload, retrieval cap), and **`mosaic_hexxla_health`** / MVCC tag–source index semantics (vs real orphan seams).
 - **[`TODOS.md`](TODOS.md)** and **[`docs/ROADMAP.md`](docs/ROADMAP.md)** — session scratchpad and roadmap (pattern aligned with HexxlaDB); [`AGENTS.md`](AGENTS.md) links both.
 - **MCP retrieval session budget** — optional YAML **`retrieval.session_approx_token_budget`** (0 = unlimited) and **`retrieval.bytes_per_approx_token`**; per‑MCP‑session cumulative approximate tokens on JSON outputs from HexxlaDB read tools; tool **`mosaic_hexxla_retrieval_budget_status`**; see [configs/config.yaml](configs/config.yaml).
 - Root **[README.md](README.md)** (Mosaic + HexxlaDB MCP overview; logo **`assets/images/mosaic_logo_shadow.svg`**).
@@ -69,7 +81,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Bootstrapper CLI skeleton (`cmd/go-llm-project-structure/main.go`)
+- ~~Bootstrapper CLI skeleton (`cmd/go-llm-project-structure`)~~ — removed; module is **`github.com/sploitzberg/mosaic`**, primary binary **`mosaic-mcp`**
 - Hexagonal architecture guardrail script
 - AGENTS.md with instructions for LLMs and contributors
 - Layer-specific README.md files explaining responsibilities
@@ -78,5 +90,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Standardized project layout for LLM-friendly hexagonal architecture templates
 
-[Unreleased]: https://github.com/sploitzberg/go-hexagonal-architecture-template/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/sploitzberg/go-hexagonal-architecture-template/releases/tag/v0.1.0
+[Unreleased]: https://github.com/sploitzberg/mosaic/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/sploitzberg/mosaic/releases/tag/v0.1.0

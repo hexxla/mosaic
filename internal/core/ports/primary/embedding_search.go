@@ -3,7 +3,7 @@ package primary
 import (
 	"context"
 
-	"github.com/sploitzberg/go-llm-project-structure/internal/core/domain"
+	"github.com/sploitzberg/mosaic/internal/core/domain"
 )
 
 // EmbeddingSearch is the driving port for semantic (embedding ANN) search over the lattice.

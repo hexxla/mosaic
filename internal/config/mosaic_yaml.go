@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -20,6 +21,10 @@ type MosaicConfigLoaded struct {
 	// DatabasePassphrase is optional at-rest encryption passphrase from YAML (prefer MOSAIC_DB_PASSPHRASE or -db-passphrase).
 	DatabasePassphrase string
 	Retrieval          RetrievalBudgetConfig
+
+	// MVCCRetainCommitsBehindHead is forwarded into [hexxladb.Options.MVCCRetention] on each Mosaic open (including post-compact reopen).
+	MVCCRetainCommitsBehindHead uint64
+	DeleteAutoMaintain          DeleteAutoMaintainConfig
 }
 
 // retentionYAMLFields is the retention subsection (capture_mode, enforcement, notes).
@@ -32,6 +37,20 @@ type retentionYAMLFields struct {
 // databaseYAMLFields is optional DB encryption hints (avoid committing real secrets in Git).
 type databaseYAMLFields struct {
 	Passphrase string `yaml:"passphrase"`
+	// MVCCRetainCommitsBehindHead maps to [hexxladb.Options.MVCCRetention] when opening Mosaic MCP (see OPERATIONS pruning).
+	MVCCRetainCommitsBehindHead *uint64           `yaml:"mvcc_retain_commits_behind_head,omitempty"`
+	AutoMaintainAfterCellDelete *autoMaintainYAML `yaml:"auto_maintain_after_cell_delete,omitempty"`
+}
+
+// autoMaintainYAML enables post-delete MVCC prune and/or compaction (documented under database.* in Mosaic ops docs).
+type autoMaintainYAML struct {
+	Enabled                 bool   `yaml:"enabled"`
+	Prune                   *bool  `yaml:"prune,omitempty"`
+	Compact                 *bool  `yaml:"compact,omitempty"`
+	PruneProfile            string `yaml:"prune_profile,omitempty"`
+	MaxPruneRoundsPerDelete *int   `yaml:"max_prune_rounds_per_delete,omitempty"`
+	// DebounceAfterDeleteMS — nil = use [DefaultDebounceAfterDelete] when enabled; 0 = no debounce (maintain after each delete).
+	DebounceAfterDeleteMS *int `yaml:"debounce_after_delete_ms,omitempty"`
 }
 
 // retrievalYAMLFields is optional limits for MCP read-tool payload budgeting (see docs in configs/config.yaml).
@@ -142,8 +161,44 @@ func ParseMosaicConfigYAML(data []byte) (MosaicConfigLoaded, error) {
 	}
 
 	dbPass := ""
+	var mvccRetain uint64
+	delMaintain := DeleteAutoMaintainConfig{}
 	if raw.Database != nil {
 		dbPass = strings.TrimSpace(raw.Database.Passphrase)
+		if raw.Database.MVCCRetainCommitsBehindHead != nil {
+			mvccRetain = *raw.Database.MVCCRetainCommitsBehindHead
+		}
+		if raw.Database.AutoMaintainAfterCellDelete != nil {
+			am := raw.Database.AutoMaintainAfterCellDelete
+			delMaintain.Enabled = am.Enabled
+			if am.Enabled {
+				delMaintain.Prune = true
+				delMaintain.Compact = true
+				if am.Prune != nil {
+					delMaintain.Prune = *am.Prune
+				}
+				if am.Compact != nil {
+					delMaintain.Compact = *am.Compact
+				}
+				if am.MaxPruneRoundsPerDelete != nil && *am.MaxPruneRoundsPerDelete > 0 {
+					delMaintain.MaxPruneRoundsPerDel = *am.MaxPruneRoundsPerDelete
+				}
+				prof, err := ParseMVCCPruneProfile(am.PruneProfile)
+				if err != nil {
+					return MosaicConfigLoaded{}, err
+				}
+				delMaintain.MVCCPruneProfile = prof
+				if am.DebounceAfterDeleteMS != nil {
+					ms := *am.DebounceAfterDeleteMS
+					if ms < 0 {
+						return MosaicConfigLoaded{}, errors.New("mosaic config: database.auto_maintain_after_cell_delete.debounce_after_delete_ms must be >= 0")
+					}
+					delMaintain.DebounceAfterDelete = time.Duration(ms) * time.Millisecond
+				} else {
+					delMaintain.DebounceAfterDelete = DefaultDebounceAfterDelete
+				}
+			}
+		}
 	}
 
 	retrieval := DefaultRetrievalBudgetConfig()
@@ -160,12 +215,16 @@ func ParseMosaicConfigYAML(data []byte) (MosaicConfigLoaded, error) {
 		}
 	}
 
-	return MosaicConfigLoaded{
-		Retention:          rt,
-		AllowDeleteCell:    allowDelete,
-		DatabasePassphrase: dbPass,
-		Retrieval:          retrieval,
-	}, nil
+	loaded := MosaicConfigLoaded{
+		Retention:                   rt,
+		AllowDeleteCell:             allowDelete,
+		DatabasePassphrase:          dbPass,
+		Retrieval:                   retrieval,
+		MVCCRetainCommitsBehindHead: mvccRetain,
+		DeleteAutoMaintain:          delMaintain,
+	}
+	applyDeleteAutoMaintainDefaults(&loaded)
+	return loaded, nil
 }
 
 func normalizeRetentionPolicy(captureMode string, enforcement retentionEnforcementField, notes string) (RetentionPolicy, error) {

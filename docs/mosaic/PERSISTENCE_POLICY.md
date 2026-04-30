@@ -96,7 +96,8 @@ HexxlaDB **`Open`** creates the file when it does not exist. Mosaic wraps that i
 
 | File | Purpose |
 | ---- | ------- |
-| [`configs/config.yaml`](../../configs/config.yaml) | Canonical — `retention` + `allow_delete_cell` for dev |
+| [`docs/mosaic/MOSAIC_CONFIG.md`](./MOSAIC_CONFIG.md) | Full **`version: 1`** policy YAML reference (all keys) |
+| [`configs/config.yaml`](../../configs/config.yaml) | Minimal committed example (copy or adapt) |
 
 A **flat** layout ( `version` plus `capture_mode` / `enforcement` / `notes` at the top level, no `retention` key) is still valid; no separate example file is shipped.
 

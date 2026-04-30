@@ -24,7 +24,7 @@ else
     cat > "$TEST_FILE" <<'EOF'
 package domain
 
-import "github.com/sploitzberg/go-llm-project-structure/internal/adapter"
+import "github.com/sploitzberg/mosaic/internal/adapter"
 
 type TestEntity struct{}
 EOF
@@ -47,7 +47,7 @@ else
     cat > "$TEST_FILE" <<'EOF'
 package service
 
-import "github.com/sploitzberg/go-llm-project-structure/internal/adapter"
+import "github.com/sploitzberg/mosaic/internal/adapter"
 
 type TestService struct{}
 EOF

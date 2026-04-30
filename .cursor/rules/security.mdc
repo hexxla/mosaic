@@ -1,0 +1,16 @@
+---
+description: Security Best Practices
+globs: ["**/*.go"]
+alwaysApply: true
+---
+
+# Security Rules (Always Apply)
+
+- Never hardcode credentials, API keys, or secrets
+- Use `os.Getenv` or a secure config loader (`internal/config`)
+- Always wrap errors with `%w` to avoid leaking sensitive information
+- Validate all user input and command-line arguments
+- Use `context.Context` for cancellation and deadlines
+- Prefer `github.com/google/uuid` over insecure random generators
+- Follow `gosec` findings (enabled in CI)
+- Do not log sensitive data (passwords, tokens, PII)

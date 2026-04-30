@@ -3,7 +3,7 @@ package config
 import (
 	"fmt"
 
-	"github.com/sploitzberg/go-llm-project-structure/internal/core/domain"
+	"github.com/sploitzberg/mosaic/internal/core/domain"
 )
 
 // MosaicConfigVersion is the top-level config file schema version.

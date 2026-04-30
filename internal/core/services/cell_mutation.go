@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/sploitzberg/go-llm-project-structure/internal/config"
-	"github.com/sploitzberg/go-llm-project-structure/internal/core/domain"
-	"github.com/sploitzberg/go-llm-project-structure/internal/core/ports/primary"
-	"github.com/sploitzberg/go-llm-project-structure/internal/core/ports/secondary"
+	"github.com/sploitzberg/mosaic/internal/config"
+	"github.com/sploitzberg/mosaic/internal/core/domain"
+	"github.com/sploitzberg/mosaic/internal/core/ports/primary"
+	"github.com/sploitzberg/mosaic/internal/core/ports/secondary"
 )
 
 const (
@@ -106,20 +106,21 @@ func (s *CellMutationService) PutEmbedding(ctx context.Context, cmd *domain.PutE
 }
 
 // DeleteCell implements [primary.CellMutation].
-func (s *CellMutationService) DeleteCell(ctx context.Context, cmd *domain.DeleteCellCommand) error {
+func (s *CellMutationService) DeleteCell(ctx context.Context, cmd *domain.DeleteCellCommand) (cellRemoved bool, err error) {
 	if s == nil || s.writer == nil {
-		return fmt.Errorf("cell mutation: nil dependencies")
+		return false, fmt.Errorf("cell mutation: nil dependencies")
 	}
 	if cmd == nil {
-		return fmt.Errorf("cell mutation: nil command")
+		return false, fmt.Errorf("cell mutation: nil command")
 	}
 	if err := s.runtime.DeleteCellDenied(); err != nil {
-		return fmt.Errorf("cell mutation: %w", err)
+		return false, fmt.Errorf("cell mutation: %w", err)
 	}
-	if err := s.writer.DeleteCell(ctx, cmd); err != nil {
-		return fmt.Errorf("cell mutation delete cell: %w", err)
+	cellRemoved, err = s.writer.DeleteCell(ctx, cmd)
+	if err != nil {
+		return false, fmt.Errorf("cell mutation delete cell: %w", err)
 	}
-	return nil
+	return cellRemoved, nil
 }
 
 func normalizePutCell(cmd *domain.PutCellCommand) (*domain.PutCellCommand, error) {

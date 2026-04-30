@@ -6,23 +6,23 @@ import (
 
 	"github.com/hexxla/hexxladb"
 
-	"github.com/sploitzberg/go-llm-project-structure/internal/core/domain"
-	"github.com/sploitzberg/go-llm-project-structure/internal/core/ports/secondary"
+	"github.com/sploitzberg/mosaic/internal/core/domain"
+	"github.com/sploitzberg/mosaic/internal/core/ports/secondary"
 )
 
 // ContextPackAdapter implements [secondary.ContextPackLoader] via Tx.LoadContextPackFrom.
 type ContextPackAdapter struct {
-	db *hexxladb.DB
+	live *LiveDB
 }
 
-// NewContextPackAdapter wraps an open database (caller owns lifecycle).
-func NewContextPackAdapter(db *hexxladb.DB) *ContextPackAdapter {
-	return &ContextPackAdapter{db: db}
+// NewContextPackAdapter wraps a [LiveDB] (caller owns [LiveDB.Close]).
+func NewContextPackAdapter(live *LiveDB) *ContextPackAdapter {
+	return &ContextPackAdapter{live: live}
 }
 
 // LoadFromSeeds implements [secondary.ContextPackLoader].
 func (a *ContextPackAdapter) LoadFromSeeds(ctx context.Context, cmd *domain.LoadContextPackCommand) (domain.ContextPackResponse, error) {
-	if a == nil || a.db == nil {
+	if a == nil || a.live == nil {
 		return domain.ContextPackResponse{}, fmt.Errorf("hexxlastore context pack: nil database")
 	}
 	if cmd == nil || len(cmd.Seeds) == 0 {
@@ -45,14 +45,16 @@ func (a *ContextPackAdapter) LoadFromSeeds(ctx context.Context, cmd *domain.Load
 	}
 
 	var pack hexxladb.ContextPack
-	err := a.db.View(func(tx *hexxladb.Tx) error {
-		var errInner error
-		pack, errInner = tx.LoadContextPackFrom(ctx, cmd.MaxRing, cmd.MaxTokens,
-			hexxladb.ByteLenBudgeter{},
-			cfg,
-			coords...,
-		)
-		return errInner
+	err := a.live.WithRead(func(db *hexxladb.DB) error {
+		return db.View(func(tx *hexxladb.Tx) error {
+			var errInner error
+			pack, errInner = tx.LoadContextPackFrom(ctx, cmd.MaxRing, cmd.MaxTokens,
+				hexxladb.ByteLenBudgeter{},
+				cfg,
+				coords...,
+			)
+			return errInner
+		})
 	})
 	if err != nil {
 		return domain.ContextPackResponse{}, fmt.Errorf("hexxlastore load context pack: %w", err)

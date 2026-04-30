@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sploitzberg/go-llm-project-structure/internal/config"
+	"github.com/sploitzberg/mosaic/internal/config"
 )
 
 func TestMCPPolicyInstructions_defaultNoFile(t *testing.T) {
@@ -31,6 +31,9 @@ func TestMCPPolicyInstructions_configFilePath(t *testing.T) {
 	}
 	if !strings.Contains(s, "allowed (allow_delete_cell: true)") {
 		t.Fatalf("expected delete allowed: %q", s)
+	}
+	if !strings.Contains(s, "cell_removed:") {
+		t.Fatalf("expected cell_removed guidance: %q", s)
 	}
 }
 

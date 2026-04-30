@@ -3,7 +3,7 @@ package config
 import (
 	"errors"
 
-	"github.com/sploitzberg/go-llm-project-structure/internal/core/domain"
+	"github.com/sploitzberg/mosaic/internal/core/domain"
 )
 
 // MosaicRuntimeConfig aggregates startup-loaded settings used to gate mutating MCP tools

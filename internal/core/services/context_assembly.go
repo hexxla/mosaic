@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/sploitzberg/go-llm-project-structure/internal/core/domain"
-	"github.com/sploitzberg/go-llm-project-structure/internal/core/ports/primary"
-	"github.com/sploitzberg/go-llm-project-structure/internal/core/ports/secondary"
+	"github.com/sploitzberg/mosaic/internal/core/domain"
+	"github.com/sploitzberg/mosaic/internal/core/ports/primary"
+	"github.com/sploitzberg/mosaic/internal/core/ports/secondary"
 )
 
 const (

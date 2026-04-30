@@ -15,12 +15,12 @@ import (
 
 	"github.com/hexxla/hexxladb"
 
-	"github.com/sploitzberg/go-llm-project-structure/internal/adapter/primary/mcpsrv"
-	"github.com/sploitzberg/go-llm-project-structure/internal/adapter/secondary/hexxlastore"
-	"github.com/sploitzberg/go-llm-project-structure/internal/adapter/secondary/ollamaembed"
-	"github.com/sploitzberg/go-llm-project-structure/internal/config"
-	"github.com/sploitzberg/go-llm-project-structure/internal/core/services"
-	ollamac "github.com/sploitzberg/go-llm-project-structure/internal/ollama"
+	"github.com/sploitzberg/mosaic/internal/adapter/primary/mcpsrv"
+	"github.com/sploitzberg/mosaic/internal/adapter/secondary/hexxlastore"
+	"github.com/sploitzberg/mosaic/internal/adapter/secondary/ollamaembed"
+	"github.com/sploitzberg/mosaic/internal/config"
+	"github.com/sploitzberg/mosaic/internal/core/services"
+	ollamac "github.com/sploitzberg/mosaic/internal/ollama"
 )
 
 // version is set at link time by goreleaser or -ldflags.
@@ -77,11 +77,14 @@ func run(log *slog.Logger) error {
 		"enforcement_enabled", mosaicLoaded.Retention.EnforcementEnabled(),
 		"allow_delete_cell", mosaicLoaded.AllowDeleteCell,
 		"retrieval_session_approx_token_budget", mosaicLoaded.Retrieval.SessionApproxTokenBudget,
+		"auto_maintain_after_cell_delete", mosaicLoaded.DeleteAutoMaintain.Enabled,
+		"post_delete_maintain_debounce_ms", mosaicLoaded.DeleteAutoMaintain.DebounceAfterDelete.Milliseconds(),
+		"mvcc_retain_commits_behind_head", mosaicLoaded.MVCCRetainCommitsBehindHead,
 		"config_file", configPathUsed)
 
 	retrievalBudget := mcpsrv.NewRetrievalBudgetTracker(mosaicLoaded.Retrieval)
 
-	openOpts, err := config.BuildHexxlaOpenOptions(config.HexxlaOpenParams{
+	encOpts, err := config.BuildHexxlaOpenOptions(config.HexxlaOpenParams{
 		FlagPassphrase: *dbPassphraseFlag,
 		YAMLPassphrase: mosaicLoaded.DatabasePassphrase,
 	})
@@ -89,48 +92,61 @@ func run(log *slog.Logger) error {
 		return fmt.Errorf("database encryption options: %w", err)
 	}
 
+	openOpts := config.MergeMVCCRetainIntoOpenOptions(encOpts, mosaicLoaded.MVCCRetainCommitsBehindHead)
+
 	db, err := hexxladb.Open(dbCfg.Path, openOpts)
 	if err != nil {
 		return fmt.Errorf("open database: %w", err)
 	}
+	embeddingDimAtBoot := db.EmbeddingDimension()
+
+	live := hexxlastore.NewLiveDB(db)
 	defer func() {
-		if cerr := db.Close(); cerr != nil {
+		if cerr := live.Close(); cerr != nil {
 			log.Error("close database", "err", cerr)
 		}
 	}()
 
-	engineHealth := hexxlastore.NewEngineHealthAdapter(db)
-	healthSvc := services.NewHealthService(engineHealth, version)
+	engineHealth := hexxlastore.NewEngineHealthAdapter(live, dbCfg.Path)
+	healthSvc := services.NewHealthService(engineHealth, version, mosaicLoaded.MVCCRetainCommitsBehindHead)
 
-	cellReader := hexxlastore.NewCellReaderAdapter(db)
+	cellReader := hexxlastore.NewCellReaderAdapter(live)
 	ollamaClient := ollamac.NewClient(ollamaCfg.Base, ollamaCfg.Model)
 	cellRetrieval := services.NewCellRetrievalService(
 		cellReader,
 		ollamaembed.NewTextEmbedder(ollamaClient),
-		db.EmbeddingDimension(),
+		embeddingDimAtBoot,
 	)
 
-	contextPackLoader := hexxlastore.NewContextPackAdapter(db)
+	contextPackLoader := hexxlastore.NewContextPackAdapter(live)
 	contextAssembly := services.NewContextAssemblyService(contextPackLoader)
 
-	embeddingANN := hexxlastore.NewEmbeddingANNAdapter(db, ollamaClient)
+	embeddingANN := hexxlastore.NewEmbeddingANNAdapter(live, ollamaClient)
 	embeddingSvc := services.NewEmbeddingSearchService(embeddingANN)
 
-	cellWriter := hexxlastore.NewCellWriterAdapter(db)
+	cellWriter := hexxlastore.NewCellWriterAdapter(live, dbCfg.Path, openOpts, mosaicLoaded.DeleteAutoMaintain)
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		defer cancel()
+		if err := cellWriter.FlushPostDeleteMaintain(shutdownCtx); err != nil {
+			log.Error("flush post-delete maintain", "err", err)
+		}
+	}()
+
 	runtimeCfg := config.NewMosaicRuntimeConfig(mosaicLoaded.Retention, mosaicLoaded.AllowDeleteCell)
 	mutationSvc := services.NewCellMutationService(
-		cellWriter, ollamaembed.NewTextEmbedder(ollamaClient), db.EmbeddingDimension(),
+		cellWriter, ollamaembed.NewTextEmbedder(ollamaClient), embeddingDimAtBoot,
 		services.WithMosaicRuntime(runtimeCfg),
 	)
 
-	seamStore := hexxlastore.NewSeamStoreAdapter(db)
+	seamStore := hexxlastore.NewSeamStoreAdapter(live)
 	seamSvc := services.NewSeamLifecycleService(seamStore)
 
-	facetEdgeStore := hexxlastore.NewFacetEdgeStoreAdapter(db)
+	facetEdgeStore := hexxlastore.NewFacetEdgeStoreAdapter(live)
 	facetEdgeSvc := services.NewFacetEdgeService(facetEdgeStore)
 	facetEdgeBrowse := services.NewFacetEdgeReadService(facetEdgeStore)
 
-	tagCatalog := hexxlastore.NewTagCatalogAdapter(db)
+	tagCatalog := hexxlastore.NewTagCatalogAdapter(live)
 	tagBrowseSvc := services.NewTagCatalogService(tagCatalog)
 
 	policyInstructions := config.MCPPolicyInstructions(runtimeCfg, configPathUsed)

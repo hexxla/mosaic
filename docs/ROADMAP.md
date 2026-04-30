@@ -2,6 +2,10 @@
 
 For completed work, see [`CHANGELOG.md`](../CHANGELOG.md) and [`TODOS.md`](../TODOS.md) (Recently Completed).
 
+## Recently shipped
+
+Documented in **`CHANGELOG.md`**; session log in **`TODOS.md` → Recently Completed**. Includes: post-delete **debounced** prune/compact + shutdown flush; **`mosaic_hexxla_health`** **`disk`** + **`mvcc_retain_commits_behind_head`**; **`MOSAIC_CONFIG.md`** and minimal **`configs/config.yaml`**; **`README`** refresh; Go module **`github.com/sploitzberg/mosaic`** and removal of the old bootstrap CLI.
+
 ## Near-term
 
 Engineering polish aligned with Mosaic as the MCP orchestration layer over HexxlaDB. Details and checkboxes live in [`TODOS.md`](../TODOS.md); echoed here as roadmap themes.

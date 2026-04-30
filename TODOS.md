@@ -17,7 +17,11 @@ Immediate next steps. Update after each session.
 
 ## Recently Completed
 
----
+- 2026-04-29: **Post-delete maintenance** — **`database.auto_maintain_after_cell_delete.debounce_after_delete_ms`** (default 2s when enabled); **`FlushPostDeleteMaintain`** on **`mosaic-mcp`** shutdown; prune + compact batching ([`internal/adapter/secondary/hexxlastore`](internal/adapter/secondary/hexxlastore)).
+- 2026-04-29: **`mosaic_hexxla_health`** — JSON **`disk`** (primary + WAL **`Stat`**) and **`mvcc_retain_commits_behind_head`** (effective policy).
+- 2026-04-29: **Policy / onboarding docs** — **[`docs/mosaic/MOSAIC_CONFIG.md`](docs/mosaic/MOSAIC_CONFIG.md)** full YAML reference; **[`configs/config.yaml`](configs/config.yaml)** values-only example; **[`README.md`](README.md)** Get started + feature overview.
+- 2026-04-29: **Go module & build** — **`module github.com/sploitzberg/mosaic`**; removed legacy **`cmd/go-llm-project-structure`**; **`make build`** / CI pre-push build **`mosaic-mcp`**; **[`.goreleaser.yml`](.goreleaser.yml)** publishes **`mosaic-mcp`**.
+- 2026-04-29: **Troubleshooting** — **[`docs/mosaic/HEXXLA_TROUBLESHOOTING.md`](docs/mosaic/HEXXLA_TROUBLESHOOTING.md)** disk / **`mosaic_hexxla_health`** section; MCP tool description updates.
 
 ## Usage Notes
 

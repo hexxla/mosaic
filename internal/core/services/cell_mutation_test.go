@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/sploitzberg/go-llm-project-structure/internal/config"
-	"github.com/sploitzberg/go-llm-project-structure/internal/core/domain"
+	"github.com/sploitzberg/mosaic/internal/config"
+	"github.com/sploitzberg/mosaic/internal/core/domain"
 )
 
 type stubCellWriter struct {
@@ -36,12 +36,12 @@ func (s *stubCellWriter) PutEmbedding(_ context.Context, coord domain.AxialCoord
 	return nil
 }
 
-func (s *stubCellWriter) DeleteCell(context.Context, *domain.DeleteCellCommand) error {
+func (s *stubCellWriter) DeleteCell(context.Context, *domain.DeleteCellCommand) (bool, error) {
 	if s == nil {
-		return nil
+		return false, nil
 	}
 	s.deleteCellCalls++
-	return nil
+	return true, nil
 }
 
 type stubEmbedder struct {
@@ -129,7 +129,7 @@ func TestCellMutationService_PutCell_validation(t *testing.T) {
 		w := &stubCellWriter{}
 		rt := config.NewMosaicRuntimeConfig(config.DefaultRetentionPolicy(), false)
 		svc := NewCellMutationService(w, nil, 384, WithMosaicRuntime(rt))
-		err := svc.DeleteCell(t.Context(), &domain.DeleteCellCommand{
+		_, err := svc.DeleteCell(t.Context(), &domain.DeleteCellCommand{
 			Coord: domain.AxialCoord{Q: 0, R: 0},
 		})
 		if err == nil {

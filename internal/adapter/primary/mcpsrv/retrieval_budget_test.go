@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/sploitzberg/go-llm-project-structure/internal/config"
+	"github.com/sploitzberg/mosaic/internal/config"
 )
 
 func TestApproximateTokensFromJSONBytes(t *testing.T) {

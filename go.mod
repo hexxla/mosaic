@@ -1,4 +1,4 @@
-module github.com/sploitzberg/go-llm-project-structure
+module github.com/sploitzberg/mosaic
 
 go 1.26.2
 

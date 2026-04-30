@@ -3,7 +3,7 @@ package config_test
 import (
 	"testing"
 
-	"github.com/sploitzberg/go-llm-project-structure/internal/config"
+	"github.com/sploitzberg/mosaic/internal/config"
 )
 
 func TestParseMosaicConfigYAML_retrieval_budget(t *testing.T) {
