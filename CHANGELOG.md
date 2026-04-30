@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **README** — **Version** GitHub badge (same style as HexxlaDB root README). **GitHub Actions** — **`ci.yml`**, **`integration.yml`**, and **`release.yml`** use **`actions/checkout@v6`** and **`actions/setup-go@v6`** (Node 24–compatible runners; clears Node.js 20 action deprecation notices).
 - **Default database file** when **`mosaic-create-db`** / **`mosaic-seed`** omit **`-db`**, **`-name`**, and **`MOSAIC_DB_PATH`**: **`mosaic.hexxla`** in the shell’s current working directory (was **`.tmp/mosaic-seed.hexxla`**). **Makefile** **`MOSAIC_DB_PATH`** default is **`./mosaic.hexxla`**; **`.gitignore`** includes **`/mosaic.hexxla`** at repo root.
 - **Documentation** — README **Get started** (Ollama expected; seed demos called out as dev-only; path choice); **[`DATABASE_CREATION.md`](docs/mosaic/DATABASE_CREATION.md)** adds encrypted DB + MCP setup; removed **`POLICY_AND_RETENTION.md`** (obsolete operator gates), **`HYBRID_RETRIEVAL_PLAN.md`** / **`HEXXLA_API_ROADMAP.md`** (superseded by **IMPLEMENTATION_PLAN**, **MCP_AGENT_BLUEPRINT**, **HEXXLA_API_SURFACE_COVERAGE**).
 - **Breaking:** Go module path is **`github.com/sploitzberg/mosaic`** (was `github.com/sploitzberg/go-llm-project-structure`). Update imports and **`go.mod`** `replace` directives. Bootstrap **`cmd/go-llm-project-structure`** removed — use **`mosaic-mcp`**, **`mosaic-seed`**, **`mosaic-create-db`**.

@@ -11,6 +11,7 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/sploitzberg/mosaic.svg)](https://pkg.go.dev/github.com/sploitzberg/mosaic)
 [![Go Report Card](https://goreportcard.com/badge/github.com/sploitzberg/mosaic)](https://goreportcard.com/report/github.com/sploitzberg/mosaic)
 [![Go 1.26](https://img.shields.io/badge/go-1.26-00ADD8?logo=go)](https://go.dev/doc/go1.26)
+[![Version](https://img.shields.io/github/v/tag/sploitzberg/mosaic?label=version&color=7c3aed)](https://github.com/sploitzberg/mosaic/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 </div>
