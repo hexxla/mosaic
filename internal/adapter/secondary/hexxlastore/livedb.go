@@ -38,7 +38,10 @@ func (l *LiveDB) WithRead(fn func(*hexxladb.DB) error) error {
 	if l.closed.Load() || l.inner == nil {
 		return fmt.Errorf("hexxlastore LiveDB: closed")
 	}
-	return fn(l.inner)
+	if err := fn(l.inner); err != nil {
+		return fmt.Errorf("hexxlastore LiveDB WithRead: %w", err)
+	}
+	return nil
 }
 
 // Close closes the current inner database (exclusive with readers).

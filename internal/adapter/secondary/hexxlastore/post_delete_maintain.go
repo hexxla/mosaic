@@ -22,9 +22,9 @@ func runPostDeleteMaintain(ctx context.Context, live *LiveDB, primaryPath string
 		err := live.WithRead(func(db *hexxladb.DB) error {
 			sched := hexxladb.PruneScheduler{Profile: prof}
 			rounds := cfg.PruneRoundsCap()
-			for i := 0; i < rounds; i++ {
+			for range rounds {
 				if err := ctx.Err(); err != nil {
-					return err
+					return fmt.Errorf("post-delete prune: %w", err)
 				}
 				n, err := sched.Tick(db)
 				if err != nil {
