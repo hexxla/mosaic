@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/images/mosaic_logo_shadow.svg" alt="Mosaic" width="300">
+<img src="assets/images/mosaic_logo_shadow.svg" alt="Mosaic" width="240">
 
 # Mosaic
 
