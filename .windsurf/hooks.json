@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "pre_read_code": [
+      {
+        "command": ".windsurf/hooks/pre-read.sh",
+        "show_output": false
+      }
+    ],
+    "post_write_code": [
+      {
+        "command": ".windsurf/hooks/post-write.sh",
+        "show_output": true
+      }
+    ]
+  }
+}
