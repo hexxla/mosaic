@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeReadFile": [
+      {
+        "command": ".cursor/hooks/pre-read.sh",
+        "description": "Inject architecture and mosaic context before reading files"
+      }
+    ],
+    "beforeSubmitPrompt": [
+      {
+        "command": ".cursor/hooks/pre-submit-prompt.sh",
+        "description": "Inject mosaic context before agent reasoning"
+      }
+    ],
+    "beforeMCPExecution": [
+      {
+        "command": ".cursor/hooks/pre-mcp-execution.sh",
+        "description": "Provide mosaic MCP tool guidance"
+      }
+    ],
+    "afterFileEdit": [
+      {
+        "command": ".cursor/hooks/post-write.sh",
+        "description": "Auto-format and validate Go files after edit"
+      }
+    ],
+    "sessionStart": [
+      {
+        "command": ".cursor/hooks/session-start.sh",
+        "description": "Inject mosaic context at session start"
+      }
+    ]
+  }
+}
