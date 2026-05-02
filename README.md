@@ -138,6 +138,49 @@ For command names, YAML keys, and troubleshooting, explore the **`docs/`** tree 
 
 ---
 
+## Ratchet: Tool flow governance
+
+Mosaic integrates **[mcp-ratchet](https://github.com/hexxla/mcp-ratchet)** to enforce tool call sequences and prerequisites. This prevents agents from making unsafe or context-free mutations by requiring specific discovery or validation steps before write operations.
+
+### Features
+
+- **Prerequisite validation**: Tools can require other tools to be called first (e.g., `put_cell` requires `list_tags` to prevent tag fragmentation)
+- **One-time use tokens**: Prerequisite tokens can be consumed after use, forcing fresh discovery for each operation
+- **Time-bound sessions**: Tokens expire after a configurable duration, ensuring context remains current
+- **Flexible rules**: Multiple prerequisite rules per tool (e.g., `put_cell` accepts `list_tags`, `tag_counts`, or retrieval tools)
+- **Session management**: Session-based token tracking across tool calls
+
+### Benefits
+
+- **Tag hygiene**: Forces agents to review available tags before writing, preventing fragmentation
+- **Context awareness**: Requires retrieval tools before mutations to verify cell existence and understand context
+- **Budget enforcement**: Requires budget estimation before large context loads
+- **Auditability**: Tool call sequences are logged and validated against policy
+- **Safety**: Prevents blind writes by requiring discovery steps
+
+### Configuration
+
+Ratchet rules are defined in **`configs/ratchet.yaml`**. Each rule specifies:
+
+- `tool`: The tool being governed
+- `prerequisite`: Required prerequisite tool (empty string means no prerequisite)
+- `error_message`: Custom error message shown when validation fails
+- `one_time_use`: Whether the prerequisite token is consumed after use
+- `expiry`: Time limit for token validity (ignored when `one_time_use: true`)
+
+Example rule:
+
+```yaml
+- tool: "mosaic_hexxla_put_cell"
+  prerequisite: "mosaic_hexxla_list_tags"
+  error_message: "Before saving a cell, review available tags to prevent fragmentation. Call mosaic_hexxla_list_tags to see current vocabulary."
+  one_time_use: true
+```
+
+For detailed configuration options and examples, see **[`docs/mosaic/RATCHET_INTEGRATION.md`](docs/mosaic/RATCHET_INTEGRATION.md)**.
+
+---
+
 ## Reliable tool use from agents
 
 MCP **does not force** models to call tools. Reinforce behavior with **project rules**, **`retention.notes`** in your policy YAML (they are injected into server instructions), and **[`.cursor/rules/mosaic-mcp-agent.mdc`](.cursor/rules/mosaic-mcp-agent.mdc)** or **[docs/mosaic/AGENT_CLIENT_WORKFLOWS.md](docs/mosaic/AGENT_CLIENT_WORKFLOWS.md)**. The steady pattern is **discover** candidates, **assemble** a budgeted context pack, and **persist** only where policy permits — **`docs/mosaic/`** spells out names and payloads.
