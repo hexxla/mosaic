@@ -4,6 +4,7 @@ go 1.26.2
 
 require (
 	github.com/hexxla/hexxladb v0.3.0
+	github.com/hexxla/mcp-ratchet v0.0.0-20260502154854-157eb61e54c9
 	github.com/modelcontextprotocol/go-sdk v1.6.0
 	gopkg.in/yaml.v3 v3.0.1
 )

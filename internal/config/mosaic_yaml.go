@@ -30,6 +30,9 @@ type MosaicConfigLoaded struct {
 	OllamaBaseURL string
 	// OllamaEmbedModel — trimmed from **`ollama.embed_model`** when set.
 	OllamaEmbedModel string
+
+	// RatchetConfig is the ratchet workflow enforcement configuration (optional).
+	RatchetConfig RatchetConfig
 }
 
 // retentionYAMLFields is the retention subsection (capture_mode, enforcement, notes).
@@ -97,6 +100,7 @@ func DefaultMosaicConfig() MosaicConfigLoaded {
 		Retention:       DefaultRetentionPolicy(),
 		AllowDeleteCell: false,
 		Retrieval:       DefaultRetrievalBudgetConfig(),
+		RatchetConfig:   RatchetConfig{},
 	}
 }
 
@@ -242,6 +246,7 @@ func ParseMosaicConfigYAML(data []byte) (MosaicConfigLoaded, error) {
 		DeleteAutoMaintain:          delMaintain,
 		OllamaBaseURL:               ollURL,
 		OllamaEmbedModel:            ollModel,
+		RatchetConfig:               RatchetConfig{},
 	}
 	applyDeleteAutoMaintainDefaults(&loaded)
 	return loaded, nil

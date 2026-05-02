@@ -3,8 +3,10 @@ package mcpsrv
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 
+	ratchetdomain "github.com/hexxla/mcp-ratchet/pkg/ratchet/domain"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/sploitzberg/mosaic/internal/core/domain"
@@ -59,7 +61,67 @@ func validateContextPackBudgetInput(in *contextPackInput) error {
 }
 
 // RegisterContextPackTool registers mosaic_hexxla_load_context_pack (Hexxla Tx.LoadContextPackFrom).
-func RegisterContextPackTool(server *mcp.Server, svc primary.ContextAssembly, log *slog.Logger, budget *RetrievalBudgetTracker) {
+func RegisterContextPackTool(server *mcp.Server, svc primary.ContextAssembly, log *slog.Logger, budget *RetrievalBudgetTracker, ratchetWrapper *RatchetWrapper) {
+	handler := func(ctx context.Context, req *mcp.CallToolRequest, in contextPackInput) (*mcp.CallToolResult, domain.ContextPackResponse, error) {
+		return handleContextPack(ctx, req, &in, svc, log, budget)
+	}
+
+	if ratchetWrapper != nil {
+		originalHandler := handler
+		wrappedHandler := func(ctx context.Context, req *mcp.CallToolRequest, in contextPackInput) (*mcp.CallToolResult, domain.ContextPackResponse, error) {
+			sessionID := ratchetWrapper.DeriveSessionID(ctx)
+
+			session, err := ratchetWrapper.sessionStore.Get(ctx, sessionID)
+			if err != nil {
+				session = ratchetdomain.NewSession(sessionID)
+				if createErr := ratchetWrapper.sessionStore.Create(ctx, session); createErr != nil {
+					if ratchetWrapper.log != nil {
+						ratchetWrapper.log.WarnContext(ctx, "failed to create session", "error", createErr)
+					}
+				}
+			}
+
+			var token ratchetdomain.TokenValue
+			if tokens, ok := session.Tokens[ratchetdomain.ToolName("mosaic_hexxla_load_context_pack")]; ok && len(tokens) > 0 {
+				token = tokens[len(tokens)-1]
+			}
+
+			err = ratchetWrapper.ratchetSvc.ValidateToolCall(ctx, sessionID, ratchetdomain.ToolName("mosaic_hexxla_load_context_pack"), token)
+			if err != nil {
+				return nil, domain.ContextPackResponse{}, fmt.Errorf("ratchet validation failed: %w", err)
+			}
+
+			result, resp, err := originalHandler(ctx, req, in)
+			if err != nil {
+				return result, resp, err
+			}
+
+			_, err = ratchetWrapper.ratchetSvc.IssueToken(ctx, sessionID, ratchetdomain.ToolName("mosaic_hexxla_load_context_pack"))
+			if err != nil {
+				if ratchetWrapper.log != nil {
+					ratchetWrapper.log.WarnContext(ctx, "failed to issue ratchet token", "error", err)
+				}
+			}
+
+			session, err = ratchetWrapper.sessionStore.Get(ctx, sessionID)
+			if err != nil {
+				if ratchetWrapper.log != nil {
+					ratchetWrapper.log.WarnContext(ctx, "failed to get session after token issuance", "error", err)
+				}
+			} else {
+				session.RecordToolCall(ratchetdomain.ToolName("mosaic_hexxla_load_context_pack"))
+				if updateErr := ratchetWrapper.sessionStore.Update(ctx, session); updateErr != nil {
+					if ratchetWrapper.log != nil {
+						ratchetWrapper.log.WarnContext(ctx, "failed to update session with tool call", "error", updateErr)
+					}
+				}
+			}
+
+			return result, resp, nil
+		}
+		handler = wrappedHandler
+	}
+
 	mcp.AddTool(server, &mcp.Tool{
 		Name: "mosaic_hexxla_load_context_pack",
 		Description: "Expand hex-neighbourhood context from seed coordinates using HexxlaDB LoadContextPackFrom (ring walk + UTF-8 byte budget via ByteLenBudgeter, optional seams & supersession filtering). " +
@@ -68,40 +130,42 @@ func RegisterContextPackTool(server *mcp.Server, svc primary.ContextAssembly, lo
 			"Preview bytes with mosaic_hexxla_estimate_context_budget_bytes. " +
 			"Start with a moderate max_ring and budget; increase if needed. " +
 			"Embedding search alone returns similar cells only; this tool pulls adjacent lattice context (seams, neighbours) for prompts.",
-	}, func(ctx context.Context, req *mcp.CallToolRequest, in contextPackInput) (*mcp.CallToolResult, domain.ContextPackResponse, error) {
-		if log != nil {
-			log.DebugContext(ctx, "mosaic_hexxla_load_context_pack invoked")
-		}
-		if len(in.Seeds) == 0 {
-			return nil, domain.ContextPackResponse{}, errors.New("seeds: at least one {q,r} required")
-		}
-		if err := validateContextPackBudgetInput(&in); err != nil {
-			return nil, domain.ContextPackResponse{}, err
-		}
-		seeds := make([]domain.AxialCoord, 0, len(in.Seeds))
-		for _, s := range in.Seeds {
-			seeds = append(seeds, domain.AxialCoord{Q: s.Q, R: s.R})
-		}
-		cmd := &domain.LoadContextPackCommand{
-			Seeds:               seeds,
-			MaxRing:             in.MaxRing,
-			OmitBudget:          in.OmitBudget,
-			BudgetTokensApprox:  in.BudgetTokensApprox,
-			BytesPerApproxToken: in.BytesPerApproxToken,
-			MaxBudgetBytes:      in.MaxBudgetBytes,
-			MaxTokens:           in.MaxTokens,
-			MaxCells:            in.MaxCells,
-			FilterSuperseded:    in.FilterSuperseded,
-			IncludeSeams:        in.IncludeSeams,
-			IncludeFacetText:    in.IncludeFacetText,
-			Explain:             in.Explain,
-		}
-		out, err := RunBudgetedRead(budget, req, func() (domain.ContextPackResponse, error) {
-			return svc.LoadFromSeeds(ctx, cmd)
-		})
-		if err != nil {
-			return nil, domain.ContextPackResponse{}, err
-		}
-		return nil, out, nil
+	}, handler)
+}
+
+func handleContextPack(ctx context.Context, req *mcp.CallToolRequest, in *contextPackInput, svc primary.ContextAssembly, log *slog.Logger, budget *RetrievalBudgetTracker) (*mcp.CallToolResult, domain.ContextPackResponse, error) {
+	if log != nil {
+		log.DebugContext(ctx, "mosaic_hexxla_load_context_pack invoked")
+	}
+	if len(in.Seeds) == 0 {
+		return nil, domain.ContextPackResponse{}, errors.New("seeds: at least one {q,r} required")
+	}
+	if err := validateContextPackBudgetInput(in); err != nil {
+		return nil, domain.ContextPackResponse{}, err
+	}
+	seeds := make([]domain.AxialCoord, 0, len(in.Seeds))
+	for _, s := range in.Seeds {
+		seeds = append(seeds, domain.AxialCoord{Q: s.Q, R: s.R})
+	}
+	cmd := &domain.LoadContextPackCommand{
+		Seeds:               seeds,
+		MaxRing:             in.MaxRing,
+		OmitBudget:          in.OmitBudget,
+		BudgetTokensApprox:  in.BudgetTokensApprox,
+		BytesPerApproxToken: in.BytesPerApproxToken,
+		MaxBudgetBytes:      in.MaxBudgetBytes,
+		MaxTokens:           in.MaxTokens,
+		MaxCells:            in.MaxCells,
+		FilterSuperseded:    in.FilterSuperseded,
+		IncludeSeams:        in.IncludeSeams,
+		IncludeFacetText:    in.IncludeFacetText,
+		Explain:             in.Explain,
+	}
+	out, err := RunBudgetedRead(budget, req, func() (domain.ContextPackResponse, error) {
+		return svc.LoadFromSeeds(ctx, cmd)
 	})
+	if err != nil {
+		return nil, domain.ContextPackResponse{}, err
+	}
+	return nil, out, nil
 }

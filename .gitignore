@@ -99,7 +99,7 @@ NOTES.md
 
 # LLM tool configurations (other tools)
 .claude/
-.windsurf/*
+# .windsurf/*
 !.windsurf/rules/
 !.windsurf/rules/**
 !.windsurf/workflows/

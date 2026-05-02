@@ -1,8 +1,19 @@
 # MCP-Ratchet Integration with Mosaic
 
-**Status:** Design proposal for integrating mcp-ratchet into mosaic-mcp to enforce tool call order and workflow compliance.
+**Status:** Partially implemented - Phase 1-4 complete, Phase 5a complete, Phase 5b pending, Phase 6 skipped, Phase 7 in progress.
 
 **Purpose:** This document describes how mcp-ratchet can be integrated into the Mosaic MCP server to enforce correct tool usage patterns, guide LLMs through recommended workflows, and improve overall agent reliability when using Mosaic.
+
+**Implementation Status:**
+
+- ✅ Phase 1: Dependency Setup - mcp-ratchet added as Go module dependency
+- ✅ Phase 2: Config Structure - RatchetConfig struct and loading functions created
+- ✅ Phase 3: Command-Line Flags - `-ratchet-config` flag added to cmd/mosaic-mcp/main.go
+- ✅ Phase 4: Service Initialization - Ratchet service initialized with all required adapters
+- ✅ Phase 5a: Tool Wrapper - Wrapper created and integrated for load_context_pack tool
+- ⏳ Phase 5b: Tool Wrapper - Remaining tools (put_cell, put_embedding, delete_cell, seam ops, facet/edge ops, read-only ops) pending
+- ⏭️ Phase 6: Testing - Skipped (deferred to future work)
+- ⏳ Phase 7: Documentation - In progress
 
 **Design Philosophy:** Maximum compliance and guardrails - `one_time_use: true` for state-dependent operations to ensure fresh checks, short expiry times (1-2 minutes) for current state verification, and strong enforcement for all critical workflows.
 
@@ -454,13 +465,13 @@ func requiresHealthCheck(input LoadContextPackInput) bool {
 
 ### Enable/Disable Ratchet
 
-Add a flag to mosaic-mcp to enable or disable ratchet enforcement:
+Add a flag to mosaic-mcp to specify the ratchet configuration file:
 
 ```bash
-./mosaic-mcp -policy configs/config.yaml -db ./data/mosaic.db -ratchet-config configs/ratchet.yaml -enable-ratchet
+./mosaic-mcp -policy configs/config.yaml -db ./data/mosaic.db -ratchet-config configs/ratchet.yaml
 ```
 
-If `-enable-ratchet` is not provided, tools operate without ratchet validation (current behavior).
+If `-ratchet-config` is not provided, ratchet is disabled and tools operate without validation (current behavior). If `-ratchet-config` is provided, ratchet is automatically enabled and enforces the rules defined in the configuration file.
 
 ### Strict vs. Lenient Mode
 

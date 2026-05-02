@@ -6,6 +6,8 @@ github.com/google/jsonschema-go v0.4.3 h1:/DBOLZTfDow7pe2GmaJNhltueGTtDKICi8V8p+
 github.com/google/jsonschema-go v0.4.3/go.mod h1:r5quNTdLOYEz95Ru18zA0ydNbBuYoo9tgaYcxEYhJVE=
 github.com/hexxla/hexxladb v0.3.0 h1:DiEHCdIhdj7e0Tvt/TgEEr74KlXI1Qfk+CprVJBPO9E=
 github.com/hexxla/hexxladb v0.3.0/go.mod h1:7j+2oYhdQSxefa3v86VlNSqcl0hyKu2p7Zb7VwDjvBA=
+github.com/hexxla/mcp-ratchet v0.0.0-20260502154854-157eb61e54c9 h1:6wI39ojUDLwUZXZuLX8e++/SGgNldUC6tY79YWBGedg=
+github.com/hexxla/mcp-ratchet v0.0.0-20260502154854-157eb61e54c9/go.mod h1:VH4K8URcyXrOOBrEUTULE+HlusXijMZfJWNsMk5GVXA=
 github.com/modelcontextprotocol/go-sdk v1.6.0 h1:PPLS3kn7WtOEnR+Af4X5H96SG0qSab8R/ZQT/HkhPkY=
 github.com/modelcontextprotocol/go-sdk v1.6.0/go.mod h1:kzm3kzFL1/+AziGOE0nUs3gvPoNxMCvkxokMkuFapXQ=
 github.com/oklog/ulid/v2 v2.1.0 h1:+9lhoxAP56we25tyYETBBY1YLA2SaoLvUFgrP2miPJU=

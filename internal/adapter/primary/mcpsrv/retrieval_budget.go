@@ -8,6 +8,7 @@ import (
 	"math"
 	"sync"
 
+	ratchetdomain "github.com/hexxla/mcp-ratchet/pkg/ratchet/domain"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/sploitzberg/mosaic/internal/config"
@@ -162,14 +163,76 @@ func (t *RetrievalBudgetTracker) Status(req *mcp.CallToolRequest) RetrievalBudge
 }
 
 // RegisterRetrievalBudgetStatusTool registers mosaic_hexxla_retrieval_budget_status (read-only; never charged against the budget).
-func RegisterRetrievalBudgetStatusTool(server *mcp.Server, tracker *RetrievalBudgetTracker, log *slog.Logger) {
+func RegisterRetrievalBudgetStatusTool(server *mcp.Server, tracker *RetrievalBudgetTracker, log *slog.Logger, ratchetWrapper *RatchetWrapper) {
+	handler := func(ctx context.Context, req *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, RetrievalBudgetStatus, error) {
+		return handleRetrievalBudgetStatus(ctx, req, tracker, log)
+	}
+
+	if ratchetWrapper != nil {
+		originalHandler := handler
+		wrappedHandler := func(ctx context.Context, req *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, RetrievalBudgetStatus, error) {
+			sessionID := ratchetWrapper.DeriveSessionID(ctx)
+
+			session, err := ratchetWrapper.sessionStore.Get(ctx, sessionID)
+			if err != nil {
+				session = ratchetdomain.NewSession(sessionID)
+				if createErr := ratchetWrapper.sessionStore.Create(ctx, session); createErr != nil {
+					if ratchetWrapper.log != nil {
+						ratchetWrapper.log.WarnContext(ctx, "failed to create session", "error", createErr)
+					}
+				}
+			}
+
+			var token ratchetdomain.TokenValue
+			if tokens, ok := session.Tokens[ratchetdomain.ToolName("mosaic_hexxla_retrieval_budget_status")]; ok && len(tokens) > 0 {
+				token = tokens[len(tokens)-1]
+			}
+
+			err = ratchetWrapper.ratchetSvc.ValidateToolCall(ctx, sessionID, ratchetdomain.ToolName("mosaic_hexxla_retrieval_budget_status"), token)
+			if err != nil {
+				return nil, RetrievalBudgetStatus{}, fmt.Errorf("ratchet validation failed: %w", err)
+			}
+
+			result, resp, err := originalHandler(ctx, req, struct{}{})
+			if err != nil {
+				return result, resp, err
+			}
+
+			_, err = ratchetWrapper.ratchetSvc.IssueToken(ctx, sessionID, ratchetdomain.ToolName("mosaic_hexxla_retrieval_budget_status"))
+			if err != nil {
+				if ratchetWrapper.log != nil {
+					ratchetWrapper.log.WarnContext(ctx, "failed to issue ratchet token", "error", err)
+				}
+			}
+
+			session, err = ratchetWrapper.sessionStore.Get(ctx, sessionID)
+			if err != nil {
+				if ratchetWrapper.log != nil {
+					ratchetWrapper.log.WarnContext(ctx, "failed to get session after token issuance", "error", err)
+				}
+			} else {
+				session.RecordToolCall(ratchetdomain.ToolName("mosaic_hexxla_retrieval_budget_status"))
+				if updateErr := ratchetWrapper.sessionStore.Update(ctx, session); updateErr != nil {
+					if ratchetWrapper.log != nil {
+						ratchetWrapper.log.WarnContext(ctx, "failed to update session with tool call", "error", updateErr)
+					}
+				}
+			}
+
+			return result, resp, nil
+		}
+		handler = wrappedHandler
+	}
+
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "mosaic_hexxla_retrieval_budget_status",
 		Description: "Answer: how much approximate retrieval (JSON from HexxlaDB read tools) this MCP session has accumulated. metering_enabled true when the server tracks usage. budgeting_enabled true when session_approx_token_budget > 0 (hard cap). When budgeting is off, usage is still metered for observability. Stateless clients without Mcp-Session-Id may share the empty session key.",
-	}, func(ctx context.Context, req *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, RetrievalBudgetStatus, error) {
-		if log != nil {
-			log.DebugContext(ctx, "mosaic_hexxla_retrieval_budget_status invoked")
-		}
-		return nil, tracker.Status(req), nil
-	})
+	}, handler)
+}
+
+func handleRetrievalBudgetStatus(ctx context.Context, req *mcp.CallToolRequest, tracker *RetrievalBudgetTracker, log *slog.Logger) (*mcp.CallToolResult, RetrievalBudgetStatus, error) {
+	if log != nil {
+		log.DebugContext(ctx, "mosaic_hexxla_retrieval_budget_status invoked")
+	}
+	return nil, tracker.Status(req), nil
 }

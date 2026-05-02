@@ -14,12 +14,16 @@ import (
 	"time"
 
 	"github.com/hexxla/hexxladb"
+	ratchetadapters "github.com/hexxla/mcp-ratchet/pkg/ratchet/adapters"
+	ratchetprimary "github.com/hexxla/mcp-ratchet/pkg/ratchet/ports/primary"
+	ratchetsecondary "github.com/hexxla/mcp-ratchet/pkg/ratchet/ports/secondary"
+	ratchetservices "github.com/hexxla/mcp-ratchet/pkg/ratchet/services"
 
 	"github.com/sploitzberg/mosaic/internal/adapter/primary/mcpsrv"
 	"github.com/sploitzberg/mosaic/internal/adapter/secondary/hexxlastore"
 	"github.com/sploitzberg/mosaic/internal/adapter/secondary/ollamaembed"
 	"github.com/sploitzberg/mosaic/internal/config"
-	"github.com/sploitzberg/mosaic/internal/core/services"
+	mosaicservices "github.com/sploitzberg/mosaic/internal/core/services"
 	ollamac "github.com/sploitzberg/mosaic/internal/ollama"
 )
 
@@ -40,6 +44,7 @@ func run(log *slog.Logger) error {
 	dbFlag := flag.String("db", "", "path to HexxlaDB file (overrides -name and "+config.EnvDBPath+")")
 	nameFlag := flag.String("name", "", "base name: <db-dir>/<name>.hexxla (overrides "+config.EnvDBPath+"; mutually exclusive with -db)")
 	dbDirFlag := flag.String("db-dir", "", "parent directory when using -name (default: from "+config.EnvMosaicDBDir+" or .tmp)")
+	ratchetConfigFlag := flag.String("ratchet-config", "", "path to ratchet workflow enforcement YAML (overrides "+config.EnvRatchetConfigFile+"); if not provided, ratchet is disabled")
 	flag.Parse()
 
 	mcpCfg, err := config.LoadMCPFromEnv()
@@ -67,6 +72,54 @@ func run(log *slog.Logger) error {
 		mosaicLoaded = loaded
 	} else {
 		configPathUsed = ""
+	}
+
+	// Load ratchet config if provided
+	ratchetConfigPath := config.ResolveRatchetConfigPath(*ratchetConfigFlag)
+	ratchetConfig, err := config.LoadRatchetConfig(ratchetConfigPath)
+	if err != nil {
+		return fmt.Errorf("ratchet config: %w", err)
+	}
+	mosaicLoaded.RatchetConfig = ratchetConfig
+
+	// Initialize ratchet service if config is provided
+	var ratchetSvc ratchetprimary.RatchetService
+	var sessionStore ratchetsecondary.SessionStore
+	if ratchetConfig.Path != "" {
+		configLoader := ratchetadapters.NewYAMLConfigLoader()
+		tokenStore := ratchetadapters.NewMemoryTokenStore()
+		sessionStore = ratchetadapters.NewMemorySessionStore()
+		randomGen := ratchetadapters.NewCryptoRandomGenerator()
+		clock := ratchetadapters.NewRealClock()
+
+		ratchetSvc = ratchetservices.NewRatchetService(
+			configLoader,
+			tokenStore,
+			sessionStore,
+			randomGen,
+			clock,
+		)
+
+		// Load ratchet rules from config file
+		configFile, err := os.Open(ratchetConfig.Path)
+		if err != nil {
+			return fmt.Errorf("open ratchet config file: %w", err)
+		}
+		defer func() {
+			if cerr := configFile.Close(); cerr != nil {
+				log.Warn("close ratchet config file", "err", cerr)
+			}
+		}()
+
+		ctx := context.Background()
+		rules, err := ratchetSvc.LoadConfiguration(ctx, configFile)
+		if err != nil {
+			return fmt.Errorf("load ratchet configuration: %w", err)
+		}
+
+		log.Info("ratchet config loaded",
+			"config_file", ratchetConfig.Path,
+			"rules_count", len(rules))
 	}
 
 	ollamaCfg, err := config.ResolveOllama(config.OllamaResolveInput{
@@ -115,21 +168,21 @@ func run(log *slog.Logger) error {
 	}()
 
 	engineHealth := hexxlastore.NewEngineHealthAdapter(live, dbCfg.Path)
-	healthSvc := services.NewHealthService(engineHealth, version, mosaicLoaded.MVCCRetainCommitsBehindHead)
+	healthSvc := mosaicservices.NewHealthService(engineHealth, version, mosaicLoaded.MVCCRetainCommitsBehindHead)
 
 	cellReader := hexxlastore.NewCellReaderAdapter(live)
 	ollamaClient := ollamac.NewClient(ollamaCfg.Base, ollamaCfg.Model)
-	cellRetrieval := services.NewCellRetrievalService(
+	cellRetrieval := mosaicservices.NewCellRetrievalService(
 		cellReader,
 		ollamaembed.NewTextEmbedder(ollamaClient),
 		embeddingDimAtBoot,
 	)
 
 	contextPackLoader := hexxlastore.NewContextPackAdapter(live)
-	contextAssembly := services.NewContextAssemblyService(contextPackLoader)
+	contextAssembly := mosaicservices.NewContextAssemblyService(contextPackLoader)
 
 	embeddingANN := hexxlastore.NewEmbeddingANNAdapter(live, ollamaClient)
-	embeddingSvc := services.NewEmbeddingSearchService(embeddingANN)
+	embeddingSvc := mosaicservices.NewEmbeddingSearchService(embeddingANN)
 
 	cellWriter := hexxlastore.NewCellWriterAdapter(live, dbCfg.Path, openOpts, mosaicLoaded.DeleteAutoMaintain)
 	defer func() {
@@ -141,36 +194,42 @@ func run(log *slog.Logger) error {
 	}()
 
 	runtimeCfg := config.NewMosaicRuntimeConfig(mosaicLoaded.Retention, mosaicLoaded.AllowDeleteCell)
-	mutationSvc := services.NewCellMutationService(
+	mutationSvc := mosaicservices.NewCellMutationService(
 		cellWriter, ollamaembed.NewTextEmbedder(ollamaClient), embeddingDimAtBoot,
-		services.WithMosaicRuntime(runtimeCfg),
+		mosaicservices.WithMosaicRuntime(runtimeCfg),
 	)
 
 	seamStore := hexxlastore.NewSeamStoreAdapter(live)
-	seamSvc := services.NewSeamLifecycleService(seamStore)
+	seamSvc := mosaicservices.NewSeamLifecycleService(seamStore)
 
 	facetEdgeStore := hexxlastore.NewFacetEdgeStoreAdapter(live)
-	facetEdgeSvc := services.NewFacetEdgeService(facetEdgeStore)
-	facetEdgeBrowse := services.NewFacetEdgeReadService(facetEdgeStore)
+	facetEdgeSvc := mosaicservices.NewFacetEdgeService(facetEdgeStore)
+	facetEdgeBrowse := mosaicservices.NewFacetEdgeReadService(facetEdgeStore)
 
 	tagCatalog := hexxlastore.NewTagCatalogAdapter(live)
-	tagBrowseSvc := services.NewTagCatalogService(tagCatalog)
+	tagBrowseSvc := mosaicservices.NewTagCatalogService(tagCatalog)
+
+	// Create ratchet wrapper if ratchet service is available
+	var ratchetWrapper *mcpsrv.RatchetWrapper
+	if ratchetConfig.Path != "" {
+		ratchetWrapper = mcpsrv.NewRatchetWrapper(ratchetSvc, sessionStore, log)
+	}
 
 	policyInstructions := config.MCPPolicyInstructions(runtimeCfg, configPathUsed)
 	srv := mcpsrv.NewServer("mosaic", version, mcpsrv.ServerInstructions(policyInstructions))
-	mcpsrv.RegisterHealthTool(srv, healthSvc, log, retrievalBudget)
-	mcpsrv.RegisterCellQueryTool(srv, cellRetrieval, log, retrievalBudget)
-	mcpsrv.RegisterCellSearchTool(srv, cellRetrieval, log, retrievalBudget)
-	mcpsrv.RegisterEmbeddingSearchTool(srv, embeddingSvc, log, retrievalBudget)
-	mcpsrv.RegisterContextPackTool(srv, contextAssembly, log, retrievalBudget)
-	mcpsrv.RegisterContextBudgetEstimateTool(srv, log)
-	mcpsrv.RegisterCellMutationTools(srv, mutationSvc, runtimeCfg, log)
-	mcpsrv.RegisterSeamTools(srv, seamSvc, log, retrievalBudget)
-	mcpsrv.RegisterFacetEdgeTools(srv, facetEdgeSvc, log)
-	mcpsrv.RegisterFacetEdgeBrowseTools(srv, facetEdgeBrowse, log, retrievalBudget)
-	mcpsrv.RegisterTagBrowseTools(srv, tagBrowseSvc, log, retrievalBudget)
-	mcpsrv.RegisterPersistencePolicyTool(srv, runtimeCfg, configPathUsed, log)
-	mcpsrv.RegisterRetrievalBudgetStatusTool(srv, retrievalBudget, log)
+	mcpsrv.RegisterHealthTool(srv, healthSvc, log, retrievalBudget, ratchetWrapper)
+	mcpsrv.RegisterCellQueryTool(srv, cellRetrieval, log, retrievalBudget, ratchetWrapper)
+	mcpsrv.RegisterCellSearchTool(srv, cellRetrieval, log, retrievalBudget, ratchetWrapper)
+	mcpsrv.RegisterEmbeddingSearchTool(srv, embeddingSvc, log, retrievalBudget, ratchetWrapper)
+	mcpsrv.RegisterContextPackTool(srv, contextAssembly, log, retrievalBudget, ratchetWrapper)
+	mcpsrv.RegisterContextBudgetEstimateTool(srv, log, ratchetWrapper)
+	mcpsrv.RegisterCellMutationTools(srv, mutationSvc, runtimeCfg, log, ratchetWrapper)
+	mcpsrv.RegisterSeamTools(srv, seamSvc, log, retrievalBudget, ratchetWrapper)
+	mcpsrv.RegisterFacetEdgeTools(srv, facetEdgeSvc, log, ratchetWrapper)
+	mcpsrv.RegisterFacetEdgeBrowseTools(srv, facetEdgeBrowse, log, retrievalBudget, ratchetWrapper)
+	mcpsrv.RegisterTagBrowseTools(srv, tagBrowseSvc, log, retrievalBudget, ratchetWrapper)
+	mcpsrv.RegisterPersistencePolicyTool(srv, runtimeCfg, configPathUsed, log, ratchetWrapper)
+	mcpsrv.RegisterRetrievalBudgetStatusTool(srv, retrievalBudget, log, ratchetWrapper)
 	h := mcpsrv.StreamableHTTPHandler(srv, log)
 
 	mux := http.NewServeMux()
