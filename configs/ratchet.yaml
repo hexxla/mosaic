@@ -25,7 +25,7 @@ rules:
     prerequisite: ""
     expiry: "10m"
     error_message: ""
-    one_time_use: false
+    one_time_use: true
 
   - tool: "mosaic_hexxla_tag_counts"
     prerequisite: ""
@@ -131,27 +131,27 @@ rules:
   - tool: "mosaic_hexxla_put_cell"
     prerequisite: "mosaic_hexxla_list_tags"
     error_message: "Before saving a cell, review available tags to prevent fragmentation. Call mosaic_hexxla_list_tags to see current vocabulary."
-    one_time_use: true
+    one_time_use: false
 
   - tool: "mosaic_hexxla_put_cell"
     prerequisite: "mosaic_hexxla_tag_counts"
     error_message: "Before saving a cell, understand current tag frequency. Call mosaic_hexxla_tag_counts to see tag usage patterns."
-    one_time_use: true
+    one_time_use: false
 
   - tool: "mosaic_hexxla_put_cell"
     prerequisite: "mosaic_hexxla_search_embedding"
     error_message: "Before saving a cell, verify the target location and understand existing context. Call a retrieval tool (search_embedding, query_cells, or search_cells) to locate relevant cells."
-    one_time_use: true
+    one_time_use: false
 
   - tool: "mosaic_hexxla_put_cell"
     prerequisite: "mosaic_hexxla_query_cells"
     error_message: "Before saving a cell, verify the target location and understand existing context. Call a retrieval tool (search_embedding, query_cells, or search_cells) to locate relevant cells."
-    one_time_use: true
+    one_time_use: false
 
   - tool: "mosaic_hexxla_put_cell"
     prerequisite: "mosaic_hexxla_search_cells"
     error_message: "Before saving a cell, verify the target location and understand existing context. Call a retrieval tool (search_embedding, query_cells, or search_cells) to locate relevant cells."
-    one_time_use: true
+    one_time_use: false
 
   # Budget Estimation - Strong enforcement for large operations
   # estimate_context_budget_bytes required before large context loads
@@ -161,7 +161,7 @@ rules:
   - tool: "mosaic_hexxla_load_context_pack"
     prerequisite: "mosaic_hexxla_estimate_context_budget_bytes"
     error_message: "Before loading context, preview token usage. Call mosaic_hexxla_estimate_context_budget_bytes to avoid exceeding context limits."
-    one_time_use: true
+    one_time_use: false
 
   # Health Check - Session-level enforcement
   # health is session-level (one_time_use: false, 15m expiry)
@@ -171,17 +171,17 @@ rules:
   - tool: "mosaic_hexxla_put_embedding"
     prerequisite: "mosaic_hexxla_search_embedding"
     error_message: "Before storing an embedding, verify the target cell exists. Call a retrieval tool (search_embedding, query_cells, or search_cells) to locate the cell."
-    one_time_use: true
+    one_time_use: false
 
   - tool: "mosaic_hexxla_put_embedding"
     prerequisite: "mosaic_hexxla_query_cells"
     error_message: "Before storing an embedding, verify the target cell exists. Call a retrieval tool (search_embedding, query_cells, or search_cells) to locate the cell."
-    one_time_use: true
+    one_time_use: false
 
   - tool: "mosaic_hexxla_put_embedding"
     prerequisite: "mosaic_hexxla_search_cells"
     error_message: "Before storing an embedding, verify the target cell exists. Call a retrieval tool (search_embedding, query_cells, or search_cells) to locate the cell."
-    one_time_use: true
+    one_time_use: false
 
   # Delete Operations - Context-aware deletion
   # delete_cell requires retrieval to verify cell exists before deletion
@@ -190,17 +190,17 @@ rules:
   - tool: "mosaic_hexxla_delete_cell"
     prerequisite: "mosaic_hexxla_search_embedding"
     error_message: "Before deleting, verify the cell exists and understand its context. Call a retrieval tool (search_embedding, query_cells, or search_cells) to locate the cell."
-    one_time_use: true
+    one_time_use: false
 
   - tool: "mosaic_hexxla_delete_cell"
     prerequisite: "mosaic_hexxla_query_cells"
     error_message: "Before deleting, verify the cell exists and understand its context. Call a retrieval tool (search_embedding, query_cells, or search_cells) to locate the cell."
-    one_time_use: true
+    one_time_use: false
 
   - tool: "mosaic_hexxla_delete_cell"
     prerequisite: "mosaic_hexxla_search_cells"
     error_message: "Before deleting, verify the cell exists and understand its context. Call a retrieval tool (search_embedding, query_cells, or search_cells) to locate the cell."
-    one_time_use: true
+    one_time_use: false
 
   # Seam Operations - Context-aware seam management
   # Seam operations require retrieval to understand current state
@@ -209,47 +209,47 @@ rules:
   - tool: "mosaic_hexxla_mark_conflict"
     prerequisite: "mosaic_hexxla_search_embedding"
     error_message: "Before marking a conflict, understand the current state. Call a retrieval tool (search_embedding, query_cells, or search_cells) to locate relevant cells."
-    one_time_use: true
+    one_time_use: false
 
   - tool: "mosaic_hexxla_mark_conflict"
     prerequisite: "mosaic_hexxla_query_cells"
     error_message: "Before marking a conflict, understand the current state. Call a retrieval tool (search_embedding, query_cells, or search_cells) to locate relevant cells."
-    one_time_use: true
+    one_time_use: false
 
   - tool: "mosaic_hexxla_mark_conflict"
     prerequisite: "mosaic_hexxla_search_cells"
     error_message: "Before marking a conflict, understand the current state. Call a retrieval tool (search_embedding, query_cells, or search_cells) to locate relevant cells."
-    one_time_use: true
+    one_time_use: false
 
   - tool: "mosaic_hexxla_mark_supersedes"
     prerequisite: "mosaic_hexxla_search_embedding"
     error_message: "Before marking supersession, understand the current state. Call a retrieval tool (search_embedding, query_cells, or search_cells) to locate relevant cells."
-    one_time_use: true
+    one_time_use: false
 
   - tool: "mosaic_hexxla_mark_supersedes"
     prerequisite: "mosaic_hexxla_query_cells"
     error_message: "Before marking supersession, understand the current state. Call a retrieval tool (search_embedding, query_cells, or search_cells) to locate relevant cells."
-    one_time_use: true
+    one_time_use: false
 
   - tool: "mosaic_hexxla_mark_supersedes"
     prerequisite: "mosaic_hexxla_search_cells"
     error_message: "Before marking supersession, understand the current state. Call a retrieval tool (search_embedding, query_cells, or search_cells) to locate relevant cells."
-    one_time_use: true
+    one_time_use: false
 
   - tool: "mosaic_hexxla_resolve_seam"
     prerequisite: "mosaic_hexxla_search_embedding"
     error_message: "Before resolving a seam, understand the current state. Call a retrieval tool (search_embedding, query_cells, or search_cells) to locate relevant cells."
-    one_time_use: true
+    one_time_use: false
 
   - tool: "mosaic_hexxla_resolve_seam"
     prerequisite: "mosaic_hexxla_query_cells"
     error_message: "Before resolving a seam, understand the current state. Call a retrieval tool (search_embedding, query_cells, or search_cells) to locate relevant cells."
-    one_time_use: true
+    one_time_use: false
 
   - tool: "mosaic_hexxla_resolve_seam"
     prerequisite: "mosaic_hexxla_search_cells"
     error_message: "Before resolving a seam, understand the current state. Call a retrieval tool (search_embedding, query_cells, or search_cells) to locate relevant cells."
-    one_time_use: true
+    one_time_use: false
 
   # Facet/Edge Operations - Flexible retrieval acceptance
   # Facet/edge operations require fresh retrieval for valid cell coordinates
@@ -259,32 +259,32 @@ rules:
   - tool: "mosaic_hexxla_put_facet"
     prerequisite: "mosaic_hexxla_search_embedding"
     error_message: "Before writing a facet, verify the cell exists. Call a retrieval tool (search_embedding, query_cells, or search_cells) to locate the cell."
-    one_time_use: true
+    one_time_use: false
 
   - tool: "mosaic_hexxla_put_facet"
     prerequisite: "mosaic_hexxla_query_cells"
     error_message: "Before writing a facet, verify the cell exists. Call a retrieval tool (search_embedding, query_cells, or search_cells) to locate the cell."
-    one_time_use: true
+    one_time_use: false
 
   - tool: "mosaic_hexxla_put_facet"
     prerequisite: "mosaic_hexxla_search_cells"
     error_message: "Before writing a facet, verify the cell exists. Call a retrieval tool (search_embedding, query_cells, or search_cells) to locate the cell."
-    one_time_use: true
+    one_time_use: false
 
   - tool: "mosaic_hexxla_link_cells"
     prerequisite: "mosaic_hexxla_search_embedding"
     error_message: "Before linking cells, verify both cells exist. Call a retrieval tool (search_embedding, query_cells, or search_cells) to locate the cells."
-    one_time_use: true
+    one_time_use: false
 
   - tool: "mosaic_hexxla_link_cells"
     prerequisite: "mosaic_hexxla_query_cells"
     error_message: "Before linking cells, verify both cells exist. Call a retrieval tool (search_embedding, query_cells, or search_cells) to locate the cells."
-    one_time_use: true
+    one_time_use: false
 
   - tool: "mosaic_hexxla_link_cells"
     prerequisite: "mosaic_hexxla_search_cells"
     error_message: "Before linking cells, verify both cells exist. Call a retrieval tool (search_embedding, query_cells, or search_cells) to locate the cells."
-    one_time_use: true
+    one_time_use: false
 
   # Read-only operations - No prerequisites
   # Health check is session-level, not required per read operation
