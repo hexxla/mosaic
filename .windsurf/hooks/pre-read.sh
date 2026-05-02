@@ -5,6 +5,11 @@
 ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 cd "$ROOT"
 
+# Run Mosaic-specific context injection
+if [ -f ".windsurf/hooks/pre-read-mosaic-context.sh" ]; then
+  ./.windsurf/hooks/pre-read-mosaic-context.sh "$1" 2>/dev/null || true
+fi
+
 # Run context injection
 if [ -f "scripts/llm/hooks/pre-read-context-injection.sh" ]; then
   ./scripts/llm/hooks/pre-read-context-injection.sh "$1" 2>/dev/null || true

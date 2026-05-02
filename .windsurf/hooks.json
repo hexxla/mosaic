@@ -6,10 +6,28 @@
         "show_output": false
       }
     ],
-    "post_write_code": [
+    "pre_mcp_tool_use": [
       {
-        "command": ".windsurf/hooks/post-write.sh",
-        "show_output": true
+        "command": ".windsurf/hooks/pre-mcp-tool-use.sh",
+        "show_output": false
+      }
+    ],
+    "pre_user_prompt": [
+      {
+        "command": ".windsurf/hooks/pre-user-prompt.sh",
+        "show_output": false
+      }
+    ],
+    "post_cascade_response": [
+      {
+        "command": ".windsurf/hooks/post-cascade-response.sh",
+        "show_output": false
+      }
+    ],
+    "post_cascade_response_with_transcript": [
+      {
+        "command": ".windsurf/hooks/post-cascade-response-with-transcript.sh",
+        "show_output": false
       }
     ]
   }
