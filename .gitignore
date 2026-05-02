@@ -93,7 +93,7 @@ TODO.md
 NOTES.md
 
 # Cursor — ignore local IDE noise; version-control agent rules under .cursor/rules/
-.cursor/*
+# .cursor/*
 !.cursor/rules/
 !.cursor/rules/**
 
