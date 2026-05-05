@@ -46,14 +46,15 @@ func registerPutFacetTool(server *mcp.Server, svc primary.FacetEdge, log *slog.L
 		wrappedHandler := func(ctx context.Context, req *mcp.CallToolRequest, in putFacetInput) (*mcp.CallToolResult, domain.MutationOK, error) {
 			sessionID := ratchetWrapper.DeriveSessionID(ctx)
 
+			// Use ratchetSvc.CreateSession for session_created events
+			_, err := ratchetWrapper.ratchetSvc.CreateSession(ctx, sessionID)
+			if err != nil {
+				return nil, domain.MutationOK{}, fmt.Errorf("failed to create session: %w", err)
+			}
+
 			session, err := ratchetWrapper.sessionStore.Get(ctx, sessionID)
 			if err != nil {
-				session = ratchetdomain.NewSession(sessionID)
-				if createErr := ratchetWrapper.sessionStore.Create(ctx, session); createErr != nil {
-					if ratchetWrapper.log != nil {
-						ratchetWrapper.log.WarnContext(ctx, "failed to create session", "error", createErr)
-					}
-				}
+				return nil, domain.MutationOK{}, fmt.Errorf("failed to get session: %w", err)
 			}
 
 			var token ratchetdomain.TokenValue
@@ -128,14 +129,15 @@ func registerLinkCellsTool(server *mcp.Server, svc primary.FacetEdge, log *slog.
 		wrappedHandler := func(ctx context.Context, req *mcp.CallToolRequest, in linkInput) (*mcp.CallToolResult, domain.MutationOK, error) {
 			sessionID := ratchetWrapper.DeriveSessionID(ctx)
 
+			// Use ratchetSvc.CreateSession for session_created events
+			_, err := ratchetWrapper.ratchetSvc.CreateSession(ctx, sessionID)
+			if err != nil {
+				return nil, domain.MutationOK{}, fmt.Errorf("failed to create session: %w", err)
+			}
+
 			session, err := ratchetWrapper.sessionStore.Get(ctx, sessionID)
 			if err != nil {
-				session = ratchetdomain.NewSession(sessionID)
-				if createErr := ratchetWrapper.sessionStore.Create(ctx, session); createErr != nil {
-					if ratchetWrapper.log != nil {
-						ratchetWrapper.log.WarnContext(ctx, "failed to create session", "error", createErr)
-					}
-				}
+				return nil, domain.MutationOK{}, fmt.Errorf("failed to get session: %w", err)
 			}
 
 			var token ratchetdomain.TokenValue

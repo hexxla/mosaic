@@ -59,14 +59,15 @@ func registerFindSeamsTool(server *mcp.Server, svc primary.SeamLifecycle, log *s
 		wrappedHandler := func(ctx context.Context, req *mcp.CallToolRequest, in findSeamsInput) (*mcp.CallToolResult, domain.FindSeamsResponse, error) {
 			sessionID := ratchetWrapper.DeriveSessionID(ctx)
 
+			// Use ratchetSvc.CreateSession for session_created events
+			_, err := ratchetWrapper.ratchetSvc.CreateSession(ctx, sessionID)
+			if err != nil {
+				return nil, domain.FindSeamsResponse{}, fmt.Errorf("failed to create session: %w", err)
+			}
+
 			session, err := ratchetWrapper.sessionStore.Get(ctx, sessionID)
 			if err != nil {
-				session = ratchetdomain.NewSession(sessionID)
-				if createErr := ratchetWrapper.sessionStore.Create(ctx, session); createErr != nil {
-					if ratchetWrapper.log != nil {
-						ratchetWrapper.log.WarnContext(ctx, "failed to create session", "error", createErr)
-					}
-				}
+				return nil, domain.FindSeamsResponse{}, fmt.Errorf("failed to get session: %w", err)
 			}
 
 			var token ratchetdomain.TokenValue
@@ -144,14 +145,15 @@ func registerMarkConflictTool(server *mcp.Server, svc primary.SeamLifecycle, log
 		wrappedHandler := func(ctx context.Context, req *mcp.CallToolRequest, in markConflictInput) (*mcp.CallToolResult, domain.MutationOK, error) {
 			sessionID := ratchetWrapper.DeriveSessionID(ctx)
 
+			// Use ratchetSvc.CreateSession for session_created events
+			_, err := ratchetWrapper.ratchetSvc.CreateSession(ctx, sessionID)
+			if err != nil {
+				return nil, domain.MutationOK{}, fmt.Errorf("failed to create session: %w", err)
+			}
+
 			session, err := ratchetWrapper.sessionStore.Get(ctx, sessionID)
 			if err != nil {
-				session = ratchetdomain.NewSession(sessionID)
-				if createErr := ratchetWrapper.sessionStore.Create(ctx, session); createErr != nil {
-					if ratchetWrapper.log != nil {
-						ratchetWrapper.log.WarnContext(ctx, "failed to create session", "error", createErr)
-					}
-				}
+				return nil, domain.MutationOK{}, fmt.Errorf("failed to get session: %w", err)
 			}
 
 			var token ratchetdomain.TokenValue
@@ -226,14 +228,15 @@ func registerMarkSupersedesTool(server *mcp.Server, svc primary.SeamLifecycle, l
 		wrappedHandler := func(ctx context.Context, req *mcp.CallToolRequest, in markSupInput) (*mcp.CallToolResult, domain.MutationOK, error) {
 			sessionID := ratchetWrapper.DeriveSessionID(ctx)
 
+			// Use ratchetSvc.CreateSession for session_created events
+			_, err := ratchetWrapper.ratchetSvc.CreateSession(ctx, sessionID)
+			if err != nil {
+				return nil, domain.MutationOK{}, fmt.Errorf("failed to create session: %w", err)
+			}
+
 			session, err := ratchetWrapper.sessionStore.Get(ctx, sessionID)
 			if err != nil {
-				session = ratchetdomain.NewSession(sessionID)
-				if createErr := ratchetWrapper.sessionStore.Create(ctx, session); createErr != nil {
-					if ratchetWrapper.log != nil {
-						ratchetWrapper.log.WarnContext(ctx, "failed to create session", "error", createErr)
-					}
-				}
+				return nil, domain.MutationOK{}, fmt.Errorf("failed to get session: %w", err)
 			}
 
 			var token ratchetdomain.TokenValue
@@ -308,14 +311,15 @@ func registerResolveSeamTool(server *mcp.Server, svc primary.SeamLifecycle, log 
 		wrappedHandler := func(ctx context.Context, req *mcp.CallToolRequest, in resolveInput) (*mcp.CallToolResult, domain.MutationOK, error) {
 			sessionID := ratchetWrapper.DeriveSessionID(ctx)
 
+			// Use ratchetSvc.CreateSession for session_created events
+			_, err := ratchetWrapper.ratchetSvc.CreateSession(ctx, sessionID)
+			if err != nil {
+				return nil, domain.MutationOK{}, fmt.Errorf("failed to create session: %w", err)
+			}
+
 			session, err := ratchetWrapper.sessionStore.Get(ctx, sessionID)
 			if err != nil {
-				session = ratchetdomain.NewSession(sessionID)
-				if createErr := ratchetWrapper.sessionStore.Create(ctx, session); createErr != nil {
-					if ratchetWrapper.log != nil {
-						ratchetWrapper.log.WarnContext(ctx, "failed to create session", "error", createErr)
-					}
-				}
+				return nil, domain.MutationOK{}, fmt.Errorf("failed to get session: %w", err)
 			}
 
 			var token ratchetdomain.TokenValue

@@ -1,9 +1,9 @@
 version: 1
 
 # Optional Ollama overrides (otherwise MOSAIC_OLLAMA_URL / MOSAIC_EMBED_MODEL or built-in defaults).
-# ollama:
-#   base_url: http://127.0.0.1:11434
-#   embed_model: all-minilm
+ollama:
+  base_url: http://127.0.0.1:11434
+  embed_model: nomic-embed-text
 
 retention:
   capture_mode: save_all_turns
@@ -21,3 +21,11 @@ database:
     debounce_after_delete_ms: 2000
     prune_profile: balanced
     max_prune_rounds_per_delete: 256
+
+# MCP server observability settings.
+# These control HTTP stats/events endpoints and WebSocket real-time streaming.
+mcp:
+  observability:
+    http_enabled: true
+    websocket_enabled: true
+    websocket_path: "/observability/stream"

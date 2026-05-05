@@ -25,14 +25,15 @@ func RegisterHealthTool(server *mcp.Server, health primary.Health, log *slog.Log
 		wrappedHandler := func(ctx context.Context, req *mcp.CallToolRequest, _ healthInput) (*mcp.CallToolResult, domain.HealthSummary, error) {
 			sessionID := ratchetWrapper.DeriveSessionID(ctx)
 
+			// Use ratchetSvc.CreateSession for session_created events
+			_, err := ratchetWrapper.ratchetSvc.CreateSession(ctx, sessionID)
+			if err != nil {
+				return nil, domain.HealthSummary{}, fmt.Errorf("failed to create session: %w", err)
+			}
+
 			session, err := ratchetWrapper.sessionStore.Get(ctx, sessionID)
 			if err != nil {
-				session = ratchetdomain.NewSession(sessionID)
-				if createErr := ratchetWrapper.sessionStore.Create(ctx, session); createErr != nil {
-					if ratchetWrapper.log != nil {
-						ratchetWrapper.log.WarnContext(ctx, "failed to create session", "error", createErr)
-					}
-				}
+				return nil, domain.HealthSummary{}, fmt.Errorf("failed to get session: %w", err)
 			}
 
 			var token ratchetdomain.TokenValue

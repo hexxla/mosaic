@@ -55,14 +55,15 @@ func registerGetFacet(server *mcp.Server, svc primary.FacetEdgeBrowse, log *slog
 		wrappedHandler := func(ctx context.Context, req *mcp.CallToolRequest, in getFacetInput) (*mcp.CallToolResult, domain.GetFacetResponse, error) {
 			sessionID := ratchetWrapper.DeriveSessionID(ctx)
 
+			// Use ratchetSvc.CreateSession for session_created events
+			_, err := ratchetWrapper.ratchetSvc.CreateSession(ctx, sessionID)
+			if err != nil {
+				return nil, domain.GetFacetResponse{}, fmt.Errorf("failed to create session: %w", err)
+			}
+
 			session, err := ratchetWrapper.sessionStore.Get(ctx, sessionID)
 			if err != nil {
-				session = ratchetdomain.NewSession(sessionID)
-				if createErr := ratchetWrapper.sessionStore.Create(ctx, session); createErr != nil {
-					if ratchetWrapper.log != nil {
-						ratchetWrapper.log.WarnContext(ctx, "failed to create session", "error", createErr)
-					}
-				}
+				return nil, domain.GetFacetResponse{}, fmt.Errorf("failed to get session: %w", err)
 			}
 
 			var token ratchetdomain.TokenValue
@@ -132,14 +133,15 @@ func registerListFacets(server *mcp.Server, svc primary.FacetEdgeBrowse, log *sl
 		wrappedHandler := func(ctx context.Context, req *mcp.CallToolRequest, in listFacetsInput) (*mcp.CallToolResult, domain.ListFacetsForCellResponse, error) {
 			sessionID := ratchetWrapper.DeriveSessionID(ctx)
 
+			// Use ratchetSvc.CreateSession for session_created events
+			_, err := ratchetWrapper.ratchetSvc.CreateSession(ctx, sessionID)
+			if err != nil {
+				return nil, domain.ListFacetsForCellResponse{}, fmt.Errorf("failed to create session: %w", err)
+			}
+
 			session, err := ratchetWrapper.sessionStore.Get(ctx, sessionID)
 			if err != nil {
-				session = ratchetdomain.NewSession(sessionID)
-				if createErr := ratchetWrapper.sessionStore.Create(ctx, session); createErr != nil {
-					if ratchetWrapper.log != nil {
-						ratchetWrapper.log.WarnContext(ctx, "failed to create session", "error", createErr)
-					}
-				}
+				return nil, domain.ListFacetsForCellResponse{}, fmt.Errorf("failed to get session: %w", err)
 			}
 
 			var token ratchetdomain.TokenValue
@@ -209,14 +211,15 @@ func registerGetEdge(server *mcp.Server, svc primary.FacetEdgeBrowse, log *slog.
 		wrappedHandler := func(ctx context.Context, req *mcp.CallToolRequest, in getEdgeInput) (*mcp.CallToolResult, domain.GetEdgeResponse, error) {
 			sessionID := ratchetWrapper.DeriveSessionID(ctx)
 
+			// Use ratchetSvc.CreateSession for session_created events
+			_, err := ratchetWrapper.ratchetSvc.CreateSession(ctx, sessionID)
+			if err != nil {
+				return nil, domain.GetEdgeResponse{}, fmt.Errorf("failed to create session: %w", err)
+			}
+
 			session, err := ratchetWrapper.sessionStore.Get(ctx, sessionID)
 			if err != nil {
-				session = ratchetdomain.NewSession(sessionID)
-				if createErr := ratchetWrapper.sessionStore.Create(ctx, session); createErr != nil {
-					if ratchetWrapper.log != nil {
-						ratchetWrapper.log.WarnContext(ctx, "failed to create session", "error", createErr)
-					}
-				}
+				return nil, domain.GetEdgeResponse{}, fmt.Errorf("failed to get session: %w", err)
 			}
 
 			var token ratchetdomain.TokenValue
@@ -290,14 +293,15 @@ func registerListEdgesFrom(server *mcp.Server, svc primary.FacetEdgeBrowse, log 
 		wrappedHandler := func(ctx context.Context, req *mcp.CallToolRequest, in listEdgesFromInput) (*mcp.CallToolResult, domain.ListEdgesFromResponse, error) {
 			sessionID := ratchetWrapper.DeriveSessionID(ctx)
 
+			// Use ratchetSvc.CreateSession for session_created events
+			_, err := ratchetWrapper.ratchetSvc.CreateSession(ctx, sessionID)
+			if err != nil {
+				return nil, domain.ListEdgesFromResponse{}, fmt.Errorf("failed to create session: %w", err)
+			}
+
 			session, err := ratchetWrapper.sessionStore.Get(ctx, sessionID)
 			if err != nil {
-				session = ratchetdomain.NewSession(sessionID)
-				if createErr := ratchetWrapper.sessionStore.Create(ctx, session); createErr != nil {
-					if ratchetWrapper.log != nil {
-						ratchetWrapper.log.WarnContext(ctx, "failed to create session", "error", createErr)
-					}
-				}
+				return nil, domain.ListEdgesFromResponse{}, fmt.Errorf("failed to get session: %w", err)
 			}
 
 			var token ratchetdomain.TokenValue

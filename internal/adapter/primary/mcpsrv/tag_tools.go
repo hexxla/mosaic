@@ -24,14 +24,15 @@ func RegisterTagBrowseTools(server *mcp.Server, svc primary.TagBrowse, log *slog
 		wrappedHandler := func(ctx context.Context, req *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, domain.DistinctTagsResult, error) {
 			sessionID := ratchetWrapper.DeriveSessionID(ctx)
 
+			// Use ratchetSvc.CreateSession for session_created events
+			_, err := ratchetWrapper.ratchetSvc.CreateSession(ctx, sessionID)
+			if err != nil {
+				return nil, domain.DistinctTagsResult{}, fmt.Errorf("failed to create session: %w", err)
+			}
+
 			session, err := ratchetWrapper.sessionStore.Get(ctx, sessionID)
 			if err != nil {
-				session = ratchetdomain.NewSession(sessionID)
-				if createErr := ratchetWrapper.sessionStore.Create(ctx, session); createErr != nil {
-					if ratchetWrapper.log != nil {
-						ratchetWrapper.log.WarnContext(ctx, "failed to create session", "error", createErr)
-					}
-				}
+				return nil, domain.DistinctTagsResult{}, fmt.Errorf("failed to get session: %w", err)
 			}
 
 			var token ratchetdomain.TokenValue
@@ -92,14 +93,15 @@ func RegisterTagBrowseTools(server *mcp.Server, svc primary.TagBrowse, log *slog
 		wrappedHandler2 := func(ctx context.Context, req *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, domain.TagCountsResult, error) {
 			sessionID := ratchetWrapper.DeriveSessionID(ctx)
 
+			// Use ratchetSvc.CreateSession for session_created events
+			_, err := ratchetWrapper.ratchetSvc.CreateSession(ctx, sessionID)
+			if err != nil {
+				return nil, domain.TagCountsResult{}, fmt.Errorf("failed to create session: %w", err)
+			}
+
 			session, err := ratchetWrapper.sessionStore.Get(ctx, sessionID)
 			if err != nil {
-				session = ratchetdomain.NewSession(sessionID)
-				if createErr := ratchetWrapper.sessionStore.Create(ctx, session); createErr != nil {
-					if ratchetWrapper.log != nil {
-						ratchetWrapper.log.WarnContext(ctx, "failed to create session", "error", createErr)
-					}
-				}
+				return nil, domain.TagCountsResult{}, fmt.Errorf("failed to get session: %w", err)
 			}
 
 			var token ratchetdomain.TokenValue

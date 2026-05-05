@@ -1,7 +1,7 @@
 # Makefile for Mosaic (MCP server + tooling)
 
 .PHONY: help build build-mosaic-mcp build-mosaic-seed build-mosaic-create-db test test-all integration lint fmt ci clean install install-mosaic-mcp install-mosaic-seed install-mosaic-create-db seed reseed mosaic-dev run-mosaic-mcp run-mosaic-seed run-mosaic-create-db create-db tidy vet update govulncheck \
-	build-linux build-darwin build-windows build-all
+	build-linux build-darwin build-windows build-all run-ws-test
 
 # Bare `make` runs the full CI pipeline (same as `make ci`). Use `make help` to list targets.
 .DEFAULT_GOAL := ci
@@ -36,6 +36,11 @@ MOSAIC_POLICY_FILE   ?=
 MOSAIC_CREATE_DB_FLAGS ?=
 MOSAIC_SEED_FLAGS      ?=
 MOSAIC_MCP_FLAGS       ?=
+
+# WebSocket test client defaults. Override when invoking make.
+WS_TEST_HOST       ?= localhost:8787
+WS_TEST_PATH       ?= /observability/stream
+WS_TEST_SESSION_ID ?= mosaic-mcp-session
 
 # Default build artifact is mosaic-mcp (used by build-linux/darwin/windows helpers).
 build: build-mosaic-mcp
@@ -162,6 +167,7 @@ help:
 	@echo "  make mosaic-dev      seed then run mosaic-mcp (optional MOSAIC_SEED_FLAGS / MOSAIC_MCP_FLAGS)"
 	@echo "  make run-mosaic-mcp Run mosaic-mcp (MOSAIC_* ; optional MOSAIC_MCP_FLAGS e.g. -policy)"
 	@echo "  make run-mosaic-create-db | make create-db  Empty DB (MOSAIC_DB_PATH; MOSAIC_CREATE_DB_FLAGS)"
+	@echo "  make run-ws-test     Connect WebSocket test client (WS_TEST_HOST, WS_TEST_SESSION_ID)"
 	@echo "  make clean           Remove build artifacts"
 	@echo "  make tidy            go mod tidy"
 	@echo "  make llm-setup       Setup LLM tool configurations"
@@ -188,6 +194,9 @@ run-mosaic-mcp:
 	MOSAIC_DB_PATH="$(MOSAIC_DB_PATH)" MOSAIC_MCP_ADDR="$(MOSAIC_MCP_ADDR)" MOSAIC_MCP_PATH="$(MOSAIC_MCP_PATH)" \
 		MOSAIC_POLICY_FILE="$(MOSAIC_POLICY_FILE)" \
 		go run ./cmd/mosaic-mcp $(MOSAIC_MCP_FLAGS)
+
+run-ws-test:
+	go run ./cmd/ws-test -host "$(WS_TEST_HOST)" -path "$(WS_TEST_PATH)" -session-id "$(WS_TEST_SESSION_ID)"
 
 run-mosaic-create-db create-db:
 	MOSAIC_DB_PATH="$(MOSAIC_DB_PATH)" MOSAIC_POLICY_FILE="$(MOSAIC_POLICY_FILE)" \

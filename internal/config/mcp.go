@@ -23,6 +23,22 @@ type MCP struct {
 
 	// Path is the HTTP path at which MCP JSON-RPC is served (single endpoint).
 	Path string
+
+	// Observability holds server-level observability settings (HTTP endpoints, WebSocket).
+	Observability MCPObservability
+}
+
+// MCPObservability holds server-level observability configuration.
+// These settings control how the MCP server exposes ratchet observability events.
+type MCPObservability struct {
+	// HTTPEnabled controls whether HTTP observability endpoints are exposed.
+	HTTPEnabled bool `yaml:"http_enabled"`
+
+	// WebSocketEnabled controls whether WebSocket streaming is enabled.
+	WebSocketEnabled bool `yaml:"websocket_enabled"`
+
+	// WebSocketPath is the HTTP path for WebSocket connections.
+	WebSocketPath string `yaml:"websocket_path"`
 }
 
 // LoadMCPFromEnv reads MCP settings from MOSAIC_MCP_ADDR and MOSAIC_MCP_PATH.

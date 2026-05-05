@@ -33,6 +33,9 @@ type MosaicConfigLoaded struct {
 
 	// RatchetConfig is the ratchet workflow enforcement configuration (optional).
 	RatchetConfig RatchetConfig
+
+	// MCP holds server-level observability settings for the MCP server.
+	MCPObservability MCPObservability
 }
 
 // retentionYAMLFields is the retention subsection (capture_mode, enforcement, notes).
@@ -91,6 +94,14 @@ type rawMosaicConfig struct {
 
 	Retrieval *retrievalYAMLFields `yaml:"retrieval,omitempty"`
 	Ollama    *ollamaYAMLFields    `yaml:"ollama,omitempty"`
+
+	// MCP holds server-level observability settings for the MCP server.
+	MCP *mcpYAMLFields `yaml:"mcp,omitempty"`
+}
+
+// mcpYAMLFields is the MCP subsection (observability settings).
+type mcpYAMLFields struct {
+	Observability MCPObservability `yaml:"observability,omitempty"`
 }
 
 // DefaultMosaicConfig is the in-process default when no file is loaded.
@@ -237,6 +248,14 @@ func ParseMosaicConfigYAML(data []byte) (MosaicConfigLoaded, error) {
 		ollModel = strings.TrimSpace(raw.Ollama.EmbedModel)
 	}
 
+	mcpObs := MCPObservability{}
+	if raw.MCP != nil {
+		mcpObs = raw.MCP.Observability
+		if mcpObs.WebSocketPath == "" {
+			mcpObs.WebSocketPath = "/observability/stream"
+		}
+	}
+
 	loaded := MosaicConfigLoaded{
 		Retention:                   rt,
 		AllowDeleteCell:             allowDelete,
@@ -247,6 +266,7 @@ func ParseMosaicConfigYAML(data []byte) (MosaicConfigLoaded, error) {
 		OllamaBaseURL:               ollURL,
 		OllamaEmbedModel:            ollModel,
 		RatchetConfig:               RatchetConfig{},
+		MCPObservability:            mcpObs,
 	}
 	applyDeleteAutoMaintainDefaults(&loaded)
 	return loaded, nil

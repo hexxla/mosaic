@@ -149,6 +149,7 @@ Mosaic integrates **[mcp-ratchet](https://github.com/hexxla/mcp-ratchet)** to en
 - **Time-bound sessions**: Tokens expire after a configurable duration, ensuring context remains current
 - **Flexible rules**: Multiple prerequisite rules per tool (e.g., `put_cell` accepts `list_tags`, `tag_counts`, or retrieval tools)
 - **Session management**: Session-based token tracking across tool calls
+- **Observability**: Real-time event capture, WebSocket streaming, and HTTP endpoints for monitoring tool usage, session state, and token issuance
 
 ### Benefits
 
@@ -176,6 +177,23 @@ Example rule:
   error_message: "Before saving a cell, review available tags to prevent fragmentation. Call mosaic_hexxla_list_tags to see current vocabulary."
   one_time_use: true
 ```
+
+#### Observability
+
+Ratchet observability is configured in the same file under the `observability` section:
+
+```yaml
+observability:
+  enabled: true
+  storage_type: memory # memory or hexxladb
+  retention_days: 0 # 0 = keep all events
+```
+
+When enabled, Mosaic exposes HTTP endpoints for monitoring:
+
+- **`GET /observability/stats`** - Aggregate statistics (total events, tokens issued, active sessions)
+- **`GET /observability/events?session_id=<id>&limit=<n>`** - Paginated event history
+- **`WS /observability/stream`** - WebSocket endpoint for real-time event streaming
 
 For detailed configuration options and examples, see **[`docs/mosaic/RATCHET_INTEGRATION.md`](docs/mosaic/RATCHET_INTEGRATION.md)**.
 
