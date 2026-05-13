@@ -1,9 +1,9 @@
 module github.com/sploitzberg/mosaic
 
-go 1.26.2
+go 1.26.3
 
 require (
-	github.com/hexxla/hexxladb v0.3.0
+	github.com/hexxla/hexxladb v0.5.0
 	github.com/modelcontextprotocol/go-sdk v1.6.0
 	gopkg.in/yaml.v3 v3.0.1
 )
