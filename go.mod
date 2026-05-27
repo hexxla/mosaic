@@ -4,7 +4,7 @@ go 1.26.2
 
 require (
 	github.com/hexxla/hexxladb v0.3.0
-	github.com/modelcontextprotocol/go-sdk v1.6.0
+	github.com/modelcontextprotocol/go-sdk v1.6.1
 	gopkg.in/yaml.v3 v3.0.1
 )
 
