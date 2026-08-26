@@ -28,7 +28,7 @@ func RegisterContextBudgetEstimateTool(server *mcp.Server, log *slog.Logger) {
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "mosaic_hexxla_estimate_context_budget_bytes",
-		Description: "Preview UTF-8 byte budget from an approximate token count (same approximation and clamps as mosaic_hexxla_load_context_pack with budget_tokens_approx). Call before load_context_pack when tuning budget_tokens_approx or max_budget_bytes. Hexxla counts UTF-8 bytes (ByteLenBudgeter), not tokenizer tokens.",
+		Description: "Preview UTF-8 byte budget from an approximate token count (same approximation and clamps as mosaic_hexxla_load_context_pack with budget_tokens_approx). Call before load_context_pack when tuning budget_tokens_approx or max_budget_bytes. Mosaic enforces bytes without tracking provider tokenizers.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in estimateInput) (*mcp.CallToolResult, contextBudgetEstimateOutput, error) {
 		if log != nil {
 			log.DebugContext(ctx, "mosaic_hexxla_estimate_context_budget_bytes invoked")

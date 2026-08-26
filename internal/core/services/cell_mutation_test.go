@@ -14,17 +14,21 @@ type stubCellWriter struct {
 	putEmbVecLen    int
 	deleteCellCalls int
 	lastPutCellKind domain.CellPutKind
+	lastPutCell     *domain.PutCellCommand
+	putCellResult   domain.PutCellMutationResult
 }
 
-func (s *stubCellWriter) PutCell(_ context.Context, cmd *domain.PutCellCommand) error {
+func (s *stubCellWriter) PutCell(_ context.Context, cmd *domain.PutCellCommand) (domain.PutCellMutationResult, error) {
 	if s == nil {
-		return nil
+		return domain.PutCellMutationResult{}, nil
 	}
 	s.putCellCalls++
 	if cmd != nil {
 		s.lastPutCellKind = cmd.Kind
+		copied := *cmd
+		s.lastPutCell = &copied
 	}
-	return nil
+	return s.putCellResult, nil
 }
 
 func (s *stubCellWriter) PutEmbedding(_ context.Context, coord domain.AxialCoord, vec []float32) error {
@@ -71,7 +75,7 @@ func TestCellMutationService_PutCell_validation(t *testing.T) {
 	t.Run("rejects_empty_content", func(t *testing.T) {
 		t.Parallel()
 		svc := NewCellMutationService(&stubCellWriter{}, nil, 384)
-		err := svc.PutCell(t.Context(), &domain.PutCellCommand{
+		_, err := svc.PutCell(t.Context(), &domain.PutCellCommand{
 			Coord:      domain.AxialCoord{Q: 0, R: 0},
 			RawContent: "   ",
 			SourceID:   "src",
@@ -86,7 +90,7 @@ func TestCellMutationService_PutCell_validation(t *testing.T) {
 		t.Parallel()
 		w := &stubCellWriter{}
 		svc := NewCellMutationService(w, nil, 384)
-		if err := svc.PutCell(t.Context(), &domain.PutCellCommand{
+		if _, err := svc.PutCell(t.Context(), &domain.PutCellCommand{
 			Coord:      domain.AxialCoord{Q: 1, R: -1},
 			RawContent: "hello",
 			SourceID:   "session-1",
@@ -97,6 +101,9 @@ func TestCellMutationService_PutCell_validation(t *testing.T) {
 		}
 		if w.lastPutCellKind != domain.CellPutKindFact {
 			t.Fatalf("kind: got %q", w.lastPutCellKind)
+		}
+		if w.lastPutCell.Placement != domain.CellPlacementExact {
+			t.Fatalf("placement: got %q", w.lastPutCell.Placement)
 		}
 	})
 
@@ -109,7 +116,7 @@ func TestCellMutationService_PutCell_validation(t *testing.T) {
 		}
 		w := &stubCellWriter{}
 		svc := NewCellMutationService(w, nil, 384, WithMosaicRuntime(config.NewMosaicRuntimeConfig(pol, false)))
-		err := svc.PutCell(t.Context(), &domain.PutCellCommand{
+		_, err := svc.PutCell(t.Context(), &domain.PutCellCommand{
 			Coord:      domain.AxialCoord{Q: 0, R: 0},
 			RawContent: "reply",
 			SourceID:   "s",
@@ -139,6 +146,84 @@ func TestCellMutationService_PutCell_validation(t *testing.T) {
 			t.Fatalf("delete should not reach writer")
 		}
 	})
+}
+
+func TestCellMutationService_PutCell_placement(t *testing.T) {
+	t.Parallel()
+
+	t.Run("near_anchor_defaults_radius_and_returns_actual_placement", func(t *testing.T) {
+		t.Parallel()
+		want := domain.PutCellMutationResult{
+			OK:        true,
+			Coord:     domain.AxialCoord{Q: 4, R: -2},
+			Placement: domain.CellPlacementNearAnchor,
+			Probes:    3,
+		}
+		writer := &stubCellWriter{putCellResult: want}
+		svc := NewCellMutationService(writer, nil, 384)
+		got, err := svc.PutCell(t.Context(), &domain.PutCellCommand{
+			Coord:      domain.AxialCoord{Q: 3, R: -2},
+			RawContent: "hello",
+			SourceID:   "source",
+			Confidence: 0.8,
+			Placement:  domain.CellPlacementNearAnchor,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != want {
+			t.Fatalf("result: got %+v want %+v", got, want)
+		}
+		if writer.lastPutCell.MaxRadius != defaultCellPlacementMaxRadius {
+			t.Fatalf("MaxRadius=%d want %d", writer.lastPutCell.MaxRadius, defaultCellPlacementMaxRadius)
+		}
+	})
+
+	for _, tc := range []struct {
+		name string
+		cmd  domain.PutCellCommand
+	}{
+		{
+			name: "near_anchor_rejects_overwrite",
+			cmd: domain.PutCellCommand{
+				Placement: domain.CellPlacementNearAnchor, AllowOverwrite: true,
+			},
+		},
+		{
+			name: "near_anchor_rejects_excessive_radius",
+			cmd: domain.PutCellCommand{
+				Placement: domain.CellPlacementNearAnchor, MaxRadius: maximumCellPlacementMaxRadius + 1,
+			},
+		},
+		{
+			name: "exact_rejects_radius",
+			cmd: domain.PutCellCommand{
+				Placement: domain.CellPlacementExact, MaxRadius: 1,
+			},
+		},
+		{
+			name: "rejects_unknown_placement",
+			cmd: domain.PutCellCommand{
+				Placement: "automatic",
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			writer := &stubCellWriter{}
+			svc := NewCellMutationService(writer, nil, 384)
+			cmd := tc.cmd
+			cmd.RawContent = "hello"
+			cmd.SourceID = "source"
+			cmd.Confidence = 0.8
+			if _, err := svc.PutCell(t.Context(), &cmd); err == nil {
+				t.Fatal("expected placement validation error")
+			}
+			if writer.putCellCalls != 0 {
+				t.Fatalf("writer called %d times", writer.putCellCalls)
+			}
+		})
+	}
 }
 
 func TestCellMutationService_PutEmbedding_text_and_vector_paths(t *testing.T) {

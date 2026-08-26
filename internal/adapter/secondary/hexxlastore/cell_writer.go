@@ -37,45 +37,62 @@ func NewCellWriterAdapter(live *LiveDB, primaryPath string, reopenOpts *hexxladb
 }
 
 // PutCell implements [secondary.CellWriter].
-func (a *CellWriterAdapter) PutCell(ctx context.Context, cmd *domain.PutCellCommand) error {
+func (a *CellWriterAdapter) PutCell(ctx context.Context, cmd *domain.PutCellCommand) (domain.PutCellMutationResult, error) {
 	if a == nil || a.live == nil {
-		return fmt.Errorf("hexxlastore cell writer: nil database")
+		return domain.PutCellMutationResult{}, fmt.Errorf("hexxlastore cell writer: nil database")
 	}
 	if cmd == nil {
-		return fmt.Errorf("hexxlastore cell writer: nil command")
-	}
-	pk, err := hexxladb.Pack(hexxladb.Coord{Q: cmd.Coord.Q, R: cmd.Coord.R})
-	if err != nil {
-		return fmt.Errorf("hexxlastore put cell: %w", err)
+		return domain.PutCellMutationResult{}, fmt.Errorf("hexxlastore cell writer: nil command")
 	}
 	kind := cmd.Kind
 	if kind == "" {
 		kind = domain.CellPutKindFact
 	}
-	return a.live.WithRead(func(db *hexxladb.DB) error {
+	placement := cmd.Placement
+	if placement == "" {
+		placement = domain.CellPlacementExact
+	}
+	result := domain.PutCellMutationResult{Placement: placement}
+	err := a.live.WithRead(func(db *hexxladb.DB) error {
 		updErr := db.Update(func(tx *hexxladb.Tx) error {
-			switch kind {
-			case domain.CellPutKindFact:
-				r := hexxladb.NewFactCell(pk, cmd.RawContent, cmd.SourceID, "mcp-cell", cmd.Confidence)
-				r.Tags = mergeTagLists(r.Tags, cmd.Tags)
-				if err := tx.PutCell(ctx, r); err != nil {
-					return fmt.Errorf("tx PutCell: %w", err)
+			selected := hexxladb.Coord{Q: cmd.Coord.Q, R: cmd.Coord.R}
+			var key hexxladb.PackedCoord
+			switch placement {
+			case domain.CellPlacementExact:
+				var err error
+				key, err = hexxladb.Pack(selected)
+				if err != nil {
+					return fmt.Errorf("pack exact coordinate: %w", err)
 				}
-			case domain.CellPutKindUserMessage:
-				r := hexxladb.NewUserMessageCell(pk, cmd.RawContent, cmd.SourceID, cmd.Confidence)
-				r.Tags = mergeTagLists(r.Tags, cmd.Tags)
-				if err := tx.PutCell(ctx, r); err != nil {
-					return fmt.Errorf("tx PutCell: %w", err)
+				_, occupied, err := tx.GetCell(key)
+				if err != nil {
+					return fmt.Errorf("check exact coordinate: %w", err)
 				}
-			case domain.CellPutKindAssistantResponse:
-				r := hexxladb.NewAssistantResponseCell(pk, cmd.RawContent, cmd.SourceID, cmd.Confidence)
-				r.Tags = mergeTagLists(r.Tags, cmd.Tags)
-				if err := tx.PutCell(ctx, r); err != nil {
-					return fmt.Errorf("tx PutCell: %w", err)
+				if occupied && !cmd.AllowOverwrite {
+					return fmt.Errorf("%w: (%d,%d)", domain.ErrCellCoordinateOccupied, selected.Q, selected.R)
 				}
+				result.Replaced = occupied
+			case domain.CellPlacementNearAnchor:
+				placed, err := tx.FindFreeCellPlacement(ctx, selected, cmd.MaxRadius)
+				if err != nil {
+					return fmt.Errorf("find free cell placement: %w", err)
+				}
+				selected = placed.Coord
+				key = placed.Key
+				result.Probes = placed.Probes
 			default:
-				return fmt.Errorf("unknown cell kind %q", kind)
+				return fmt.Errorf("unknown cell placement %q", placement)
 			}
+
+			rec, err := newCellRecord(key, cmd, kind)
+			if err != nil {
+				return fmt.Errorf("build cell record: %w", err)
+			}
+			if err := tx.PutCell(ctx, rec); err != nil {
+				return fmt.Errorf("tx PutCell: %w", err)
+			}
+			result.OK = true
+			result.Coord = domain.AxialCoord{Q: selected.Q, R: selected.R}
 			return nil
 		})
 		if updErr != nil {
@@ -83,6 +100,26 @@ func (a *CellWriterAdapter) PutCell(ctx context.Context, cmd *domain.PutCellComm
 		}
 		return nil
 	})
+	if err != nil {
+		return domain.PutCellMutationResult{}, err
+	}
+	return result, nil
+}
+
+func newCellRecord(key hexxladb.PackedCoord, cmd *domain.PutCellCommand, kind domain.CellPutKind) (hexxladb.CellRecord, error) {
+	var rec hexxladb.CellRecord
+	switch kind {
+	case domain.CellPutKindFact:
+		rec = hexxladb.NewFactCell(key, cmd.RawContent, cmd.SourceID, "mcp-cell", cmd.Confidence)
+	case domain.CellPutKindUserMessage:
+		rec = hexxladb.NewUserMessageCell(key, cmd.RawContent, cmd.SourceID, cmd.Confidence)
+	case domain.CellPutKindAssistantResponse:
+		rec = hexxladb.NewAssistantResponseCell(key, cmd.RawContent, cmd.SourceID, cmd.Confidence)
+	default:
+		return hexxladb.CellRecord{}, fmt.Errorf("unknown cell kind %q", kind)
+	}
+	rec.Tags = mergeTagLists(rec.Tags, cmd.Tags)
+	return rec, nil
 }
 
 // PutEmbedding implements [secondary.CellWriter].

@@ -38,17 +38,18 @@ Applies when reasoning about **mosaic** MCP tools (`cmd/mosaic-mcp`) backed by H
 1. Call **`mosaic_hexxla_list_tags`** (and often **`mosaic_hexxla_tag_counts`**) **before** **`mosaic_hexxla_put_cell`** when the DB taxonomy is unknown or you might invent a near‑duplicate tag.
 2. **Reuse** existing tags when they fit; only add new tags when nothing matches — keeps retrieval and reports consistent.
 3. Align **`source_id`** and **`kind`** with your persistence story (see persistence policy / config).
+4. Choose placement explicitly: use default **`exact`** only for a known free coordinate (or set **`allow_overwrite: true`** for an intentional replacement); use **`near_anchor`** with an application-chosen semantic anchor for collision-safe allocation, then retain the returned coordinate.
 
 ### Turn persistence (when policy is “store every exchange”)
 
-Mosaic **never** auto‑saves chat — persistence is **only** via explicit **`mosaic_hexxla_put_cell`** (and related tools). When your operator/product policy requires a **full transcript** of user and assistant turns, align YAML **`retention.capture_mode`** with that intent (see **`save_all_turns`** in [`docs/mosaic/PERSISTENCE_POLICY.md`](docs/mosaic/PERSISTENCE_POLICY.md)) and call **`mosaic_hexxla_get_persistence_policy`** if unsure what the server allows.
+Mosaic **never** auto‑saves chat — persistence is **only** via explicit **`mosaic_hexxla_put_cell`** (and related tools). When your operator/product policy requires a **full transcript** of user and assistant turns, align YAML **`retention.capture_mode`** with that intent (see **`save_all_turns`** in [`docs/mosaic/PERSISTENCE_POLICY.md`](../../docs/mosaic/PERSISTENCE_POLICY.md)) and call **`mosaic_hexxla_get_persistence_policy`** if unsure what the server allows.
 
 **Mandatory sequence for that policy (one exchange = two writes):**
 
 1. **Receive** the user message (and any session / correlation ids your stack uses).
-2. **First persistence action** — **`mosaic_hexxla_put_cell`** with **`kind=user_message`**, **`raw_content`** = user text, stable **`source_id`** (e.g. session id), chosen **`(q,r)`** per project convention, tags as policy requires (reuse taxonomy via **`list_tags`** when needed).
+2. **First persistence action** — **`mosaic_hexxla_put_cell`** with **`kind=user_message`**, **`raw_content`** = user text, stable **`source_id`** (e.g. session id), tags as policy requires, and explicit exact or `near_anchor` placement; retain the returned coordinate.
 3. **Reason, retrieve, and generate** the assistant reply (retrieval pipeline above still applies).
-4. **Last persistence action before closing the turn** — **`mosaic_hexxla_put_cell`** with **`kind=assistant_response`**, same **`source_id`**, assistant text in **`raw_content`**, appropriate **`(q,r)`** / tags.
+4. **Last persistence action before closing the turn** — **`mosaic_hexxla_put_cell`** with **`kind=assistant_response`**, same **`source_id`**, assistant text in **`raw_content`**, appropriate tags, and an explicit placement choice; retain the returned coordinate.
 
 Skipping step 2 or 4 when **`save_all_turns`** (or explicit “persist everything” policy) is in effect is a **policy failure**. If **`capture_mode`** is **`llm_curates`**, storage is **discretionary** — this subsection is **not** a mandate unless humans/operators override.
 
@@ -63,7 +64,7 @@ Skipping step 2 or 4 when **`save_all_turns`** (or explicit “persist everythin
 | `mosaic_hexxla_query_cells` | **Structured** indexed query (tags, time, radius, sort, explain); optional **`embed_query_text`** → hybrid ANN + predicates |
 | `mosaic_hexxla_search_cells` | **Lexical** relevance; optional **`embed_query_text`** → hybrid lexical + ANN |
 | `mosaic_hexxla_load_context_pack` | **Lattice-expanded** context from **seed coords** (rings + byte budget; seams / supersession optional) |
-| `mosaic_hexxla_put_cell` | **Write** a cell (`PutCell`; `kind` = fact / user_message / assistant_response) |
+| `mosaic_hexxla_put_cell` | **Write** a cell using safe `exact` or bounded `near_anchor` placement; returns actual coordinate |
 | `mosaic_hexxla_put_embedding` | **Write** an embedding at `(q,r)` — **text** (Ollama) or **vector** (raw; length = DB dim) |
 | `mosaic_hexxla_delete_cell` | **Delete** a cell (`DeleteCell`, MVCC tombstone semantics) |
 | `mosaic_hexxla_find_seams` | **List** seams near a center (`FindSeams`; optional unresolved-only) |
@@ -91,7 +92,7 @@ Skipping step 2 or 4 when **`save_all_turns`** (or explicit “persist everythin
 
 ## Primitive note
 
-`Tx.LoadContext` / **`LoadContextAt`** are **not** the same as **`LoadContextPackFrom`** — see [`docs/mosaic/MCP_AGENT_BLUEPRINT.md`](docs/mosaic/MCP_AGENT_BLUEPRINT.md).
+HexxlaDB's current provider-neutral primitive is **`Tx.LoadContext`**. Mosaic's **`mosaic_hexxla_load_context_pack`** wraps those count-bounded candidates with byte budgeting, optional facet text, seams, supersession filtering, and explanations; see [`docs/mosaic/MCP_AGENT_BLUEPRINT.md`](../../docs/mosaic/MCP_AGENT_BLUEPRINT.md).
 
 ## Retrieval budget vs relevance
 
@@ -105,7 +106,7 @@ Skipping step 2 or 4 when **`save_all_turns`** (or explicit “persist everythin
 
 ## References
 
-- [`docs/mosaic/MCP_AGENT_BLUEPRINT.md`](docs/mosaic/MCP_AGENT_BLUEPRINT.md)
-- [`docs/mosaic/PERSISTENCE_POLICY.md`](docs/mosaic/PERSISTENCE_POLICY.md)
-- [`docs/mosaic/IMPLEMENTATION_PLAN.md`](docs/mosaic/IMPLEMENTATION_PLAN.md)
+- [`docs/mosaic/MCP_AGENT_BLUEPRINT.md`](../../docs/mosaic/MCP_AGENT_BLUEPRINT.md)
+- [`docs/mosaic/PERSISTENCE_POLICY.md`](../../docs/mosaic/PERSISTENCE_POLICY.md)
+- [`docs/mosaic/IMPLEMENTATION_PLAN.md`](../../docs/mosaic/IMPLEMENTATION_PLAN.md)
 - [Cursor 3.0: built‑in Memories removed — external MCP memory](https://omegamax.co/blog/cursor-removed-memories)

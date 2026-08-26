@@ -31,7 +31,7 @@ structure:
 
       Full documentation:
       - `internal/README.md`
-      - `docs/architecture.md`
+      - `docs/architecture/architecture.md`
 
   # === Rules ===
   - path: rules/core.md

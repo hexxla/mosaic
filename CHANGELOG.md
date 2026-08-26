@@ -9,9 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Cell placement safety** ⚠️ **breaking write behavior** — `mosaic_hexxla_put_cell` now defaults to safe exact placement: writing over a live coordinate requires explicit `allow_overwrite: true`. New `placement: near_anchor` atomically composes HexxlaDB `FindFreeCellPlacement` with `PutCell` using a caller-owned anchor and bounded radius (default 8, maximum 32). Responses report the actual coordinate, placement mode, occupied probes, and whether an exact write replaced a live cell.
+
+- **HexxlaDB v0.6.0 compatibility** — context assembly now retrieves count-bounded candidates with `Tx.LoadContext`; Mosaic owns approximate-token conversion, UTF-8 byte accounting, outer-ring/low-confidence eviction, and compatibility byte aliases in MCP responses.
+- **Toolchain and storage defaults** — require Go **1.27.0**, depend on `github.com/hexxla/hexxladb` **v0.6.0**, and use HexxlaDB’s validated **4096-byte** page profile for newly created databases (existing files retain their persisted layout).
+- **Context responses** — add authoritative `total_bytes` / `max_budget_bytes` fields and optional returned facet text; deprecated `total_tokens` / `max_tokens_budget` remain byte-valued compatibility aliases.
+- **Documentation, agent guidance, and seed corpus** — align current HexxlaDB retrieval, embeddings, authenticated-v3 encryption, changefeed, page allocation, retention, and tokenizer ownership; remove false claims that Ratchet is integrated; distinguish runtime MCP schemas from historical and aspirational blueprints; and document current missing-path and seed-policy credential limitations.
+
+## [0.2.0] - 2026-05-05
+
+### Changed
+
 - **README · Get started** — Primary build **`make build-mosaic-mcp build-mosaic-create-db`** (**`bin/<os>-<arch>/`**); **`build-mosaic-seed`** framed as developer-only (**`make seed`** uses **`go run`**). **`go install`** for **`mosaic-mcp`** / **`mosaic-create-db`** only unless using the seed binary.
 
-- **README** — Version badge uses a **static** **`v0.1.0`** shield (linked to **`/releases/tag/v0.1.0`**) because **`img.shields.io/github/v/tag/hexxla/mosaic`** resolves to **no tag** until **`v*`** tags exist on the GitHub repo; switch back to **`github/v/tag`** after the first tag is published if you prefer a dynamic badge.
+- **README** — Version badge and release link updated to **`v0.2.0`**.
 - **README & changelog links** — GitHub Actions badges, **releases**, clone URL, and **[Unreleased]** compare links use **`github.com/hexxla/mosaic`** (canonical repo). **pkg.go.dev** and **Go Report Card** remain **`github.com/sploitzberg/mosaic`** (Go module path).
 - **Dependencies** — **`github.com/modelcontextprotocol/go-sdk`** **v1.6.0** (was v1.5.0).
 - **Release workflow** — Drop mandatory **GPG** import (was failing when **`GPG_PRIVATE_KEY`** / **`GPG_PASSPHRASE`** secrets are unset); **[`.goreleaser.yml`](.goreleaser.yml)** does not define **`signs`**. Restore **`crazy-max/ghaction-import-gpg`** and **`GPG_FINGERPRINT`** when you add signing to GoReleaser and repository secrets.
@@ -58,5 +69,6 @@ First tagged release of **Mosaic**: local **Model Context Protocol** server back
 
 - GitHub Actions **`actions/checkout@v6`**, **`actions/setup-go@v6`**; **`MOSAIC_POLICY_FILE`** forwarded in **`Makefile`** for seed/MCP/create-db when set.
 
-[Unreleased]: https://github.com/hexxla/mosaic/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/hexxla/mosaic/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/hexxla/mosaic/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/hexxla/mosaic/releases/tag/v0.1.0

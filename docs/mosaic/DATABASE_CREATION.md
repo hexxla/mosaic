@@ -48,13 +48,21 @@ Path resolution is centralized in **`internal/config/mosaic_db_path.go`** ([**`R
 | **`mosaic-create-db`** | Empty database only (no Ollama). Fast path for “create file then point **`mosaic-mcp`** at **`MOSAIC_DB_PATH`**. |
 | **`mosaic-seed`** | Same creation step, then fills demo cells/embeddings if the built-in corpus is non-empty (needs Ollama for embeddings). |
 
-**`mosaic-mcp`** does not create files; it opens an existing path from **`MOSAIC_DB_PATH`** (and optional encryption — **`BuildHexxlaOpenOptions`** / **`ApplyHexxlaEncryption`**).
+The recommended workflow is to create the file explicitly before starting **`mosaic-mcp`**. Current `mosaic-mcp` calls HexxlaDB `Open` directly, so a missing or mistyped path creates a new database with the MCP open options rather than failing. That file does not receive `mosaic-create-db`'s embedding layout. Always create the intended path first and verify `mosaic_hexxla_health` reports the expected embedding dimension and limits. A pending operator-safety item tracks changing the command to refuse missing paths.
 
 ---
 
 ## Encrypted database (passphrase or raw key)
 
-Use **one** of: **`-db-passphrase`**, **`MOSAIC_DB_PASSPHRASE`**, optional **`database.passphrase`** in policy YAML (via **`-policy`** / **`MOSAIC_POLICY_FILE`**), or **`MOSAIC_DB_ENCRYPTION_KEY_HEX`** (raw key; never combine with passphrase sources). Precedence for passphrase: flag → env → YAML.
+Credential sources differ by command:
+
+| Command | Passphrase precedence |
+| ------- | --------------------- |
+| **`mosaic-mcp`** | `-db-passphrase` → `MOSAIC_DB_PASSPHRASE` → policy YAML `database.passphrase` |
+| **`mosaic-create-db`** | `-db-passphrase` → `MOSAIC_DB_PASSPHRASE` → policy YAML `database.passphrase` |
+| **`mosaic-seed`** | `-db-passphrase` → `MOSAIC_DB_PASSPHRASE`; policy YAML currently configures Ollama only |
+
+All three also accept **`MOSAIC_DB_ENCRYPTION_KEY_HEX`** as a raw key; never combine it with a passphrase source. New encrypted files use authenticated HexxlaDB format v3. Plaintext files use format v2 when MVCC is enabled.
 
 **About `-force` / `-replace`:** Both flags mean the same thing: **delete the existing file at the resolved path and create (or seed) again.** They are **not** required for encryption itself — only when you want to overwrite a database that is already on disk. If a file already exists and you did not pass **`-replace`/`-force`**, the command **errors** (create-db) or **skips seed** (seed) and tells you to pick another **`-db`** / **`-name`** or overwrite explicitly.
 
@@ -193,7 +201,7 @@ make create-db
 # Empty DB with force + policy file (YAML database.passphrase optional)
 make create-db MOSAIC_CREATE_DB_FLAGS='-force -policy configs/config.yaml'
 
-# Custom DB path + smaller pages for new file
+# Custom DB path + explicit page size for new file
 make create-db MOSAIC_DB_PATH=./projects/custom.hexxla MOSAIC_CREATE_DB_FLAGS='-force -page-size 4096'
 
 # Seed (skips if DB exists unless you reseed)
@@ -218,4 +226,4 @@ make mosaic-dev MOSAIC_SEED_FLAGS='-embedding-dim 384' MOSAIC_MCP_FLAGS='-policy
 
 ## Quick reference (defaults)
 
-Unless overridden by flags, **`DefaultMosaicDatabaseLayout`** uses: MVCC on, page size **65536**, max value bytes **16384**, embedding dimension **384**, distance metric **cosine**. See [`mosaic_hexxla_db.go`](../../internal/config/mosaic_hexxla_db.go).
+Unless overridden by flags, **`DefaultMosaicDatabaseLayout`** uses: MVCC on, page size **4096**, max value bytes **16384**, embedding dimension **384**, distance metric **cosine**. Existing database files retain the page size persisted at creation. See [`mosaic_hexxla_db.go`](../../internal/config/mosaic_hexxla_db.go).

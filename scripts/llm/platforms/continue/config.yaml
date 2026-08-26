@@ -22,7 +22,7 @@ structure:
 
       Reference:
       - internal/README.md
-      - docs/architecture.md
+      - docs/architecture/architecture.md
 
   - path: agents/architect.md
     type: file

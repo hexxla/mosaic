@@ -18,7 +18,7 @@ A hexagonal lattice offers 6-neighbor connectivity, natural ring enumeration, ex
 
 ## Relationship to HexxlaDB
 
-HexxlaDB is the production-ready embedded storage engine (v0.2+). It provides the hex-native keyspace, Morton-packed coordinates, MVCC snapshots, optional HNSW embeddings, WAL durability, changefeed, and all core primitives (`PutCell`, `WalkRing`, `LoadContextPackFrom`, `FindSeams`, `ResolveSeam`, etc.).
+HexxlaDB is the production-shaped embedded storage engine. It provides the hex-native keyspace, Morton-packed coordinates, MVCC snapshots, optional HNSW embeddings, WAL durability, changefeed, and core primitives such as `PutCell`, `WalkRing`, `LoadContext`, `FindSeams`, and `ResolveSeam`. Its documented production-adoption gate still requires named pilot and operator evidence; this vision document does not override that release status.
 
 The Hexxla Runtime (this document) builds the agent-facing memory OS on top of HexxlaDB. It owns orchestration, tool surfaces, facet policies, seam auto-detection, context budgeting, and higher-level workflows.
 
@@ -41,7 +41,7 @@ Seed selection is the only fuzzy step. The runtime provides a pluggable `SeedSel
 - Explicit coordinate
 - Multi-seed merging for composite queries
 
-Multiple seeds can be combined and passed to `LoadContextPackFrom` for unified budgeted assembly.
+Multiple seeds can be passed to HexxlaDB `LoadContext` for deterministic candidate assembly; the runtime then applies its product-level ranking and request budget.
 
 ## Core Objects
 
@@ -98,7 +98,7 @@ Retrieval follows a clean four-phase flow:
 
 The primary runtime primitive is:
 
-LoadContextPackFrom(seeds, maxTokens, options)
+AssembleContext(seeds, maxCells, budgetPolicy)
 
 It supports:
 
@@ -106,7 +106,7 @@ It supports:
 - Spiral ordering within rings
 - Supersession filtering
 - Seam highlighting
-- Pluggable budget strategies (byte length, token estimation, hybrid score)
+- Pluggable application budget strategies (byte length, token estimation, hybrid score)
 
 **Ordering rule:** concentric rings from center(s) outward, axial spiral within each ring starting from positive-q direction. Low-confidence or superseded items are dropped from outer rings first when the budget is exceeded.
 
@@ -131,9 +131,9 @@ Evolution is first-class through:
 - Temporal snapshots (`ViewAtTime`)
 - Provenance tracking
 
-## Agent Tooling Surface
+## Conceptual future agent tooling surface
 
-The runtime exposes a clean, LLM-friendly tool interface:
+The full runtime envisioned here would expose a clean, LLM-friendly interface such as:
 
 - `put_memory(raw_content, tags, coord_hint?, provenance?, validity?)`
 - `search_and_load_context(query, max_tokens, strategy?)`
@@ -143,7 +143,7 @@ The runtime exposes a clean, LLM-friendly tool interface:
 - `get_temporal_view(as_of_time)`
 - `explain_seams(center, radius)`
 
-All tools return structured observations suitable for the next LLM reasoning step. The runtime handles validation, provenance injection, and HexxlaDB transaction boundaries.
+These are conceptual names, not tools registered by the current `mosaic-mcp` binary. For the 23 current tools and exact payloads, use runtime MCP `tools/list` and [`MCP_AGENT_BLUEPRINT.md`](./MCP_AGENT_BLUEPRINT.md).
 
 ## Time and Evolution
 
@@ -151,7 +151,7 @@ Every cell and seam carries explicit timestamps and validity windows. MVCC snaps
 
 ## Non-Goals (v1 Runtime)
 
-- Automatic global semantic clustering or auto-placement
+- Automatic global semantic clustering or content-inferred auto-placement
 - Full autonomous agent loop (belongs in consuming frameworks)
 - Built-in embedding model hosting (use external providers like Ollama)
 - General-purpose graph or vector database replacement
@@ -179,7 +179,7 @@ Every cell and seam carries explicit timestamps and validity windows. MVCC snaps
 ## v1 Scope (Runtime)
 
 - Seed selection strategies
-- `LoadContextPackFrom` with multi-seed and budget control
+- Multi-seed `LoadContext` retrieval with runtime-owned budget control
 - Full tool surface for LLM agents
 - Facet management and rotation policies
 - Seam detection, resolution, and preference cell handling

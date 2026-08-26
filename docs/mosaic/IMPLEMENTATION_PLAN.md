@@ -11,8 +11,8 @@
 | Field | Value |
 | --- | --- |
 | **Active phase** | Phase 6 — operator-only candidates (Compaction / prune / changelog remain off MCP) |
-| **Last meaningful update** | 2026-04-29 — facet & edge **read** MCP tools + Hexxla **`FacetWalkRecord`** / **`EdgeWalkRecord`** |
-| **MCP tools shipped** | `mosaic_hexxla_health`, `mosaic_hexxla_query_cells`, `mosaic_hexxla_search_cells`, `mosaic_hexxla_search_embedding`, `mosaic_hexxla_load_context_pack`, `mosaic_hexxla_put_cell`, `mosaic_hexxla_put_embedding`, `mosaic_hexxla_delete_cell`, `mosaic_hexxla_find_seams`, `mosaic_hexxla_mark_conflict`, `mosaic_hexxla_mark_supersedes`, `mosaic_hexxla_resolve_seam`, `mosaic_hexxla_put_facet`, `mosaic_hexxla_link_cells`, **`mosaic_hexxla_get_facet`**, **`mosaic_hexxla_list_facets`**, **`mosaic_hexxla_get_edge`**, **`mosaic_hexxla_list_edges_from`**, `mosaic_hexxla_list_tags`, `mosaic_hexxla_tag_counts` |
+| **Last meaningful update** | 2026-08-26 — HexxlaDB v0.6.0 compatibility, provider-neutral byte budgeting, and bounded cell placement |
+| **MCP tools shipped** | 23 tools: `mosaic_hexxla_health`, `mosaic_hexxla_query_cells`, `mosaic_hexxla_search_cells`, `mosaic_hexxla_search_embedding`, `mosaic_hexxla_load_context_pack`, `mosaic_hexxla_estimate_context_budget_bytes`, `mosaic_hexxla_retrieval_budget_status`, `mosaic_hexxla_put_cell`, `mosaic_hexxla_put_embedding`, `mosaic_hexxla_delete_cell`, `mosaic_hexxla_find_seams`, `mosaic_hexxla_mark_conflict`, `mosaic_hexxla_mark_supersedes`, `mosaic_hexxla_resolve_seam`, `mosaic_hexxla_put_facet`, `mosaic_hexxla_link_cells`, `mosaic_hexxla_get_facet`, `mosaic_hexxla_list_facets`, `mosaic_hexxla_get_edge`, `mosaic_hexxla_list_edges_from`, `mosaic_hexxla_list_tags`, `mosaic_hexxla_tag_counts`, `mosaic_hexxla_get_persistence_policy` |
 | **Offline / CLI** | `cmd/mosaic-seed` — 82-turn `conversational_memory` corpus + Ollama embeddings |
 
 ---
@@ -70,14 +70,14 @@ Foundation already in the repo; keep these stable when adding phases.
 
 ## Phase 2 — Context assembly
 
-**Goal:** Budgeted context packs for prompts (`LoadContextPackFrom` — multi-seed aware).
+**Goal:** Multi-seed context packs with storage-neutral retrieval and application-owned budgeting.
 
-- [x] One MCP tool **`mosaic_hexxla_load_context_pack`** (`Tx.LoadContextPackFrom`, `ByteLenBudgeter`)
+- [x] One MCP tool **`mosaic_hexxla_load_context_pack`** (`Tx.LoadContext` candidates; Mosaic UTF-8 byte budgeting)
 - [x] Domain: `LoadContextPackCommand`, `ContextPackResponse`, stats/cells/seams summaries; hints in [`retrieval_hints.go`](../../internal/core/domain/retrieval_hints.go)
-- [x] `secondary.ContextPackLoader` / `primary.ContextAssembly` / `ContextAssemblyService` (defaults: ring 3, tokens 4096; caps seeds 32, tokens 100k)
+- [x] `secondary.ContextPackLoader` / `primary.ContextAssembly` / `ContextAssemblyService` (defaults: ring 3, 4096 bytes; caps seeds 32, budget 100k bytes)
 - [x] Retrieval tools populate **`retrieval_hint`** JSON + expanded **tool descriptions** so models chain embed/query → context pack when needed
 
-**Remaining (optional):** `Tx.LoadContext` / `Tx.LoadContextAt` are **not** superseded by Pack — they are simpler (count-limited raw ring walk; temporal validity). Mosaic still prefers **`mosaic_hexxla_load_context_pack`** for LLM assembly; rationale in [MCP_AGENT_BLUEPRINT.md](./MCP_AGENT_BLUEPRINT.md) (`LoadContext` vs **`LoadContextPackFrom`**).
+HexxlaDB remains provider-neutral: it bounds assembled candidates by count. Mosaic owns approximate-token conversion, UTF-8 byte accounting, and outer-ring/low-confidence eviction; exact final-request tokenization remains a client responsibility. See [MCP_AGENT_BLUEPRINT.md](./MCP_AGENT_BLUEPRINT.md).
 
 **Exit criteria:** Caller passes seed coords (from retrieval) and receives a budgeted pack — **done**.
 
@@ -87,7 +87,7 @@ Foundation already in the repo; keep these stable when adding phases.
 
 **Goal:** Controlled mutations outside `mosaic-seed`.
 
-- [x] `PutCell` path — validation, tags, source id, `kind` (`fact` \| `user_message` \| `assistant_response`); templates + merged tags in [`hexxlastore.CellWriterAdapter`](../../internal/adapter/secondary/hexxlastore/cell_writer.go)
+- [x] `PutCell` path — validation, tags, source id, `kind` (`fact` \| `user_message` \| `assistant_response`); safe exact writes require explicit overwrite, while bounded `near_anchor` placement composes `FindFreeCellPlacement` + `PutCell` atomically and returns the actual coordinate
 - [x] `PutEmbedding` path — **text** (`secondary.TextEmbedder` / Ollama) or raw **vector**; length must match `DB.EmbeddingDimension()`
 - [x] `DeleteCell` — semantics in MCP tool description (MVCC tombstone)
 - [x] MCP tools ([`cell_mutation_tool.go`](../../internal/adapter/primary/mcpsrv/cell_mutation_tool.go)) + service tests + changelog

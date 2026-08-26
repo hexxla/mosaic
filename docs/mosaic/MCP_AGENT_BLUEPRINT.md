@@ -11,11 +11,15 @@
 - **Retrieval** (`mosaic_hexxla_search_embedding`, `mosaic_hexxla_query_cells`, `mosaic_hexxla_search_cells`) answers: *which cells match (similarity, tags, text, filters)?* Outputs are **bounded lists** (top‑K or capped query results).
 - **Neighbourhood assembly** (`mosaic_hexxla_load_context_pack`) answers: *given one or more **seed coordinates** on the hex lattice, what **budgeted** slice of nearby cells (and optionally seams / supersession) belongs in a prompt?*
 
-Hexxla upstream demos combine both: retrieve seeds → `LoadContextPackFrom`. Embedding-only answers can be sufficient when top‑K hits already contain enough evidence; otherwise **always** consider a context pack.
+Hexxla upstream demos combine both: retrieve seeds → `Tx.LoadContext`. Embedding-only answers can be sufficient when top‑K hits already contain enough evidence; otherwise **always** consider a context pack.
 
-### `LoadContext` / `LoadContextAt` vs `LoadContextPackFrom`
+### HexxlaDB retrieval vs Mosaic budgeting
 
-Hexxla also exposes **`Tx.LoadContext`** and **`Tx.LoadContextAt`** — simpler ring walks with **count** caps and raw records, optional validity-at-time (**`LoadContextAt`**). Mosaic does **not** wrap these in MCP; **`mosaic_hexxla_load_context_pack`** is the intended tool for prompts (**token/byte budgeting**, **`CellView`** assembly, seams, **`FilterSuperseded`**). Use the low-level APIs only from custom Go around Hexxla, not via MCP unless a dedicated tool is added later.
+HexxlaDB **`Tx.LoadContext`** retrieves deterministic, **`MaxCells`**-bounded assembled candidates from one or more seeds. It deliberately does not know about LLM providers or tokenizers. Mosaic’s **`mosaic_hexxla_load_context_pack`** wraps that API, then enforces a UTF-8 byte ceiling by evicting the lowest-confidence cell from the outermost occupied ring. Optional seams, supersession filtering, explanations, and facet text remain available.
+
+Mosaic’s **`budget_tokens_approx`** is only a configurable token-to-byte estimate. Exact fit depends on the provider, model, rendered messages, tool schemas, and reserved output; the client that constructs the final request remains responsible for exact tokenizer accounting.
+
+The per-call byte ceiling counts cell **`raw_content`** plus returned **`facet_text`** when `include_facet_text` is enabled. It does not claim to measure the complete JSON envelope or a rendered provider request.
 
 ---
 
@@ -30,14 +34,14 @@ Hexxla also exposes **`Tx.LoadContext`** and **`Tx.LoadContextAt`** — simpler 
 4. Inspect tool JSON for **`retrieval_hint`** when present; it steers toward **`mosaic_hexxla_load_context_pack`** when hits may be incomplete for the user’s question.
 5. Call **`mosaic_hexxla_load_context_pack`** with:
    - **`seeds`**: array of `{ "q", "r" }` from retrieval hits (often 1–3 seeds)
-   - **Budget (UTF‑8 bytes, Hexxla `ByteLenBudgeter`)** — pick one mode (see tool JSON for exclusivity rules):
+   - **Budget (UTF‑8 bytes, enforced by Mosaic)** — pick one mode (see tool JSON for exclusivity rules):
      - **`omit_budget`**: sparse “no tight cap” semantics → server resolves to the maximum allowed clamp (100000 UTF‑8 bytes).
      - **`budget_tokens_approx`** (+ optional **`bytes_per_approx_token`**, default 4): approximate LM tokens → bytes (same math as **`mosaic_hexxla_estimate_context_budget_bytes`**).
-     - **`max_budget_bytes`** or legacy **`max_tokens`**: explicit byte ceiling (both mean the same field to Hexxla; do not send conflicting values).
+     - **`max_budget_bytes`** or legacy **`max_tokens`**: explicit byte ceiling; do not send conflicting values.
      - If none of the above: default **4096** bytes.
    - Optional **`mosaic_hexxla_estimate_context_budget_bytes`** to preview **`budget_bytes`** before loading a pack.
-   - **`max_ring`**, **`max_cells`**, optional **`filter_superseded`**, **`include_seams`**, **`explain`**
-6. Response includes **`retrieval_hint`** reminding when **global** semantic search vs **local** pack applies.
+   - **`max_ring`**, **`max_cells`**, optional **`filter_superseded`**, **`include_seams`**, **`include_facet_text`**, **`explain`**
+6. Response includes authoritative **`total_bytes`** / **`max_budget_bytes`** fields and **`retrieval_hint`**. Deprecated **`total_tokens`** / **`max_tokens_budget`** aliases still report byte counts for client compatibility.
 
 ---
 
@@ -58,13 +62,22 @@ Keep this distinction explicit in docs and agent instructions so expectations do
 - Mosaic **does not** auto-save chat turns. Long-lived store of user/model text is explicit: tools that **write** cells (**`mosaic_hexxla_put_cell`**, **`mosaic_hexxla_put_embedding`**, etc.) persist data the client chooses to submit (e.g. **`kind`** `user_message` / `assistant_response`, **`source_id`** for session/session key). There is **no** default “record everything”; retrieval/query tools only **read**.
 - Decide your product policy (what to store, TTL, PIIs) **above** Mosaic; expose only via mutation calls.
 
+### Cell placement on writes
+
+`mosaic_hexxla_put_cell` supports two explicit modes:
+
+- **`placement: exact`** (default) treats `(q,r)` as the final coordinate. A live cell there causes an error unless **`allow_overwrite: true`** is supplied; intentional replacement is therefore visible at the call boundary.
+- **`placement: near_anchor`** treats `(q,r)` as an application-chosen semantic anchor and atomically selects the first free coordinate in deterministic ring order. **`max_radius`** defaults to 8 and is capped at 32. `allow_overwrite` is invalid in this mode.
+
+The response always reports **`coord`**, **`placement`**, **`probes`**, and **`replaced`**. Persist the returned coordinate for later embeddings, facets, edges, seams, and exact retrieval. Mosaic and HexxlaDB resolve bounded geometric collisions but do not infer anchors from content, tags, or embeddings.
+
 ### Full-turn persistence (explicit agent workflow)
 
 When product policy is to **store every user/assistant exchange**, the agent should treat **`mosaic_hexxla_put_cell`** as the **bookends** of each turn:
 
-1. Right after the user message is known → **`put_cell`** with **`kind=user_message`** (session **`source_id`**, project **`(q,r)`** / tags).
+1. Right after the user message is known → **`put_cell`** with **`kind=user_message`** (session **`source_id`**, tags, and either an exact coordinate or `near_anchor` placement); retain the returned coordinate.
 2. Generate the reply (retrieval steps from [Recommended workflow](#recommended-workflow) as needed).
-3. After the assistant reply is finalized → **`put_cell`** with **`kind=assistant_response`** (same **`source_id`**).
+3. After the assistant reply is finalized → **`put_cell`** with **`kind=assistant_response`** (same **`source_id`** and an explicit placement choice); retain the returned coordinate.
 
 YAML **`retention.capture_mode: save_all_turns`** matches “both sides in scope”; use **`mosaic_hexxla_get_persistence_policy`** and [`PERSISTENCE_POLICY.md`](./PERSISTENCE_POLICY.md) for enforcement details. Cursor does not provide built-in cross-session Memories (see [external memory note](https://omegamax.co/blog/cursor-removed-memories)); Mosaic MCP is one way to keep durable context **outside** the editor.
 

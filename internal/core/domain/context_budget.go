@@ -6,8 +6,8 @@ import (
 	"math"
 )
 
-// Defaults for translating approximate LM token budgets to UTF-8 byte budgets
-// when using HexxlaDB [ByteLenBudgeter] (counts bytes, not tokenizer tokens).
+// Defaults for translating approximate LM token budgets to the UTF-8 byte
+// budgets enforced by Mosaic. No provider tokenizer is required.
 const (
 	DefaultApproxBytesPerToken = 4
 	MinApproxBytesPerToken     = 2
@@ -15,7 +15,7 @@ const (
 )
 
 // ContextByteBudgetBounds are Mosaic clamps applied to resolved UTF-8 byte budgets for
-// LoadContextPack / ByteLenBudgeter (upstream maxTokens naming).
+// Mosaic context assembly.
 const (
 	ContextBudgetMinBytes = 64
 	ContextBudgetMaxBytes = 100000

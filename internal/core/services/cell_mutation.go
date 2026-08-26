@@ -12,8 +12,10 @@ import (
 )
 
 const (
-	maxTagsPerCell   = 64
-	maxSourceIDBytes = 512
+	maxTagsPerCell                = 64
+	maxSourceIDBytes              = 512
+	defaultCellPlacementMaxRadius = 8
+	maximumCellPlacementMaxRadius = 32
 )
 
 // CellMutationService implements [primary.CellMutation] with validation and optional Ollama for embed text.
@@ -44,24 +46,25 @@ func NewCellMutationService(w secondary.CellWriter, embedText secondary.TextEmbe
 }
 
 // PutCell implements [primary.CellMutation].
-func (s *CellMutationService) PutCell(ctx context.Context, cmd *domain.PutCellCommand) error {
+func (s *CellMutationService) PutCell(ctx context.Context, cmd *domain.PutCellCommand) (domain.PutCellMutationResult, error) {
 	if s == nil || s.writer == nil {
-		return fmt.Errorf("cell mutation: nil dependencies")
+		return domain.PutCellMutationResult{}, fmt.Errorf("cell mutation: nil dependencies")
 	}
 	if cmd == nil {
-		return fmt.Errorf("cell mutation: nil command")
+		return domain.PutCellMutationResult{}, fmt.Errorf("cell mutation: nil command")
 	}
 	c, err := normalizePutCell(cmd)
 	if err != nil {
-		return fmt.Errorf("cell mutation: %w", err)
+		return domain.PutCellMutationResult{}, fmt.Errorf("cell mutation: %w", err)
 	}
 	if err := s.runtime.PutCellDenied(c.Kind); err != nil {
-		return fmt.Errorf("cell mutation: %w", err)
+		return domain.PutCellMutationResult{}, fmt.Errorf("cell mutation: %w", err)
 	}
-	if err := s.writer.PutCell(ctx, c); err != nil {
-		return fmt.Errorf("cell mutation put cell: %w", err)
+	result, err := s.writer.PutCell(ctx, c)
+	if err != nil {
+		return domain.PutCellMutationResult{}, fmt.Errorf("cell mutation put cell: %w", err)
 	}
-	return nil
+	return result, nil
 }
 
 // PutEmbedding implements [primary.CellMutation].
@@ -159,13 +162,40 @@ func normalizePutCell(cmd *domain.PutCellCommand) (*domain.PutCellCommand, error
 	if conf < 0 || conf > 1 {
 		return nil, fmt.Errorf("cell mutation: confidence must be between 0 and 1")
 	}
+	placement := cmd.Placement
+	if placement == "" {
+		placement = domain.CellPlacementExact
+	}
+	maxRadius := cmd.MaxRadius
+	switch placement {
+	case domain.CellPlacementExact:
+		if maxRadius != 0 {
+			return nil, fmt.Errorf("cell mutation: max_radius applies only to near_anchor placement")
+		}
+	case domain.CellPlacementNearAnchor:
+		if cmd.AllowOverwrite {
+			return nil, fmt.Errorf("cell mutation: allow_overwrite cannot be used with near_anchor placement")
+		}
+		if maxRadius < 0 || maxRadius > maximumCellPlacementMaxRadius {
+			return nil, fmt.Errorf("cell mutation: max_radius must be between 0 and %d", maximumCellPlacementMaxRadius)
+		}
+		if maxRadius == 0 {
+			maxRadius = defaultCellPlacementMaxRadius
+		}
+	default:
+		return nil, fmt.Errorf("cell mutation: placement must be %q or %q",
+			domain.CellPlacementExact, domain.CellPlacementNearAnchor)
+	}
 	out := &domain.PutCellCommand{
-		Coord:      cmd.Coord,
-		RawContent: cmd.RawContent,
-		Tags:       tags,
-		SourceID:   src,
-		Confidence: conf,
-		Kind:       kind,
+		Coord:          cmd.Coord,
+		RawContent:     cmd.RawContent,
+		Tags:           tags,
+		SourceID:       src,
+		Confidence:     conf,
+		Kind:           kind,
+		Placement:      placement,
+		MaxRadius:      maxRadius,
+		AllowOverwrite: cmd.AllowOverwrite,
 	}
 	return out, nil
 }

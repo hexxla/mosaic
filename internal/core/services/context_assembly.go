@@ -70,6 +70,11 @@ func (s *ContextAssemblyService) LoadFromSeeds(ctx context.Context, cmd *domain.
 	if err != nil {
 		return domain.ContextPackResponse{}, fmt.Errorf("context assembly: %w", err)
 	}
+	applyContextByteBudget(&out, effectiveBudget, normalized.Explain)
+	out.SeedCount = len(normalized.Seeds)
+	out.MaxRingApplied = normalized.MaxRing
+	out.MaxBudgetBytes = effectiveBudget
+	out.MaxTokensBudget = effectiveBudget
 	out.RetrievalHint = domain.RetrievalHintAfterContextPack
 	return out, nil
 }

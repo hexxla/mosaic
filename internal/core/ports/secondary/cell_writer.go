@@ -8,7 +8,8 @@ import (
 
 // CellWriter runs HexxlaDB mutations inside DB.Update (PutCell, PutEmbedding, DeleteCell).
 type CellWriter interface {
-	PutCell(ctx context.Context, cmd *domain.PutCellCommand) error
+	// PutCell resolves placement and writes atomically, returning the actual coordinate.
+	PutCell(ctx context.Context, cmd *domain.PutCellCommand) (domain.PutCellMutationResult, error)
 	PutEmbedding(ctx context.Context, coord domain.AxialCoord, vec []float32) error
 	// DeleteCell removes a visible cell when present; CellRemoved reports whether one was removed.
 	DeleteCell(ctx context.Context, cmd *domain.DeleteCellCommand) (cellRemoved bool, err error)

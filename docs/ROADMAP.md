@@ -13,14 +13,14 @@ Engineering polish aligned with Mosaic as the MCP orchestration layer over Hexxl
 - **Oversized one-shot (session cap)** — When `retrieval.session_approx_token_budget` is on, `BeforeRead` only sees **prior** cumulative usage. A single call can still run HexxlaDB and build a full result that **would** exceed the cap on record; we fail at metering time (no usage bump, client error). **Explore:** tighter per-call defaults, truncation, pre-estimates, reject-before-query. Full definition: [`TODOS.md`](../TODOS.md) *(Pending)*.
 - **Session meter lifetime** — In-memory counters keyed by MCP session id (process lifetime). **Explore:** reset/TTL, per-chat boundaries, operator story. [`TODOS.md`](../TODOS.md) *(Pending)*.
 - **Approximate metering vs tokenizer** — `approx_tokens_used` is JSON UTF‑8 length ÷ `bytes_per_approx_token`, not the host tokenizer. **Explore:** labeling vs optional hooks. [`TODOS.md`](../TODOS.md) *(Pending)*.
+- **MCP missing-path refusal** — `mosaic-mcp` currently inherits `hexxladb.Open`'s create-on-missing behavior, so a typo can start an empty database without Mosaic's embedding layout. **Implement:** require a pre-existing regular file before open, with focused command tests. [`TODOS.md`](../TODOS.md) *(Pending)*.
+- **Seed credential parity** — `mosaic-seed` loads Ollama fields from policy YAML but currently ignores `database.passphrase`. **Decide and implement:** wire the YAML passphrase with the same precedence as create/MCP, or remove the implied shared-policy behavior from the command contract. [`TODOS.md`](../TODOS.md) *(Pending)*.
 
 ### Agent experience & host integration
 
 These reduce friction for assistants and humans wiring Mosaic into MCP clients (especially Cursor).
 
 - **MCP server identifier mismatch** — Cursor’s bridge may use an internal id (e.g. `project-0-mosaic-mosaic`) while config uses `mosaic`; mis-invocation causes “server does not exist.” **Improves Mosaic** by cutting setup/debug time and failed tool runs. **How:** Surface both ids in docs + optional tiny **Cursor** doc; see [`TODOS.md`](../TODOS.md) *(Pending)*.
-- **Lexical vs embedding semantics** — Agents should pick **`search_cells`** vs **`search_embedding`** (and hybrid `embed_query_text`) on purpose; empty lexical + non-empty ANN is **expected** when text is not literal in the DB. **Improves** answer quality and fewer false “no data” conclusions. **How:** Blueprint + rule decision table; [`TODOS.md`](../TODOS.md) *(Pending)*.
-- **Preferences = structured query** — Prefer **`query_cells`** with **`require_tags`** including **`preference`** over a loose full-text query when loading user prefs from seeded/tagged cells. **Improves** precision and aligns with taxonomy. **How:** Document pattern in blueprint + agent rule; [`TODOS.md`](../TODOS.md) *(Pending)*.
 
 ## Future
 

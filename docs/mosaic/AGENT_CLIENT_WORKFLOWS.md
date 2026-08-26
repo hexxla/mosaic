@@ -13,7 +13,9 @@ Different editors expose **repeatable agent instructions** in different places. 
 | **MCP server instructions** | Mosaic reads YAML at startup (e.g. **`retention.notes`**) and includes it in MCP server metadata—good for operator policy text. |
 | **Repo docs** | [`AGENTS.md`](../../AGENTS.md), [`MCP_AGENT_BLUEPRINT.md`](./MCP_AGENT_BLUEPRINT.md), this file—human-readable and shareable. |
 
-**Nothing** in a client guarantees the model will call MCP tools; combine layers (see [README § Usage reinforcement](../../README.md#usage-reinforcement)).
+**Nothing** in a client guarantees the model will call MCP tools; combine layers (see [README § Reliable tool use from agents](../../README.md#reliable-tool-use-from-agents)).
+
+Mosaic does **not** currently ship a reusable `SKILL.md`. The committed rules and workflows guide tool selection and chaining; the runtime MCP `tools/list` schemas are the authoritative names, inputs, outputs, and descriptions. [`HEXXLA_API_SURFACE_COVERAGE.md`](./HEXXLA_API_SURFACE_COVERAGE.md) maps those tools to the underlying HexxlaDB API without duplicating every runtime schema.
 
 ---
 
@@ -50,4 +52,4 @@ Copy or adapt these patterns into another client’s instruction format if your 
 
 - [`MCP_AGENT_BLUEPRINT.md`](./MCP_AGENT_BLUEPRINT.md)
 - [`PERSISTENCE_POLICY.md`](./PERSISTENCE_POLICY.md)
-- [README — Usage reinforcement](../../README.md#usage-reinforcement)
+- [README — Reliable tool use from agents](../../README.md#reliable-tool-use-from-agents)

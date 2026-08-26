@@ -9,8 +9,9 @@ import (
 )
 
 type stubContextLoader struct {
-	last *domain.LoadContextPackCommand
-	err  error
+	last     *domain.LoadContextPackCommand
+	response domain.ContextPackResponse
+	err      error
 }
 
 func (s *stubContextLoader) LoadFromSeeds(_ context.Context, cmd *domain.LoadContextPackCommand) (domain.ContextPackResponse, error) {
@@ -18,7 +19,67 @@ func (s *stubContextLoader) LoadFromSeeds(_ context.Context, cmd *domain.LoadCon
 	if s.err != nil {
 		return domain.ContextPackResponse{}, s.err
 	}
-	return domain.ContextPackResponse{}, nil
+	return s.response, nil
+}
+
+func TestContextAssemblyService_applies_byte_budget_after_retrieval(t *testing.T) {
+	t.Parallel()
+	stub := &stubContextLoader{response: domain.ContextPackResponse{
+		Cells: []domain.ContextPackCell{
+			{Coord: domain.AxialCoord{Q: 0, R: 0}, RawContent: "center", Confidence: 0.9, BudgetBytes: 35, BudgetRing: 0},
+			{Coord: domain.AxialCoord{Q: 1, R: 0}, RawContent: "strong", Confidence: 0.8, BudgetBytes: 20, BudgetRing: 1},
+			{Coord: domain.AxialCoord{Q: 0, R: 1}, RawContent: "weak", Confidence: 0.2, BudgetBytes: 20, BudgetRing: 1},
+		},
+		Stats: domain.ContextPackStatsDTO{CandidatesScanned: 3},
+	}}
+	svc := services.NewContextAssemblyService(stub)
+	out, err := svc.LoadFromSeeds(t.Context(), &domain.LoadContextPackCommand{
+		Seeds:          seed0(),
+		MaxBudgetBytes: 64,
+		Explain:        true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(out.Cells) != 2 || out.Cells[0].RawContent != "center" || out.Cells[1].RawContent != "strong" {
+		t.Fatalf("cells after eviction: %+v", out.Cells)
+	}
+	if out.TotalBytes != 55 || out.TotalTokens != 55 {
+		t.Fatalf("totals: bytes=%d legacy_tokens=%d", out.TotalBytes, out.TotalTokens)
+	}
+	if out.MaxBudgetBytes != 64 || out.MaxTokensBudget != 64 {
+		t.Fatalf("budgets: bytes=%d legacy_tokens=%d", out.MaxBudgetBytes, out.MaxTokensBudget)
+	}
+	if out.Stats.CandidatesScanned != 3 || out.Stats.CellsEvicted != 1 || out.Stats.MaxRingUsed != 1 {
+		t.Fatalf("stats: %+v", out.Stats)
+	}
+	if len(out.Explanations) != 3 {
+		t.Fatalf("explanations: %+v", out.Explanations)
+	}
+}
+
+func TestContextAssemblyService_facet_text_counts_toward_budget(t *testing.T) {
+	t.Parallel()
+	stub := &stubContextLoader{response: domain.ContextPackResponse{
+		Cells: []domain.ContextPackCell{{
+			Coord:       domain.AxialCoord{Q: 0, R: 0},
+			RawContent:  "small",
+			FacetText:   []string{"large derived facet"},
+			Confidence:  1,
+			BudgetBytes: 70,
+		}},
+	}}
+	svc := services.NewContextAssemblyService(stub)
+	out, err := svc.LoadFromSeeds(t.Context(), &domain.LoadContextPackCommand{
+		Seeds:          seed0(),
+		MaxBudgetBytes: 64,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(out.Cells) != 0 || out.TotalBytes != 0 || out.Stats.CellsEvicted != 1 {
+		t.Fatalf("facet budget not enforced: %+v", out)
+	}
 }
 
 func TestContextAssemblyService_defaults_and_hint(t *testing.T) {

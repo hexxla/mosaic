@@ -12,9 +12,10 @@ import (
 // Ollama all-MiniLM-L6-v2 family models (matches historical mosaic-seed defaults).
 const MosaicEmbeddingDimensionAllMiniLM = 384
 
-// Defaults for new Mosaic-created HexxlaDB files (MVCC v2, 64 KiB pages, 384-d cosine embeddings).
+// Defaults for new Mosaic-created HexxlaDB files (MVCC, 4 KiB pages, 384-d cosine embeddings).
+// Plaintext creation uses format v2; official encryption creates authenticated format v3.
 const (
-	MosaicDefaultPageSize      uint32 = 65536
+	MosaicDefaultPageSize      uint32 = 4096
 	MosaicDefaultMaxValueBytes uint32 = 16384
 )
 

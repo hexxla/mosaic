@@ -20,7 +20,7 @@ Use for **every** turn when Mosaic MCP is connected and **`capture_mode`** (with
    - **`source_id`**: stable session identifier (same for steps 2 and 4)
    - **`confidence`**: `1.0` (or policy-appropriate value)
    - **`tags`**: topic-specific tags when known; prefer **`mosaic_hexxla_list_tags`** / **`mosaic_hexxla_tag_counts`** when taxonomy is unknown and **reuse** existing tags instead of near-duplicates. Include discriminators such as `preference`, `question`, `fact` when they apply, plus broad tags like `conversation` / `user-message` if your project uses them.
-   - **`q`**, **`r`**: axial coordinates per **project convention** (e.g. increment along a session rail, or allocate from your app—stay consistent).
+   - Placement: use default **`exact`** for a known free coordinate, or **`placement: near_anchor`** with `(q,r)` as the application-selected anchor. Retain the returned coordinate; set **`allow_overwrite: true`** only for intentional exact replacement.
 
 3. **Generate response** — Answer the user (retrieval: embedding / query / search → **`mosaic_hexxla_load_context_pack`** when neighbourhood context is needed; see [`.cursor/rules/mosaic-mcp-agent.mdc`](../../.cursor/rules/mosaic-mcp-agent.mdc)).
 
@@ -30,7 +30,7 @@ Use for **every** turn when Mosaic MCP is connected and **`capture_mode`** (with
    - **`source_id`**: **same** as step 2
    - **`confidence`**: `1.0` (or policy-appropriate)
    - **`tags`**: aligned with the topic of the turn; reuse vocabulary from **`list_tags`** when possible; include `assistant-response` / `conversation` if your taxonomy uses them.
-   - **`q`**, **`r`**: next coordinates per project convention.
+   - Placement: use an explicit exact coordinate or bounded `near_anchor` allocation and retain the returned coordinate.
 
 5. **Display response** — Show the reply in chat.
 

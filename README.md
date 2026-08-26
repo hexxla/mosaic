@@ -10,7 +10,7 @@
 [![Integration](https://github.com/hexxla/mosaic/actions/workflows/integration.yml/badge.svg)](https://github.com/hexxla/mosaic/actions/workflows/integration.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/sploitzberg/mosaic.svg)](https://pkg.go.dev/github.com/sploitzberg/mosaic)
 [![Go Report Card](https://goreportcard.com/badge/github.com/sploitzberg/mosaic)](https://goreportcard.com/report/github.com/sploitzberg/mosaic)
-[![Go 1.26](https://img.shields.io/badge/go-1.26-00ADD8?logo=go)](https://go.dev/doc/go1.26)
+[![Go 1.27](https://img.shields.io/badge/go-1.27-00ADD8?logo=go)](https://go.dev/doc/go1.27)
 [![Version](https://img.shields.io/badge/version-v0.2.0-7c3aed)](https://github.com/hexxla/mosaic/releases/tag/v0.2.0)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
@@ -20,11 +20,11 @@
 
 ## Why Mosaic
 
-Mosaic keeps agent memory **on infrastructure you operate**: [MCP](https://modelcontextprotocol.io/) on **localhost**, optional **encryption at rest**, and code you can **inspect and extend**. Retention and access follow **policy you define**, so context is not outsourced by default.
+Mosaic keeps agent memory **on infrastructure you operate**: [MCP](https://modelcontextprotocol.io/) on **localhost**, optional **encryption at rest**, and code you can **inspect and extend**. Retention guidance and delete permission follow **policy you define**, so context is not outsourced by default.
 
 Agents fail in production when recalled facts drift or sessions read as unrelated reruns. Mosaic gives memory that **accumulates cleanly across sessions**, so the assistant can anchor on durable state instead of re-deriving intent from prompts alone.
 
-It is backed by **[HexxlaDB](https://github.com/hexxla/hexxladb)**: a **hex lattice** lays out related cells for **spatial, bounded expansion** from a seed; **hybrid retrieval** combines similarity with structured constraints; conflicting updates surface as **seams** rather than disappearing into the embedding space. Operators describe behaviour in **YAML**; callers receive **budgeted context** within explicit limits you can trace and revise.
+It is backed by **[HexxlaDB](https://github.com/hexxla/hexxladb)**: a **hex lattice** lays out related cells for **spatial, bounded expansion** from a seed; **hybrid retrieval** combines similarity with structured constraints; callers can record conflicting updates as explicit **seams** rather than losing the disagreement in embedding space. Operators describe behaviour in **YAML**; callers receive **budgeted context** within explicit limits you can trace and revise.
 
 ---
 
@@ -32,7 +32,7 @@ It is backed by **[HexxlaDB](https://github.com/hexxla/hexxladb)**: a **hex latt
 
 **What Mosaic needs**
 
-- **[Ollama](https://ollama.com)** running on your machine. Mosaic needs it for **embeddings** (semantic search and anything else that turns text into vectors). The sample **[configs/config.yaml](configs/config.yaml)** expects Ollama on **`http://127.0.0.1:11434`** with the **`all-minilm`** model; adjust in that file or see **[MOSAIC_CONFIG.md](docs/mosaic/MOSAIC_CONFIG.md)** for env vars and options.
+- **[Ollama](https://ollama.com)** only for operations that turn text into vectors, including semantic search, text embedding writes, and `mosaic-seed`. Database creation, health, lexical/structured reads, raw-vector writes, and the other non-embedding tools do not require it. The sample **[configs/config.yaml](configs/config.yaml)** expects Ollama on **`http://127.0.0.1:11434`** with the **`all-minilm`** model; adjust it or see **[MOSAIC_CONFIG.md](docs/mosaic/MOSAIC_CONFIG.md)**.
 
 ---
 
@@ -47,14 +47,14 @@ cd mosaic
 
 **Step 2 — Build**
 
-You need **[Go 1.26+](https://go.dev/dl/)**. From the repo root:
+You need **[Go 1.27+](https://go.dev/dl/)**. From the repo root:
 
 ```bash
 go mod download
 make build-mosaic-mcp build-mosaic-create-db
 ```
 
-After **`make`**, your programs are under **`bin/<platform>/`** (the command prints the paths). Later steps assume **`bin/linux-amd64/`** — use whatever folder **`make`** created on your machine (add **`.exe`** on Windows). There are no downloadable release binaries yet.
+After **`make`**, your programs are under **`bin/<platform>/`** (the command prints the paths). Later steps assume **`bin/linux-amd64/`** — use whatever folder **`make`** created on your machine (add **`.exe`** on Windows).
 
 **Developers:** **`make seed`** / **`make reseed`**; **`make build-mosaic-seed`** builds a **`mosaic-seed`** binary.
 
@@ -118,90 +118,33 @@ Mosaic fronts **[HexxlaDB](https://github.com/hexxla/hexxladb)** — a single em
 
 Memories sit on **hex coordinates**; **related** items can be **near** in the same way they are near on disk. Expansion from a seed is **spatial and bounded** — you pull context in **rings** with intent, not by hoping the top similarity hits cohere. The benefit: **reproducible, explainable** neighbourhoods instead of a black-box vector grab bag.
 
+Cell writes make placement explicit. `mosaic_hexxla_put_cell` defaults to an exact coordinate and refuses to replace a live cell unless `allow_overwrite` is set. With `placement: near_anchor`, `(q,r)` is a caller-chosen semantic anchor and Mosaic atomically selects the first free coordinate in deterministic ring order within a bounded radius. The response returns the actual coordinate; Mosaic does not infer semantic meaning or silently relocate existing cells.
+
 ### Retrieval that stacks
 
-Semantic similarity, structured filters, and lexical search **coexist**. You find candidates with the signal that fits the question, then **assemble** a context pack under a **byte or token budget** so the model sees a **curated slice** of the lattice — not a blunt truncation that happens to fit the window.
+Semantic similarity, structured filters, and lexical search **coexist**. You find candidates with the signal that fits the question, then **assemble** a context pack under a UTF-8 **byte budget** (optionally estimated from a token target) so the model sees a **curated slice** of the lattice. Mosaic stays provider-neutral; exact tokenizer accounting belongs with the client that renders the final model request.
 
 ### Contradictions you can keep
 
-When two memories disagree, HexxlaDB records **seams** — visible relationships the model can reason about — instead of silently letting the newer embedding win. **Supersession** tracks how preferences evolve without pretending history never happened. The benefit: **auditability and honest dialogue** when knowledge conflicts.
+When two memories disagree, callers can record a **conflict seam** with `mosaic_hexxla_mark_conflict`; an intentional replacement uses `mosaic_hexxla_mark_supersedes`. Neither Mosaic nor HexxlaDB infers semantic disagreement automatically. These visible relationships let the model reason about conflict instead of silently letting a newer embedding win.
 
 ### Policy your operators can sign
 
-**YAML** describes what to retain, whether deletes are permitted, embeddings settings, housekeeping after deletes, encryption hints — not scattered conventions in prose prompts. Agents still improvise reasoning; persistence becomes **enforceable**.
+**YAML** describes capture guidance, whether deletes are permitted, embedding settings, housekeeping after deletes, and encryption hints—not scattered conventions in prose prompts. Delete permission and configured maintenance are enforced by the server; capture modes and notes guide clients but do not auto-save turns.
 
 ### Telemetry without theatre
 
 Insight into footprint, versioning, integrity — grounded in MVCC-aware checks — sits alongside optional **automatic prune and compact** after deletes so conscientious workloads do not choke on dormant history unless you intend that trade-off.
 
-For command names, YAML keys, and troubleshooting, explore the **`docs/`** tree — begin with **[`docs/mosaic/`](docs/mosaic/)**, then **[`docs/hexxladb/`](docs/hexxladb/)** or **[`docs/architecture/`](docs/architecture/)** as needed. **[AGENTS.md](AGENTS.md)** and **[CHANGELOG.md](CHANGELOG.md)** cover contribution layout and shipped changes.
-
----
-
-## Ratchet: Tool flow governance
-
-Mosaic integrates **[mcp-ratchet](https://github.com/hexxla/mcp-ratchet)** to enforce tool call sequences and prerequisites. This prevents agents from making unsafe or context-free mutations by requiring specific discovery or validation steps before write operations.
-
-### Features
-
-- **Prerequisite validation**: Tools can require other tools to be called first (e.g., `put_cell` requires `list_tags` to prevent tag fragmentation)
-- **One-time use tokens**: Prerequisite tokens can be consumed after use, forcing fresh discovery for each operation
-- **Time-bound sessions**: Tokens expire after a configurable duration, ensuring context remains current
-- **Flexible rules**: Multiple prerequisite rules per tool (e.g., `put_cell` accepts `list_tags`, `tag_counts`, or retrieval tools)
-- **Session management**: Session-based token tracking across tool calls
-- **Observability**: Real-time event capture, WebSocket streaming, and HTTP endpoints for monitoring tool usage, session state, and token issuance
-
-### Benefits
-
-- **Tag hygiene**: Forces agents to review available tags before writing, preventing fragmentation
-- **Context awareness**: Requires retrieval tools before mutations to verify cell existence and understand context
-- **Budget enforcement**: Requires budget estimation before large context loads
-- **Auditability**: Tool call sequences are logged and validated against policy
-- **Safety**: Prevents blind writes by requiring discovery steps
-
-### Configuration
-
-Ratchet rules are defined in **`configs/ratchet.yaml`**. Each rule specifies:
-
-- `tool`: The tool being governed
-- `prerequisite`: Required prerequisite tool (empty string means no prerequisite)
-- `error_message`: Custom error message shown when validation fails
-- `one_time_use`: Whether the prerequisite token is consumed after use
-- `expiry`: Time limit for token validity (ignored when `one_time_use: true`)
-
-Example rule:
-
-```yaml
-- tool: "mosaic_hexxla_put_cell"
-  prerequisite: "mosaic_hexxla_list_tags"
-  error_message: "Before saving a cell, review available tags to prevent fragmentation. Call mosaic_hexxla_list_tags to see current vocabulary."
-  one_time_use: true
-```
-
-#### Observability
-
-Ratchet observability is configured in the same file under the `observability` section:
-
-```yaml
-observability:
-  enabled: true
-  storage_type: memory # memory or hexxladb
-  retention_days: 0 # 0 = keep all events
-```
-
-When enabled, Mosaic exposes HTTP endpoints for monitoring:
-
-- **`GET /observability/stats`** - Aggregate statistics (total events, tokens issued, active sessions)
-- **`GET /observability/events?session_id=<id>&limit=<n>`** - Paginated event history
-- **`WS /observability/stream`** - WebSocket endpoint for real-time event streaming
-
-For detailed configuration options and examples, see **[`docs/mosaic/RATCHET_INTEGRATION.md`](docs/mosaic/RATCHET_INTEGRATION.md)**.
+For command names, YAML keys, and troubleshooting, begin with **[`docs/mosaic/`](docs/mosaic/)** and the local **[`docs/architecture/`](docs/architecture/)**. HexxlaDB’s storage/API docs live in the **[upstream `docs/hexxladb` tree](https://github.com/hexxla/hexxladb/tree/main/docs/hexxladb)**. **[AGENTS.md](AGENTS.md)** and **[CHANGELOG.md](CHANGELOG.md)** cover contribution layout and shipped changes.
 
 ---
 
 ## Reliable tool use from agents
 
-MCP **does not force** models to call tools. Reinforce behavior with **project rules**, **`retention.notes`** in your policy YAML (they are injected into server instructions), and **[`.cursor/rules/mosaic-mcp-agent.mdc`](.cursor/rules/mosaic-mcp-agent.mdc)** or **[docs/mosaic/AGENT_CLIENT_WORKFLOWS.md](docs/mosaic/AGENT_CLIENT_WORKFLOWS.md)**. The steady pattern is **discover** candidates, **assemble** a budgeted context pack, and **persist** only where policy permits — **`docs/mosaic/`** spells out names and payloads.
+MCP **does not force** models to call tools. Reinforce behavior with **project rules**, **`retention.notes`** in your policy YAML (they are injected into server instructions), and **[`.cursor/rules/mosaic-mcp-agent.mdc`](.cursor/rules/mosaic-mcp-agent.mdc)** or **[docs/mosaic/AGENT_CLIENT_WORKFLOWS.md](docs/mosaic/AGENT_CLIENT_WORKFLOWS.md)**. The steady pattern is **discover** candidates, **assemble** a budgeted context pack, and **persist** only where policy permits. Runtime `tools/list` schemas are the authoritative payload contract.
+
+The repository also contains a **[Ratchet integration proposal](docs/mosaic/RATCHET_INTEGRATION.md)** and sample **[`configs/ratchet.yaml`](configs/ratchet.yaml)**. They are inactive design artifacts: `mosaic-mcp` does not load that file, enforce its prerequisites, or expose Ratchet observability endpoints.
 
 ---
 

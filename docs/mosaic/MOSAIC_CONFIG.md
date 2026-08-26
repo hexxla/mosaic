@@ -60,7 +60,7 @@ Cumulative approximate-token metering on structured JSON outputs from HexxlaDB *
 | **`session_approx_token_budget`** | int | **`0`** = no enforcement cap; metering still recorded where applicable |
 | **`bytes_per_approx_token`** | float | **`4`**; must be **2–16** if set |
 
-Tools **`estimate_context_budget`**, **`mosaic_hexxla_get_persistence_policy`**, and writes are outside this budget.
+Tools **`mosaic_hexxla_estimate_context_budget_bytes`**, **`mosaic_hexxla_get_persistence_policy`**, and writes are outside this budget.
 
 ---
 

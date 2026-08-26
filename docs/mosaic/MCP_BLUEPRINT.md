@@ -1,7 +1,9 @@
 # MCP server blueprint (local HexxlaDB tools)
 
-**Status:** implementation plan for the `mosaic` repository
+**Status:** historical design record for the initial MCP milestone; the implementation has shipped
 **Scope:** local-only [Model Context Protocol](https://modelcontextprotocol.io/docs/getting-started/intro) server exposing **tools** that operate on a [HexxlaDB](https://github.com/hexxla/hexxladb) database over **Streamable HTTP**, with **no application-layer HTTP authentication** in v1.
+
+The checklists, “what exists,” and “what to do next” sections below preserve the repository's pre-implementation plan and are not a current progress tracker. For the live tool surface and workflows, use runtime MCP `tools/list`, [`MCP_AGENT_BLUEPRINT.md`](./MCP_AGENT_BLUEPRINT.md), and [`HEXXLA_API_SURFACE_COVERAGE.md`](./HEXXLA_API_SURFACE_COVERAGE.md). Current repository status is summarized in [`IMPLEMENTATION_PLAN.md`](./IMPLEMENTATION_PLAN.md).
 
 This document is intentionally smaller in scope than [MOSAIC.md](./MOSAIC.md), which describes the full Hexxla memory OS. The milestone here is a **clean, local MCP surface** backed by HexxlaDB primitives.
 

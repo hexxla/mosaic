@@ -6,7 +6,8 @@ import (
 	"github.com/sploitzberg/mosaic/internal/core/domain"
 )
 
-// ContextPackLoader runs HexxlaDB Tx.LoadContextPackFrom inside a View.
+// ContextPackLoader retrieves provider-neutral HexxlaDB context candidates.
+// Application budgeting is applied by the primary service.
 type ContextPackLoader interface {
 	LoadFromSeeds(ctx context.Context, cmd *domain.LoadContextPackCommand) (domain.ContextPackResponse, error)
 }

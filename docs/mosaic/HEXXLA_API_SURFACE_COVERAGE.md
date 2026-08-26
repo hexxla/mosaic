@@ -39,9 +39,10 @@
 
 | Hexxla capability | Mosaic |
 | --- | --- |
-| `PutCell`, `DeleteCell`, `GetCell` | `mosaic_hexxla_put_cell`, `mosaic_hexxla_delete_cell`; reads via **`query_cells`** / **`search_cells`** / **`search_embedding`** (payload paths) |
-| `WalkRing`, `LoadContext` (simple ring walk) | *(not exposed)* — prefer **`mosaic_hexxla_load_context_pack`** ([`LoadContextPackFrom`](./MCP_AGENT_BLUEPRINT.md)) |
-| `LoadContextPackFrom` / assembly | `mosaic_hexxla_load_context_pack` |
+| `PutCell`, `FindFreeCellPlacement`, `DeleteCell`, `GetCell` | `mosaic_hexxla_put_cell` supports safe exact placement or bounded `near_anchor` allocation and returns the actual coordinate; `mosaic_hexxla_delete_cell`; reads via **`query_cells`** / **`search_cells`** / **`search_embedding`** |
+| `WalkRing` | *(not exposed directly)* |
+| `LoadContext` unified assembled retrieval | `mosaic_hexxla_load_context_pack`; HexxlaDB bounds candidates and Mosaic applies provider-neutral byte budgeting ([design](./MCP_AGENT_BLUEPRINT.md)) |
+| `LoadContextFOV`, `LoadContextVoronoi` | *(not exposed)* |
 | Secondary tag reads: `ListExistingTopics`, `TagCounts` | `mosaic_hexxla_list_tags`, `mosaic_hexxla_tag_counts` |
 | `AscendCellsByTag`, `AscendDistinctTags`, other index walks | Partially via **`query_cells`** filters; full tag iteration not a separate tool |
 | `QueryCells`, `SearchCells` | `mosaic_hexxla_query_cells`, `mosaic_hexxla_search_cells`; optional **`embed_query_text`** wires **`CellQuery.Embedding`** / **`CellSearchConfig.Embedding`** (Ollama + hybrid ANN with same predicates). |

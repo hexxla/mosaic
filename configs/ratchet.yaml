@@ -1,6 +1,6 @@
-# Ratchet configuration for Mosaic MCP server
-# This file enforces tool call order to guide LLMs through recommended Mosaic workflows
-# See docs/mosaic/RATCHET_INTEGRATION.md for detailed rationale
+# Inactive design artifact: mosaic-mcp does not load this file or integrate Ratchet.
+# This proposed Ratchet configuration illustrates tool-order governance only.
+# See docs/mosaic/RATCHET_INTEGRATION.md for the design rationale.
 #
 # DESIGN PHILOSOPHY: Maximum compliance and guardrails
 # - one_time_use: true for state-dependent operations to ensure fresh checks

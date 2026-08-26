@@ -93,7 +93,7 @@ var seedConversation = []seedMessage{
 	},
 	{
 		"assistant",
-		"HexxlaDB stores data in a hexagonal lattice. Keys encode 2-D axial coordinates (q,r) via Morton interleaving, so spatially adjacent cells have adjacent keys — range scans naturally retrieve neighbourhood context without secondary lookups.",
+		"HexxlaDB stores data in a hexagonal lattice. Pack encodes 2-D axial coordinates (q,r) into stable Morton-ordered keys with useful spatial locality. Exact rings are enumerated with Ring, WalkRings, or transaction ring walks rather than assumed to be one contiguous key range.",
 		[]string{"fact", "architecture", "hexagonal-grid", "morton-encoding", "user-123"},
 	},
 	{
@@ -113,8 +113,8 @@ var seedConversation = []seedMessage{
 	},
 	{
 		"assistant",
-		"Not yet natively. The roadmap includes an embed/ keyspace for ANN/hybrid retrieval. For now you can store raw embedding bytes as part of RawContent or a Facet, then do CPU-side similarity in your application layer.",
-		[]string{"fact", "roadmap", "embeddings", "workaround", "user-123"},
+		"Yes. PutEmbedding stores one vector per cell and persists the dimension detected from the first write unless it was configured at Open. SearchByEmbedding uses the maintained HNSW index with a flat fallback, and QueryCells can combine embedding similarity with structured filters.",
+		[]string{"fact", "embeddings", "retrieval", "api", "user-123"},
 	},
 	{
 		"user",
@@ -133,7 +133,7 @@ var seedConversation = []seedMessage{
 	},
 	{
 		"assistant",
-		"Each page is 64 KiB. Leaf pages: 64-byte common header (magic HXBT, version, kind, nkeys, next, parent), followed by key-len (uint16), val-len (uint16), key bytes, value bytes per entry. Internal pages store separator keys and 8-byte child page IDs. All multi-byte fields are big-endian.",
+		"Page size is persisted per database: 4, 8, 16, or 64 KiB, with 4 KiB the default for new files. Page 0 reserves a 512-byte database header. B+ tree nodes use a 64-byte common header; leaf entries store key and value lengths, while internal nodes store separator keys and 8-byte child page IDs. Multi-byte fields are big-endian.",
 		[]string{"fact", "internals", "btree", "page-layout", "user-123"},
 	},
 	{
@@ -153,7 +153,7 @@ var seedConversation = []seedMessage{
 	},
 	{
 		"assistant",
-		"Enable with Options.ChangelogEnabled. Every PutCell, PutSeam, ResolveSeam, PutFacet, and PutEdge appends a record to <dbpath>-changelog. Op codes: ChangelogOpPutCell (0x01), ChangelogOpPutSeam (0x02), ChangelogOpResolveSeam (0x03), ChangelogOpPutFacet (0x04), ChangelogOpPutEdge (0x05). ReadChangelogFiltered lets you scope by op code and key prefix.",
+		"Enable with Options.ChangelogEnabled. PutCell, PutSeam, ResolveSeam, PutFacet, PutEdge, and DeleteCell project recoverable at-least-once records to <dbpath>-changelog. Stable operation codes run from ChangelogOpPutCell (0x01) through ChangelogOpDeleteCell (0x06). ReadChangelogFiltered scopes reads by operation code and key prefix.",
 		[]string{"fact", "changefeed", "api", "op-codes", "user-123"},
 	},
 	{
@@ -163,7 +163,7 @@ var seedConversation = []seedMessage{
 	},
 	{
 		"assistant",
-		"Yes. AES-256-XTS encrypts each data page independently. Key can be provided as raw bytes (Options.EncryptionKey, stretched with HKDF-SHA256) or as a passphrase (Options.Passphrase, stretched with Argon2id using the per-database salt from the file header). WAL records can also carry a keyed MAC (Options.EnableWALMAC).",
+		"Yes. New encrypted databases use authenticated XChaCha20-Poly1305 pages; existing AES-256-XTS files remain readable through the legacy path. A raw Options.EncryptionKey is expanded with HKDF-SHA256, while Options.Passphrase uses Argon2id with the per-database salt. Official encryption also authenticates the header, WAL, verifier, and optional changelog.",
 		[]string{"fact", "security", "encryption", "aes-xts", "argon2id", "user-123"},
 	},
 	{
@@ -183,7 +183,7 @@ var seedConversation = []seedMessage{
 	},
 	{
 		"assistant",
-		"Yes. DB.SnapshotDiff(ctx, fromSeq, toSeq, config) returns all cell and seam writes in (fromSeq, toSeq]. Each CellDiff carries the Coord, CommitSeq, Op (DiffOpPut), and decoded CellRecord. Suitable for incremental replication, audit trails, and CDC pipelines. Requires MVCC (format v2).",
+		"DB.SnapshotDiff(ctx, fromSeq, toSeq, config) returns retained cell and seam versions in (fromSeq, toSeq] on MVCC formats v2 and v3. Pruned versions and non-cell/seam mutations are absent, so it is a bounded diagnostic rather than complete replication, audit, or CDC input. Use HexxlaDB's durable changelog consumers for complete logical change processing.",
 		[]string{"fact", "snapshot-diff", "cdc", "api", "user-123"},
 	},
 
@@ -323,7 +323,7 @@ var seedConversation = []seedMessage{
 	},
 	{
 		"assistant",
-		"LLMs have a fixed context window. Token budget management selects which memories to include given the window size. HexxlaDB's LoadContextWithBudgeting evicts low-confidence cells first (greedy fill by confidence descending), respecting a Budgeter that counts tokens or bytes. This prevents context overflow while maximising relevance.",
+		"LLMs have fixed context windows, but exact token accounting depends on the provider, model, rendered messages, tool definitions, and reserved output. HexxlaDB returns a deterministic MaxCells-bounded candidate set; Mosaic applies a provider-neutral byte ceiling, while the client that renders the final request remains responsible for exact tokenizer accounting.",
 		[]string{"fact", "llm", "token-budget", "memory", "hexxladb", "user-123"},
 	},
 	{
@@ -343,7 +343,7 @@ var seedConversation = []seedMessage{
 	},
 	{
 		"assistant",
-		"Stratified retention: (1) keep all high-confidence facts permanently; (2) keep recent turns (e.g. last 50 CommitSeq) regardless of confidence; (3) prune low-confidence, non-tagged turns beyond that window using PruneCellVersions. Tag important cells as 'permanent' and exclude them from prune candidates.",
+		"Keep logical-retention policy in the application: select obsolete cells by tags, provenance, confidence, and age, then delete them explicitly. PruneCellVersions removes eligible old MVCC versions according to commit retention; it does not choose which current facts to forget. Run compaction afterward when physical disk reclamation is required.",
 		[]string{"fact", "llm", "memory", "pruning", "strategy", "hexxladb", "user-123"},
 	},
 	{
@@ -383,7 +383,7 @@ var seedConversation = []seedMessage{
 	},
 	{
 		"assistant",
-		"Confidence encodes epistemic certainty. High-confidence cells (user-confirmed facts, verified data) are prioritised in token-budgeted context assembly and kept longer during pruning. Low-confidence cells (inferred, speculative) are evicted first. Confidence should degrade over time for time-sensitive facts.",
+		"Confidence encodes epistemic certainty. HexxlaDB stores and returns confidence without silently changing retrieval meaning. Mosaic can rank user-confirmed or verified facts ahead of inferred material; any time-based confidence or retention policy should use explicit, auditable writes.",
 		[]string{"fact", "llm", "memory", "confidence", "hexxladb", "user-123"},
 	},
 

@@ -6,7 +6,7 @@ import (
 	"github.com/sploitzberg/mosaic/internal/core/domain"
 )
 
-// ContextAssembly loads budgeted lattice neighbourhoods from seed coordinates (LoadContextPackFrom).
+// ContextAssembly loads and byte-budgets lattice neighbourhoods from seed coordinates.
 type ContextAssembly interface {
 	LoadFromSeeds(ctx context.Context, cmd *domain.LoadContextPackCommand) (domain.ContextPackResponse, error)
 }

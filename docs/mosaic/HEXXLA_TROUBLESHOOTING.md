@@ -31,7 +31,7 @@ On **MVCC** files, each **ResolveSeam** appends another `seam/<ULID>/<seq>` row.
 
 Residual real issues HealthCheck still catches:
 
-- **Orphan seams** — **[`Tx.DeleteCell`](https://pkg.go.dev/github.com/hexxla/hexxladb)** does **not** remove seams; deleting an endpoint yields seam warnings until you **resolve/remove seams** or restore cells.
+- **Orphan seams** — **[`Tx.DeleteCell`](https://pkg.go.dev/github.com/hexxla/hexxladb)** does **not** remove seams; deleting an endpoint yields seam warnings even after `ResolveSeam`, because health checks validate resolved endpoints too. The public API has no seam delete. Restore the missing cell, or perform a reviewed offline migration/repair that omits the obsolete seam.
 - **True orphan secondaries** — e.g. pruned **`cell/`** rows without matching secondary cleanup (operator edge cases).
 
 For retention and MVCC compaction, Mosaic can run bounded **`PruneScheduler.Tick`** after a successful **`mosaic_hexxla_delete_cell`** when **`database.auto_maintain_after_cell_delete`** is enabled (see [configs/config.yaml](../../configs/config.yaml)); there is no separate MCP tool that calls **`PruneCellVersions`** alone. See [HEXXLA API surface](./HEXXLA_API_SURFACE_COVERAGE.md).
@@ -40,13 +40,13 @@ For retention and MVCC compaction, Mosaic can run bounded **`PruneScheduler.Tick
 
 ## Disk size stays ~fixed (e.g. **576 KiB**) after seed, more writes, or “delete everything”
 
-### 1. **576 KiB is usually nine 64 KiB pages**
+### 1. **File size reflects allocated pages**
 
-Mosaic’s default layout uses **`PageSize` 65536** ([`internal/config/mosaic_hexxla_db.go`](../../internal/config/mosaic_hexxla_db.go)). **`576 × 1024 = 589 824 = 9 × 65 536`**, so the primary file length is exactly **nine pages**. That is normal for a small btree footprint with this page size.
+New Mosaic databases default to **`PageSize` 4096** ([`internal/config/mosaic_hexxla_db.go`](../../internal/config/mosaic_hexxla_db.go)); nine logical pages occupy about **36 KiB** before any authenticated-encryption overhead. Existing databases retain their creation-time page size, so a legacy **65536-byte** layout with nine pages remains about **576 KiB**. Both are normal small B+tree footprints.
 
-### 2. **The engine does not shrink the primary file on delete**
+### 2. **Delete does not automatically shrink the primary file**
 
-HexxlaDB’s storage shell is **extend-only**: freed btree space is **reused**, but the **file length does not drop** until you **rewrite** it. See HexxlaDB **`docs/hexxladb/OPERATIONS.md`** (“File growth (extend-only allocation)”). Without a **`Compact`** pass, the on-disk high-water mark stays put even when logical data shrinks.
+Plaintext and legacy encrypted v1/v2 files remain **extend-only** and require compaction to reclaim dead pages. Authenticated v3 records reusable pages and consumes them before extending, but reuse alone does not shorten the file; `ReclaimTail` can remove only a contiguous allocator-owned suffix and compaction repacks fragmented/low-fill pages. See HexxlaDB's upstream `docs/hexxladb/OPERATIONS.md` for the format-specific procedure.
 
 ### 3. **MVCC deletes still leave a physical row per coordinate**
 

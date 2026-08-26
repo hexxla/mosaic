@@ -1,8 +1,8 @@
 # MCP Tool Description Audit
 
-**Status:** Audit of Mosaic MCP server tool descriptions for clarity, completeness, and guidance quality.
+**Status:** Historical audit snapshot from May 2, 2026. Findings and quoted descriptions below describe that date, not the current tool surface.
 
-**Purpose:** This document audits the current tool descriptions in the Mosaic MCP server to identify areas for improvement, particularly around tag usage guidance and category conventions.
+**Purpose:** This document records the May 2, 2026 audit of Mosaic MCP tool descriptions. For the current write and placement contract, see [`MCP_AGENT_BLUEPRINT.md`](MCP_AGENT_BLUEPRINT.md#cell-placement-on-writes).
 
 ---
 

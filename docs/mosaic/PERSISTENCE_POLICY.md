@@ -54,18 +54,17 @@ If the **`retention`** key is **omitted** entirely, defaults match [`DefaultRete
 ### `allow_delete_cell`
 
 - **Omitted** → **`false`**: `mosaic_hexxla_delete_cell` is rejected until the operator sets `allow_delete_cell: true`.
-- Set to **`true`** to allow `DeleteCell` through the MCP and [CellMutationService](internal/core/services/cell_mutation.go).
+- Set to **`true`** to allow `DeleteCell` through the MCP and [CellMutationService](../../internal/core/services/cell_mutation.go).
 
 ### Encrypted HexxlaDB files (`database`)
 
-HexxlaDB supports AES-XTS at-rest encryption (passphrase via Argon2id, or raw key via HKDF). Mosaic wires credentials into [`hexxladb.Open`](https://pkg.go.dev/github.com/hexxla/hexxladb#Open) for **`cmd/mosaic-mcp`** and **`cmd/mosaic-seed`**.
+New encrypted HexxlaDB v0.6.0 files use authenticated format v3 with XChaCha20-Poly1305 pages, an authenticated header, and keyed WAL records. Existing AES-256-XTS v1/v2 files remain readable through HexxlaDB's legacy compatibility path. Passphrases use Argon2id; raw keys are expanded with HKDF-SHA256.
 
 | Mechanism | Role |
 | --------- | ---- |
-| **`mosaic-mcp -db-passphrase`** | Highest precedence for passphrase (avoid on shared hosts — may appear in process listings). |
-| **`MOSAIC_DB_PASSPHRASE`** | Env passphrase (preferred over YAML in Git). |
-| **`database.passphrase`** in policy YAML | Lowest precedence; convenient for local dev, risky to commit. |
-| **`MOSAIC_DB_ENCRYPTION_KEY_HEX`** | Hex-encoded raw key for `Options.EncryptionKey`. **Mutually exclusive** with passphrase sources. |
+| **`mosaic-mcp`** | `-db-passphrase` → `MOSAIC_DB_PASSPHRASE` → policy YAML `database.passphrase`; raw `MOSAIC_DB_ENCRYPTION_KEY_HEX` is mutually exclusive. |
+| **`mosaic-create-db`** | Same flag → env → policy YAML precedence; prefer env over command arguments or committed YAML. |
+| **`mosaic-seed`** | `-db-passphrase` → `MOSAIC_DB_PASSPHRASE`; the policy file configures Ollama only and its `database.passphrase` is currently ignored. The raw-key environment variable remains mutually exclusive. |
 
 If the database file is encrypted and no credential is provided, open fails (see upstream **`ErrEncryptionKeyRequired`** / mismatch errors).
 
@@ -78,7 +77,7 @@ HexxlaDB **`Open`** creates the file when it does not exist. Mosaic wraps that i
 | **`cmd/mosaic-create-db`** | Empty DB only — builds **[`config.NewMosaicDatabaseOptions`](../../internal/config/mosaic_hexxla_db.go)(layout)**, then **[`config.ApplyHexxlaEncryption`](../../internal/config/hexxla_open.go)**, then **`hexxladb.Open`**. |
 | **`cmd/mosaic-seed`** | Same layout + optional encryption, then seeds cells/embeddings if the corpus is non-empty. |
 
-**Encryption** is never implicit: credentials come only from the passphrase/key mechanisms in the table above (`ApplyHexxlaEncryption` / `BuildHexxlaOpenOptions`). **Layout** (MVCC, page size, max value bytes, embedding dimension, distance metric) is optional on both commands — each flag defaults to the Mosaic values in **`DefaultMosaicDatabaseLayout`** (see **`mosaic-create-db -help`** / **`mosaic-seed -help`**).
+**Encryption** is never implicit: credentials come only from the command-specific mechanisms in the table above (`ApplyHexxlaEncryption` / `BuildHexxlaOpenOptions`). **Layout** (MVCC, page size, max value bytes, embedding dimension, distance metric) is optional on both commands—each flag defaults to the Mosaic values in **`DefaultMosaicDatabaseLayout`**. Plaintext MVCC creation uses format v2; supplying official encryption credentials creates authenticated format v3 regardless of the MVCC flag.
 
 **CLI and Make examples:** [DATABASE_CREATION.md](./DATABASE_CREATION.md).
 

@@ -4,7 +4,7 @@
 
 **Canonical references (hexxladb repo):** [doc.go](https://github.com/hexxla/hexxladb/blob/main/doc.go) overview · [docs/hexxladb/API_REFERENCE.md](https://github.com/hexxla/hexxladb/blob/main/docs/hexxladb/API_REFERENCE.md) full inventory · [TX.md](https://github.com/hexxla/hexxladb/blob/main/docs/hexxladb/TX.md) transactions / MVCC.
 
-Architecture rule from hexxladb: outbound code calls **`package hexxladb` only**, not `internal/engine` ([HEXAGONAL_ARCHITECTURE.md](https://github.com/hexxla/hexxladb/blob/main/docs/context/HEXAGONAL_ARCHITECTURE.md)).
+Architecture rule from hexxladb: outbound code calls **`package hexxladb` only**, not `internal/engine` ([HEXAGONAL_ARCHITECTURE.md](https://github.com/hexxla/hexxladb/blob/main/docs/architecture/HEXAGONAL_ARCHITECTURE.md)).
 
 **Concrete MCP ↔ Hexxla capability matrix:** [HEXXLA_API_SURFACE_COVERAGE.md](./HEXXLA_API_SURFACE_COVERAGE.md).
 
@@ -17,7 +17,7 @@ Architecture rule from hexxladb: outbound code calls **`package hexxladb` only**
 | **Lifecycle** | `Open`, `Options`, `(*DB).Close`, `Compact`, encryption options | Composition root opens DB once; encryption keys from env/config. |
 | **Transactions** | `View`, `Update`, `Batch`, `ViewAt`, `ViewAtTime`; `Tx` | Secondary adapter wraps Tx boundaries; MOSAIC use cases choose read vs write snapshot. |
 | **Cells & coords** | `PutCell`, `GetCell`, `DeleteCell`; `Coord`, `PackedCoord`, `Pack`, `Unpack`; ring walks | Domain models **logical** coordinates/value; adapter maps ↔ `PutCell` / `GetCell` payloads. |
-| **Context assembly** | `LoadContext`, `LoadContextAt`; budgeting / `LoadContextPack*` variants in API ref | Fits `search_and_load_context` and token caps in [MOSAIC.md](./MOSAIC.md)—orchestration in **services**. |
+| **Context assembly** | `LoadContext` with seeds, result bounds, validity, graph/ring dispatch, seams, and supersession | Secondary adapter retrieves provider-neutral candidates; Mosaic services own ranking and byte-budget policy. |
 | **Seams** | `PutSeam`, `FindSeams`, `FindSeamsAt`, `ResolveSeam`, `MarkConflict`, supersession helpers | Mosaic MCP exposes `FindSeams`, `MarkConflict`, `MarkSupersedes`, `ResolveSeam` ([seam_tools.go](../../internal/adapter/primary/mcpsrv/seam_tools.go)); validation in `SeamLifecycleService`. |
 | **Facets & edges** | `PutFacet`, `PutEdge`, `LinkCells`, reads: `GetFacet`, `AscendFacetsForCell`, `GetEdge`, `AscendEdgesFrom` | Writes: `mosaic_hexxla_put_facet`, `mosaic_hexxla_link_cells` ([facet_edge_tools.go](../../internal/adapter/primary/mcpsrv/facet_edge_tools.go)); reads: `mosaic_hexxla_get_facet`, `mosaic_hexxla_list_facets`, `mosaic_hexxla_get_edge`, `mosaic_hexxla_list_edges_from` ([facet_edge_read_tools.go](../../internal/adapter/primary/mcpsrv/facet_edge_read_tools.go)); **`NewFacetDerived`** / **`NewProvenanceWire`** ([templates.go](https://github.com/hexxla/hexxladb/blob/main/templates.go)). |
 | **Query / search** | `QueryCells`, `SearchCells`, tag/source/time scans; embeddings + `SearchByEmbedding` when enabled | MCP **`mosaic_hexxla_query_cells`**, **`mosaic_hexxla_search_cells`**, **`mosaic_hexxla_search_embedding`** ([coverage](./HEXXLA_API_SURFACE_COVERAGE.md)). |
@@ -36,7 +36,7 @@ Architecture rule from hexxladb: outbound code calls **`package hexxladb` only**
 | **`internal/core/services`** | **No** imports of `adapter/` or concrete `hexxladb`; only **ports**. |
 | **`internal/adapter/secondary`** | **Yes** — translate domain/DTO ↔ `Open`/`Tx`/`PutCell`/… |
 
-**Practical note:** Hexxla’s public signatures often use **`record.CellRecord`** and lattice types exported from **`hexxladb`**. Keeping those types **inside the secondary adapter** avoids bloating ports and keeps MCP/tool JSON schemas stable in the application layer.
+**Practical note:** HexxlaDB v0.6.0 exports root aliases such as **`hexxladb.CellRecord`** and lattice types. Mosaic still keeps those storage-facing types **inside the secondary adapter** so ports remain product-shaped and MCP JSON schemas are not coupled to the database package.
 
 ---
 
@@ -54,13 +54,9 @@ Avoid copy-pasting the entire HexxlaDB surface into ports; expose **only what MO
 
 ---
 
-## 4. Recommended next move
+## 4. Current implementation
 
-1. **Read (team):** skim [API_REFERENCE.md](https://github.com/hexxla/hexxladb/blob/main/docs/hexxladb/API_REFERENCE.md) Lifecycle + Cells + Transactions + whichever group matches the **first tool** ([MOSAIC.md](./MOSAIC.md) tooling table).
-2. **Decide:** first vertical slice behaviors (health-only vs single read primitive vs simple `PutCell` path).
-3. **Implement in order:** Step 1 domain types → Step 3 minimal secondary port → Step 4 service → Step 5 Hexxla adapter + MCP tool registration (see [MCP_BLUEPRINT.md](./MCP_BLUEPRINT.md) “Alignment” section).
-
-That sequence **is** the plan until the first slice ships; revise the port contours after real usage.
+The initial vertical slices are complete across domain DTOs, ports, services, the HexxlaDB secondary adapter, and MCP registration. Use [`HEXXLA_API_SURFACE_COVERAGE.md`](./HEXXLA_API_SURFACE_COVERAGE.md) for the current mapping and runtime `tools/list` for exact schemas. New capabilities should still be added inside-out through the existing boundaries rather than exposing HexxlaDB types directly from MCP handlers.
 
 ---
 
@@ -68,9 +64,9 @@ That sequence **is** the plan until the first slice ships; revise the port conto
 
 Seeding follows the same **ingestion pipeline** as Hexxla’s [`examples/llm_context_engine`](https://github.com/hexxla/hexxladb/tree/main/examples/llm_context_engine): for each conversation turn, **Ollama** (`POST /api/embeddings`, default model **`all-minilm`**, **384-dimensional** vectors) then **`Update` → `PutCell` + `PutEmbedding`** on the same **packed coordinate**. The **spiral coordinate layout** matches [`examples/conversational_memory`](https://github.com/hexxla/hexxladb/tree/main/examples/conversational_memory) (`NewUserMessageCell` / `NewAssistantResponseCell`, extra tags).
 
-Requirements: **Ollama** running (e.g. `ollama pull all-minilm`). The database is created with **`EmbeddingDimension: 384`** and **`DistanceCosine`** (plus MVCC and a larger page size, aligned with the upstream LLM demo).
+Requirements: **Ollama** running (e.g. `ollama pull all-minilm`). The database is created with **`EmbeddingDimension: 384`**, **`DistanceCosine`**, MVCC, and the validated 4096-byte HexxlaDB page profile.
 
-**Why `Update` per turn (not `BatchPutCells`):** `BatchPutCells` takes `[]record.CellRecord`, which callers outside **`hexxladb`** cannot name; `PutCell` with template helpers avoids that. Embedding calls are **outside** the DB transaction (HTTP to Ollama), matching the upstream example.
+**Why `Update` per turn:** HexxlaDB v0.6.0 accepts `[]hexxladb.CellRecord` in `BatchPutCells`, but Mosaic generates each embedding over HTTP before opening the database transaction and then atomically stores that turn's cell and vector at one coordinate. A bulk cell-only batch would change those failure and durability semantics without helping the current seed workflow.
 
 **Typical flow** (run from **repository root**):
 

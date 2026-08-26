@@ -20,6 +20,9 @@ func TestDefaultMosaicDatabaseLayout_matches_MosaicNewDatabaseOptions(t *testing
 		o.DistanceMetric != legacy.DistanceMetric {
 		t.Fatalf("NewMosaicDatabaseOptions(Default) != MosaicNewDatabaseOptions: %+v vs %+v", o, legacy)
 	}
+	if def.PageSize != 4096 {
+		t.Fatalf("default PageSize=%d want HexxlaDB validated profile 4096", def.PageSize)
+	}
 }
 
 func TestParseDistanceMetricName(t *testing.T) {

@@ -10,7 +10,7 @@ import (
 	"github.com/sploitzberg/mosaic/internal/core/ports/secondary"
 )
 
-// ContextPackAdapter implements [secondary.ContextPackLoader] via Tx.LoadContextPackFrom.
+// ContextPackAdapter implements [secondary.ContextPackLoader] via Tx.LoadContext.
 type ContextPackAdapter struct {
 	live *LiveDB
 }
@@ -32,27 +32,25 @@ func (a *ContextPackAdapter) LoadFromSeeds(ctx context.Context, cmd *domain.Load
 	for _, s := range cmd.Seeds {
 		coords = append(coords, hexxladb.Coord{Q: s.Q, R: s.R})
 	}
-	cfg := hexxladb.LoadContextBudgetConfig{
-		FilterSuperseded: cmd.FilterSuperseded,
-		IncludeSeams:     cmd.IncludeSeams,
-		Explain:          cmd.Explain,
-		IncludeFacetText: cmd.IncludeFacetText,
-		SeamRadius:       0,
-	}
-	cfg.Assemble = hexxladb.DefaultAssembleCellViewOpts()
-	if cmd.MaxCells > 0 {
-		cfg.MaxCandidateCells = cmd.MaxCells
+	assemble := hexxladb.DefaultAssembleCellViewOpts()
+	assemble.IncludeFacets = cmd.IncludeFacetText
+	cfg := hexxladb.LoadContextConfig{
+		Seeds:    coords,
+		MaxRing:  cmd.MaxRing,
+		MaxCells: cmd.MaxCells,
+		Assembly: hexxladb.ContextAssemblyConfig{
+			Assemble:         assemble,
+			FilterSuperseded: cmd.FilterSuperseded,
+			IncludeSeams:     cmd.IncludeSeams,
+			Explain:          cmd.Explain,
+		},
 	}
 
 	var pack hexxladb.ContextPack
 	err := a.live.WithRead(func(db *hexxladb.DB) error {
 		return db.View(func(tx *hexxladb.Tx) error {
 			var errInner error
-			pack, errInner = tx.LoadContextPackFrom(ctx, cmd.MaxRing, cmd.MaxTokens,
-				hexxladb.ByteLenBudgeter{},
-				cfg,
-				coords...,
-			)
+			pack, errInner = tx.LoadContext(ctx, cfg)
 			return errInner
 		})
 	})
@@ -61,30 +59,38 @@ func (a *ContextPackAdapter) LoadFromSeeds(ctx context.Context, cmd *domain.Load
 	}
 
 	out := domain.ContextPackResponse{
-		Cells:           make([]domain.ContextPackCell, 0, len(pack.Cells)),
-		TotalTokens:     pack.TotalTokens,
-		SeedCount:       len(cmd.Seeds),
-		MaxRingApplied:  cmd.MaxRing,
-		MaxTokensBudget: cmd.MaxTokens,
+		Cells: make([]domain.ContextPackCell, 0, len(pack.Cells)),
 		Stats: domain.ContextPackStatsDTO{
 			CandidatesScanned: pack.Stats.CandidatesScanned,
-			CellsEvicted:      pack.Stats.CellsEvicted,
 			MaxRingUsed:       pack.Stats.MaxRingUsed,
 		},
 	}
 	for i := range pack.Cells {
 		v := &pack.Cells[i]
 		createdAt, updatedAt, validFrom, validTo := timingsFromCellView(v)
+		facetText := make([]string, 0, len(v.Facets))
+		budgetBytes := len(v.RawContent)
+		for _, facet := range v.Facets {
+			facetText = append(facetText, facet.DerivedContent)
+			budgetBytes += len(facet.DerivedContent)
+		}
+		budgetCoord := v.Coord
+		if v.SupersededFrom != nil {
+			budgetCoord = *v.SupersededFrom
+		}
 		out.Cells = append(out.Cells, domain.ContextPackCell{
-			Coord:      domain.AxialCoord{Q: v.Coord.Q, R: v.Coord.R},
-			RawContent: v.RawContent,
-			Tags:       append([]string(nil), v.Tags...),
-			SourceID:   v.Provenance.SourceID,
-			Confidence: v.Provenance.Confidence,
-			CreatedAt:  createdAt,
-			UpdatedAt:  updatedAt,
-			ValidFrom:  validFrom,
-			ValidTo:    validTo,
+			Coord:       domain.AxialCoord{Q: v.Coord.Q, R: v.Coord.R},
+			RawContent:  v.RawContent,
+			Tags:        append([]string(nil), v.Tags...),
+			SourceID:    v.Provenance.SourceID,
+			Confidence:  v.Provenance.Confidence,
+			FacetText:   facetText,
+			CreatedAt:   createdAt,
+			UpdatedAt:   updatedAt,
+			ValidFrom:   validFrom,
+			ValidTo:     validTo,
+			BudgetBytes: budgetBytes,
+			BudgetRing:  nearestSeedRing(budgetCoord, coords),
 		})
 	}
 	out.Explanations = formatContextExplanations(pack.Explanations)
@@ -99,10 +105,28 @@ func formatContextExplanations(exps []hexxladb.CellExplanation) []string {
 	}
 	out := make([]string, 0, len(exps))
 	for _, e := range exps {
-		out = append(out, fmt.Sprintf("(%d,%d) ring=%d %s tokens=%d",
-			e.Coord.Q, e.Coord.R, e.Ring, e.Reason, e.Tokens))
+		if e.Reason != "superseded" {
+			continue
+		}
+		if e.SupersededBy != nil {
+			out = append(out, fmt.Sprintf("(%d,%d) ring=%d superseded by=(%d,%d)",
+				e.Coord.Q, e.Coord.R, e.Ring, e.SupersededBy.Q, e.SupersededBy.R))
+			continue
+		}
+		out = append(out, fmt.Sprintf("(%d,%d) ring=%d superseded", e.Coord.Q, e.Coord.R, e.Ring))
 	}
 	return out
+}
+
+func nearestSeedRing(coord hexxladb.Coord, seeds []hexxladb.Coord) int {
+	best := 0
+	for i, seed := range seeds {
+		distance := coord.Distance(seed)
+		if i == 0 || distance < best {
+			best = distance
+		}
+	}
+	return best
 }
 
 // seamSummariesFromPack maps seam records from an assembled pack.

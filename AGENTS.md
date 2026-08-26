@@ -47,7 +47,7 @@ This project uses **Hexagonal Architecture** (also known as **Ports & Adapters**
 - All external interactions must go through ports
 - Follow `.golangci.yml` (especially `depguard` rules)
 
-**Security is mandatory** — see `rules/security.mdc`
+**Security is mandatory** — see [`.cursor/rules/security.mdc`](.cursor/rules/security.mdc)
 
 ### Mosaic MCP (HexxlaDB tools)
 
@@ -161,7 +161,7 @@ Environment variables control behavior:
 
 | Document | Purpose |
 | -------- | ------- |
-| [`TODOS.md`](TODOS.md) | Lightweight active/pending work; update after sessions (same idea as HexxlaDB’s `TODOS.md`) |
+| [`TODOS.md`](TODOS.md) | Lightweight active/pending work; update after sessions (same idea as HexxlaDB’s `TODO.md`) |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | Roadmap themes and out-of-scope boundaries |
 | [`CHANGELOG.md`](CHANGELOG.md) | User-visible releases and notable changes |
 

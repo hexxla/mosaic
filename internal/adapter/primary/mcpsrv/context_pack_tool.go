@@ -21,7 +21,7 @@ type contextPackInput struct {
 	// Optional defaults: max_ring 3, UTF-8 byte budget 4096 (see budget fields).
 	MaxRing   int `json:"max_ring,omitempty" jsonschema:"hex rings from each seed (max 32)"`
 	MaxCells  int `json:"max_cells,omitempty" jsonschema:"cap candidate pool before eviction (default engine 256)"`
-	MaxTokens int `json:"max_tokens,omitempty" jsonschema:"legacy: explicit UTF-8 byte budget (ByteLenBudgeter); prefer max_budget_bytes"`
+	MaxTokens int `json:"max_tokens,omitempty" jsonschema:"legacy: explicit UTF-8 byte budget enforced by Mosaic; prefer max_budget_bytes"`
 
 	OmitBudget bool `json:"omit_budget,omitempty" jsonschema:"sparse no tight cap: use maximum allowed UTF-8 byte budget (100000); exclusive with other budget fields"`
 
@@ -32,7 +32,7 @@ type contextPackInput struct {
 
 	FilterSuperseded bool `json:"filter_superseded,omitempty"`
 	IncludeSeams     bool `json:"include_seams,omitempty"`
-	IncludeFacetText bool `json:"include_facet_text,omitempty"`
+	IncludeFacetText bool `json:"include_facet_text,omitempty" jsonschema:"include facet-derived text in each cell and count it toward the byte budget"`
 	Explain          bool `json:"explain,omitempty"`
 }
 
@@ -58,11 +58,11 @@ func validateContextPackBudgetInput(in *contextPackInput) error {
 	return nil
 }
 
-// RegisterContextPackTool registers mosaic_hexxla_load_context_pack (Hexxla Tx.LoadContextPackFrom).
+// RegisterContextPackTool registers mosaic_hexxla_load_context_pack.
 func RegisterContextPackTool(server *mcp.Server, svc primary.ContextAssembly, log *slog.Logger, budget *RetrievalBudgetTracker) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name: "mosaic_hexxla_load_context_pack",
-		Description: "Expand hex-neighbourhood context from seed coordinates using HexxlaDB LoadContextPackFrom (ring walk + UTF-8 byte budget via ByteLenBudgeter, optional seams & supersession filtering). " +
+		Description: "Expand hex-neighbourhood context from seed coordinates using HexxlaDB LoadContext; Mosaic applies the UTF-8 byte budget and outer-ring/low-confidence eviction (optional seams & supersession filtering). " +
 			"Typical flow: mosaic_hexxla_search_embedding (or query/search cells) → use match coords as seeds here. " +
 			"Budget: omit_budget (sparse cap), budget_tokens_approx (LM-token estimate × bytes/token), max_budget_bytes or legacy max_tokens (explicit bytes), else default ~4096 bytes. " +
 			"Preview bytes with mosaic_hexxla_estimate_context_budget_bytes. " +

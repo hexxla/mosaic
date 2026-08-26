@@ -4,7 +4,8 @@
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 0.1.x   | :white_check_mark: |
+| 0.2.x   | :white_check_mark: |
+| 0.1.x   | :x:                |
 
 ## Reporting a Vulnerability
 
@@ -12,7 +13,7 @@ If you discover a security vulnerability, please report it privately to avoid ex
 
 **Do not open a public issue.**
 
-Instead, please send an email to: [security contact email]
+Use GitHub's private **[Report a vulnerability](https://github.com/hexxla/mosaic/security/advisories/new)** form. If that form is unavailable, contact the maintainers privately through the [Hexxla organisation](https://github.com/hexxla) rather than opening a public issue.
 
 Please include:
 - A description of the vulnerability
@@ -20,11 +21,7 @@ Please include:
 - Affected versions
 - Any potential impact or exploit
 
-We will:
-- Acknowledge receipt of the report within 48 hours
-- Provide a detailed response within 7 days
-- Work with you to understand and resolve the issue
-- Coordinate disclosure of the vulnerability
+Maintainers will acknowledge and triage reports as promptly as possible, work with reporters to understand and remediate confirmed issues, and coordinate disclosure after a fix is available.
 
 ## Security Best Practices
 
@@ -34,4 +31,4 @@ This project follows security best practices including:
 - Secret scanning in CI/CD pipeline
 - Regular dependency updates
 
-For more information on our security practices, see the [Guardrails & CI/CD](README.md#guardrails--cicd) section in the README.
+For repository security expectations, see [`AGENTS.md`](AGENTS.md) and [`.cursor/rules/security.mdc`](.cursor/rules/security.mdc). The `make ci` pipeline runs vulnerability, static-security, and secret checks.
