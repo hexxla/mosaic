@@ -2,9 +2,11 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -73,10 +75,22 @@ func run(log *slog.Logger) error {
 		if err != nil {
 			return fmt.Errorf("read observer stream: %w", err)
 		}
-		if _, err := fmt.Fprintln(os.Stdout, string(message)); err != nil {
+		if err := writeNDJSON(os.Stdout, message); err != nil {
 			return fmt.Errorf("write event: %w", err)
 		}
 	}
+}
+
+func writeNDJSON(w io.Writer, message []byte) error {
+	if _, err := w.Write(message); err != nil {
+		return fmt.Errorf("write message: %w", err)
+	}
+	if !bytes.HasSuffix(message, []byte{'\n'}) {
+		if _, err := w.Write([]byte{'\n'}); err != nil {
+			return fmt.Errorf("write record delimiter: %w", err)
+		}
+	}
+	return nil
 }
 
 func validateObserverURL(raw string) (*url.URL, error) {

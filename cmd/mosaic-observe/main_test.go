@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"net/url"
 	"testing"
 )
@@ -29,6 +30,20 @@ func TestObserverURLBoundary(t *testing.T) {
 				t.Fatalf("validateObserverURL(%q): err=%v wantErr=%v", tt.raw, err, tt.wantErr)
 			}
 		})
+	}
+}
+
+func TestWriteNDJSONUsesOneRecordDelimiter(t *testing.T) {
+	t.Parallel()
+
+	for _, message := range []string{`{"type":"event"}`, "{\"type\":\"event\"}\n"} {
+		var output bytes.Buffer
+		if err := writeNDJSON(&output, []byte(message)); err != nil {
+			t.Fatalf("writeNDJSON: %v", err)
+		}
+		if got, want := output.String(), "{\"type\":\"event\"}\n"; got != want {
+			t.Fatalf("output = %q, want %q", got, want)
+		}
 	}
 }
 
