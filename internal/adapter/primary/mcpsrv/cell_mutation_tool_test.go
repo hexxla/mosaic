@@ -19,7 +19,7 @@ func TestPutCellCommand_maps_placement_inputs(t *testing.T) {
 		MaxRadius:      12,
 		AllowOverwrite: false,
 	}
-	cmd := putCellCommand(in, domain.CellPutKindFact)
+	cmd := putCellCommand(&in, domain.CellPutKindFact)
 	if cmd.Coord != (domain.AxialCoord{Q: 3, R: -2}) || cmd.Placement != domain.CellPlacementNearAnchor || cmd.MaxRadius != 12 {
 		t.Fatalf("mapped command: %+v", cmd)
 	}

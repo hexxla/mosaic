@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"github.com/hexxla/hexxladb"
+	ratchetadapters "github.com/hexxla/mcp-ratchet/pkg/ratchet/adapters"
+	ratchetservices "github.com/hexxla/mcp-ratchet/pkg/ratchet/services"
 
 	"github.com/sploitzberg/mosaic/internal/adapter/primary/mcpsrv"
 	"github.com/sploitzberg/mosaic/internal/adapter/secondary/hexxlastore"
@@ -40,6 +42,7 @@ func run(log *slog.Logger) error {
 	dbFlag := flag.String("db", "", "path to HexxlaDB file (overrides -name and "+config.EnvDBPath+")")
 	nameFlag := flag.String("name", "", "base name: <db-dir>/<name>.hexxla (overrides "+config.EnvDBPath+"; mutually exclusive with -db)")
 	dbDirFlag := flag.String("db-dir", "", "parent directory when using -name (default: from "+config.EnvMosaicDBDir+" or .tmp)")
+	ratchetConfigFlag := flag.String("ratchet-config", "", "path to Ratchet workflow YAML (overrides "+config.EnvRatchetConfigFile+"); omitted disables Ratchet")
 	flag.Parse()
 
 	mcpCfg, err := config.LoadMCPFromEnv()
@@ -67,6 +70,11 @@ func run(log *slog.Logger) error {
 		mosaicLoaded = loaded
 	} else {
 		configPathUsed = ""
+	}
+
+	ratchetGate, err := loadRatchetGate(config.ResolveRatchetConfigPath(*ratchetConfigFlag), log)
+	if err != nil {
+		return fmt.Errorf("ratchet setup: %w", err)
 	}
 
 	ollamaCfg, err := config.ResolveOllama(config.OllamaResolveInput{
@@ -158,6 +166,9 @@ func run(log *slog.Logger) error {
 
 	policyInstructions := config.MCPPolicyInstructions(runtimeCfg, configPathUsed)
 	srv := mcpsrv.NewServer("mosaic", version, mcpsrv.ServerInstructions(policyInstructions))
+	if ratchetGate != nil {
+		srv.AddReceivingMiddleware(ratchetGate.Middleware())
+	}
 	mcpsrv.RegisterHealthTool(srv, healthSvc, log, retrievalBudget)
 	mcpsrv.RegisterCellQueryTool(srv, cellRetrieval, log, retrievalBudget)
 	mcpsrv.RegisterCellSearchTool(srv, cellRetrieval, log, retrievalBudget)
@@ -211,4 +222,40 @@ func run(log *slog.Logger) error {
 	}
 
 	return nil
+}
+
+func loadRatchetGate(path string, log *slog.Logger) (*mcpsrv.RatchetGate, error) {
+	loaded, err := config.LoadRatchetConfig(path)
+	if err != nil {
+		return nil, fmt.Errorf("ratchet config: %w", err)
+	}
+	if loaded.Path == "" {
+		return nil, nil
+	}
+
+	// #nosec G304 -- the operator explicitly selects this configuration path.
+	configFile, err := os.Open(loaded.Path)
+	if err != nil {
+		return nil, fmt.Errorf("open ratchet config: %w", err)
+	}
+
+	sessions := ratchetadapters.NewMemorySessionStore()
+	service := ratchetservices.NewRatchetService(
+		ratchetadapters.NewYAMLConfigLoader(),
+		ratchetadapters.NewMemoryTokenStore(),
+		sessions,
+		ratchetadapters.NewCryptoRandomGenerator(),
+		ratchetadapters.NewRealClock(),
+	)
+	rules, loadErr := service.LoadConfiguration(context.Background(), configFile)
+	closeErr := configFile.Close()
+	if loadErr != nil {
+		return nil, fmt.Errorf("load ratchet config: %w", loadErr)
+	}
+	if closeErr != nil {
+		return nil, fmt.Errorf("close ratchet config: %w", closeErr)
+	}
+
+	log.Info("ratchet enforcement enabled", "config_file", loaded.Path, "rules", len(rules))
+	return mcpsrv.NewRatchetGate(service, sessions, rules, log), nil
 }

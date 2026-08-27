@@ -49,7 +49,7 @@ func registerPutCellTool(server *mcp.Server, svc primary.CellMutation, gates con
 		if err := gates.PutCellDenied(kind); err != nil {
 			return nil, domain.PutCellMutationResult{}, fmt.Errorf("mosaic_hexxla_put_cell: %w", err)
 		}
-		result, err := svc.PutCell(ctx, putCellCommand(in, kind))
+		result, err := svc.PutCell(ctx, putCellCommand(&in, kind))
 		if err != nil {
 			return nil, domain.PutCellMutationResult{}, err
 		}
@@ -57,7 +57,7 @@ func registerPutCellTool(server *mcp.Server, svc primary.CellMutation, gates con
 	})
 }
 
-func putCellCommand(in putCellInput, kind domain.CellPutKind) *domain.PutCellCommand {
+func putCellCommand(in *putCellInput, kind domain.CellPutKind) *domain.PutCellCommand {
 	return &domain.PutCellCommand{
 		Coord:          domain.AxialCoord{Q: in.Q, R: in.R},
 		RawContent:     in.RawContent,

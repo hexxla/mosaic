@@ -1,186 +1,69 @@
-# Inactive design artifact: mosaic-mcp does not load this file or integrate Ratchet.
-# This proposed Ratchet configuration illustrates tool-order governance only.
-# See docs/mosaic/RATCHET_INTEGRATION.md for the design rationale.
-#
-# DESIGN PHILOSOPHY: Maximum compliance and guardrails
-# - one_time_use: true for state-dependent operations to ensure fresh checks
-# - one_time_use: false only for operations where state is stable within expiry
-# - Expiry is ignored when one_time_use: true (token consumed immediately)
-# - Strong enforcement for all critical workflows
-# - Tools with no prerequisites are explicitly listed for consistency and future scalability
+# Optional Ratchet workflow policy for mosaic-mcp.
+# Enable with -ratchet-config or MOSAIC_RATCHET_CONFIG_FILE.
+# Tools absent from this file remain unrestricted. Repeated rules for one tool
+# are alternatives (OR), not cumulative prerequisites.
 
 rules:
-  # Level 1: Discovery Tools (No Prerequisites)
-  # These tools can be called at any time without prerequisites
-  # They issue tokens that dependent tools can validate against
-  # Listed explicitly for consistency and future scalability
-
-  - tool: "mosaic_hexxla_health"
-    prerequisite: ""
-    expiry: "5m"
-    error_message: ""
-    one_time_use: false
-
+  # Successful discovery calls issue session-local tokens valid for 10 minutes.
   - tool: "mosaic_hexxla_list_tags"
     prerequisite: ""
-    expiry: "5m"
-    error_message: ""
-    one_time_use: false
-
-  - tool: "mosaic_hexxla_tag_counts"
-    prerequisite: ""
-    expiry: "5m"
+    expiry: "10m"
     error_message: ""
     one_time_use: false
 
   - tool: "mosaic_hexxla_search_embedding"
     prerequisite: ""
-    expiry: "5m"
+    expiry: "10m"
     error_message: ""
     one_time_use: false
 
   - tool: "mosaic_hexxla_query_cells"
     prerequisite: ""
-    expiry: "5m"
+    expiry: "10m"
     error_message: ""
     one_time_use: false
 
   - tool: "mosaic_hexxla_search_cells"
     prerequisite: ""
-    expiry: "5m"
+    expiry: "10m"
     error_message: ""
     one_time_use: false
 
-  - tool: "mosaic_hexxla_estimate_context_budget_bytes"
-    prerequisite: ""
-    expiry: "5m"
-    error_message: ""
-    one_time_use: false
+  # Each cell write requires a fresh successful tag-list call.
+  - tool: "mosaic_hexxla_put_cell"
+    prerequisite: "mosaic_hexxla_list_tags"
+    error_message: "Before saving a cell, call mosaic_hexxla_list_tags to review the current tag vocabulary."
+    one_time_use: true
 
-  # Core Retrieval-Assemble Pattern
-  # load_context_pack requires a retrieval tool to provide seed coordinates
-  # one_time_use: true ensures fresh retrieval for every context pack
-  # This prevents stale seeds and ensures context is relevant to current query
-  # Note: expiry ignored when one_time_use: true
-
+  # Context loading and deletion require one recent successful retrieval. These
+  # OR rules deliberately use reusable tokens: mcp-ratchet consumes only the
+  # first rule's prerequisite for a one-time multi-rule dependency.
   - tool: "mosaic_hexxla_load_context_pack"
     prerequisite: "mosaic_hexxla_search_embedding"
-    error_message: "You must call a retrieval tool (mosaic_hexxla_search_embedding, mosaic_hexxla_query_cells, or mosaic_hexxla_search_cells) immediately before calling mosaic_hexxla_load_context_pack to provide fresh seed coordinates. Each context pack requires fresh retrieval to ensure relevance to the current query."
-    one_time_use: true
+    error_message: "Before loading context, call mosaic_hexxla_search_embedding, mosaic_hexxla_query_cells, or mosaic_hexxla_search_cells."
+    one_time_use: false
 
   - tool: "mosaic_hexxla_load_context_pack"
     prerequisite: "mosaic_hexxla_query_cells"
-    error_message: "You must call a retrieval tool (mosaic_hexxla_search_embedding, mosaic_hexxla_query_cells, or mosaic_hexxla_search_cells) immediately before calling mosaic_hexxla_load_context_pack to provide fresh seed coordinates. Each context pack requires fresh retrieval to ensure relevance to the current query."
-    one_time_use: true
+    error_message: "Before loading context, call mosaic_hexxla_search_embedding, mosaic_hexxla_query_cells, or mosaic_hexxla_search_cells."
+    one_time_use: false
 
   - tool: "mosaic_hexxla_load_context_pack"
     prerequisite: "mosaic_hexxla_search_cells"
-    error_message: "You must call a retrieval tool (mosaic_hexxla_search_embedding, mosaic_hexxla_query_cells, or mosaic_hexxla_search_cells) immediately before calling mosaic_hexxla_load_context_pack to provide fresh seed coordinates. Each context pack requires fresh retrieval to ensure relevance to the current query."
-    one_time_use: true
-
-  # Tag Hygiene - Strong enforcement with one_time_use
-  # put_cell requires list_tags/tag_counts before EVERY put_cell call
-  # one_time_use: true ensures put_cell ALWAYS checks current available tags
-  # This prevents tag fragmentation and ensures consistent taxonomy
-  # Note: expiry ignored when one_time_use: true
-
-  - tool: "mosaic_hexxla_put_cell"
-    prerequisite: "mosaic_hexxla_list_tags"
-    error_message: "You must call mosaic_hexxla_list_tags immediately before calling mosaic_hexxla_put_cell to review current tag vocabulary. This is required on every put_cell call to prevent tag fragmentation and ensure consistent taxonomy. Tags may have changed since the last check."
-    one_time_use: true
-
-  - tool: "mosaic_hexxla_put_cell"
-    prerequisite: "mosaic_hexxla_tag_counts"
-    error_message: "You must call mosaic_hexxla_tag_counts immediately before calling mosaic_hexxla_put_cell to understand current tag frequency. This is required on every put_cell call to prevent tag fragmentation and ensure consistent taxonomy. Tags may have changed since the last check."
-    one_time_use: true
-
-  # Budget Estimation - Strong enforcement for large operations
-  # estimate_context_budget_bytes required before large context loads
-  # one_time_use: true ensures fresh budget calculation per operation
-  # Note: expiry ignored when one_time_use: true
-
-  - tool: "mosaic_hexxla_load_context_pack"
-    prerequisite: "mosaic_hexxla_estimate_context_budget_bytes"
-    error_message: "You must call mosaic_hexxla_estimate_context_budget_bytes immediately before calling mosaic_hexxla_load_context_pack to preview token usage for this specific operation. This is required to avoid exceeding context limits and ensure efficient token usage."
-    one_time_use: true
-
-  # Health Check - Strong enforcement for all operations
-  # health required before all operations to verify database integrity
-  # one_time_use: true ensures fresh health check for each operation
-  # Note: expiry ignored when one_time_use: true
-
-  - tool: "mosaic_hexxla_load_context_pack"
-    prerequisite: "mosaic_hexxla_health"
-    error_message: "You must call mosaic_hexxla_health immediately before calling mosaic_hexxla_load_context_pack to verify database integrity. This is required to avoid failures on corrupted or unhealthy databases."
-    one_time_use: true
-
-  - tool: "mosaic_hexxla_put_cell"
-    prerequisite: "mosaic_hexxla_health"
-    error_message: "You must call mosaic_hexxla_health immediately before calling mosaic_hexxla_put_cell to verify database integrity. This is required to ensure write operations succeed and maintain database consistency."
-    one_time_use: true
-
-  - tool: "mosaic_hexxla_put_embedding"
-    prerequisite: "mosaic_hexxla_health"
-    error_message: "You must call mosaic_hexxla_health immediately before calling mosaic_hexxla_put_embedding to verify database integrity. This is required to ensure write operations succeed and maintain database consistency."
-    one_time_use: true
-
-  # Delete Operations - Strong enforcement with health check
-  # delete_cell requires fresh health check before destructive operations
-  # one_time_use: true ensures database integrity is verified
-  # Note: expiry ignored when one_time_use: true
-
-  - tool: "mosaic_hexxla_delete_cell"
-    prerequisite: "mosaic_hexxla_health"
-    error_message: "You must call mosaic_hexxla_health immediately before calling mosaic_hexxla_delete_cell to verify database integrity. This is required before destructive operations to ensure consistent state."
-    one_time_use: true
-
-  # Seam Operations - Strong enforcement with health check
-  # Seam operations require fresh health check for state consistency
-  # one_time_use: true ensures database integrity is verified
-  # Note: expiry ignored when one_time_use: true
-
-  - tool: "mosaic_hexxla_mark_conflict"
-    prerequisite: "mosaic_hexxla_health"
-    error_message: "You must call mosaic_hexxla_health immediately before calling mosaic_hexxla_mark_conflict to verify database integrity and ensure consistent state. This is required before modifying conflict state."
-    one_time_use: true
-
-  - tool: "mosaic_hexxla_mark_supersedes"
-    prerequisite: "mosaic_hexxla_health"
-    error_message: "You must call mosaic_hexxla_health immediately before calling mosaic_hexxla_mark_supersedes to verify database integrity and ensure consistent state. This is required before modifying supersession state."
-    one_time_use: true
-
-  - tool: "mosaic_hexxla_resolve_seam"
-    prerequisite: "mosaic_hexxla_health"
-    error_message: "You must call mosaic_hexxla_health immediately before calling mosaic_hexxla_resolve_seam to verify database integrity and ensure consistent state. This is required before resolving conflicts."
-    one_time_use: true
-
-  # Facet/Edge Operations - Strong enforcement with retrieval
-  # Facet/edge operations require fresh retrieval for valid cell coordinates
-  # one_time_use: true ensures cell coordinates are current
-  # Note: expiry ignored when one_time_use: true
-
-  - tool: "mosaic_hexxla_put_facet"
-    prerequisite: "mosaic_hexxla_search_embedding"
-    error_message: "You must call a retrieval tool (mosaic_hexxla_search_embedding, mosaic_hexxla_query_cells, or mosaic_hexxla_search_cells) immediately before calling mosaic_hexxla_put_facet to ensure you have valid current cell coordinates."
-    one_time_use: true
-
-  - tool: "mosaic_hexxla_link_cells"
-    prerequisite: "mosaic_hexxla_search_embedding"
-    error_message: "You must call a retrieval tool (mosaic_hexxla_search_embedding, mosaic_hexxla_query_cells, or mosaic_hexxla_search_cells) immediately before calling mosaic_hexxla_link_cells to ensure you have valid current source and target cell coordinates."
-    one_time_use: true
-
-  # Read-only operations - Optional health check
-  # These are less critical but health check is recommended
-  # one_time_use: false allows token reuse within expiry period
-
-  - tool: "mosaic_hexxla_get_facet"
-    prerequisite: "mosaic_hexxla_health"
-    expiry: "5m"
-    error_message: "Consider calling mosaic_hexxla_health before calling mosaic_hexxla_get_facet to verify database integrity. This is recommended but not required for read operations."
+    error_message: "Before loading context, call mosaic_hexxla_search_embedding, mosaic_hexxla_query_cells, or mosaic_hexxla_search_cells."
     one_time_use: false
 
-  - tool: "mosaic_hexxla_get_edge"
-    prerequisite: "mosaic_hexxla_health"
-    expiry: "5m"
-    error_message: "Consider calling mosaic_hexxla_health before calling mosaic_hexxla_get_edge to verify database integrity. This is recommended but not required for read operations."
+  - tool: "mosaic_hexxla_delete_cell"
+    prerequisite: "mosaic_hexxla_search_embedding"
+    error_message: "Before deleting a cell, call mosaic_hexxla_search_embedding, mosaic_hexxla_query_cells, or mosaic_hexxla_search_cells to inspect it."
+    one_time_use: false
+
+  - tool: "mosaic_hexxla_delete_cell"
+    prerequisite: "mosaic_hexxla_query_cells"
+    error_message: "Before deleting a cell, call mosaic_hexxla_search_embedding, mosaic_hexxla_query_cells, or mosaic_hexxla_search_cells to inspect it."
+    one_time_use: false
+
+  - tool: "mosaic_hexxla_delete_cell"
+    prerequisite: "mosaic_hexxla_search_cells"
+    error_message: "Before deleting a cell, call mosaic_hexxla_search_embedding, mosaic_hexxla_query_cells, or mosaic_hexxla_search_cells to inspect it."
     one_time_use: false

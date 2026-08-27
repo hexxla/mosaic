@@ -2,7 +2,6 @@ package hexxlastore
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/hexxla/hexxladb"
@@ -41,7 +40,7 @@ func (a *EmbeddingANNAdapter) Search(ctx context.Context, q domain.EmbeddingSear
 		return domain.EmbeddingSearchResponse{}, fmt.Errorf("hexxlastore embedding: %w", err)
 	}
 	if dim == 0 {
-		return domain.EmbeddingSearchResponse{}, fmt.Errorf("hexxlastore embedding: %w", hexxladb.ErrEmbeddingsDisabled)
+		return domain.EmbeddingSearchResponse{}, fmt.Errorf("hexxlastore embedding: database has no configured embedding dimension")
 	}
 	vec, err := a.ollamaClient.Embed(ctx, q.Text, int(dim))
 	if err != nil {
@@ -92,9 +91,6 @@ func (a *EmbeddingANNAdapter) Search(ctx context.Context, q domain.EmbeddingSear
 		})
 	})
 	if err != nil {
-		if errors.Is(err, hexxladb.ErrEmbeddingsDisabled) {
-			return domain.EmbeddingSearchResponse{}, err
-		}
 		return domain.EmbeddingSearchResponse{}, fmt.Errorf("hexxlastore embedding search: %w", err)
 	}
 	return domain.EmbeddingSearchResponse{

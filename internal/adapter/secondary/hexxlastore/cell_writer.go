@@ -2,7 +2,6 @@ package hexxlastore
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"slices"
@@ -134,7 +133,7 @@ func (a *CellWriterAdapter) PutEmbedding(ctx context.Context, coord domain.Axial
 	return a.live.WithRead(func(db *hexxladb.DB) error {
 		dim := db.EmbeddingDimension()
 		if dim == 0 {
-			return fmt.Errorf("hexxlastore put embedding: %w", hexxladb.ErrEmbeddingsDisabled)
+			return fmt.Errorf("hexxlastore put embedding: database has no configured embedding dimension")
 		}
 		if len(vec) != int(dim) {
 			return fmt.Errorf("hexxlastore put embedding: vector length %d, want %d", len(vec), dim)
@@ -149,9 +148,6 @@ func (a *CellWriterAdapter) PutEmbedding(ctx context.Context, coord domain.Axial
 			return nil
 		})
 		if updErr != nil {
-			if errors.Is(updErr, hexxladb.ErrEmbeddingsDisabled) {
-				return updErr
-			}
 			return fmt.Errorf("hexxlastore put embedding: %w", updErr)
 		}
 		return nil

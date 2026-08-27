@@ -140,11 +140,24 @@ For command names, YAML keys, and troubleshooting, begin with **[`docs/mosaic/`]
 
 ---
 
+## Ratchet: Tool flow governance
+
+Mosaic can optionally use **[mcp-ratchet](https://github.com/hexxla/mcp-ratchet)** to enforce configured tool prerequisites within each real MCP session. Ratchet is disabled when no configuration path is supplied:
+
+```bash
+mosaic-mcp -db ./data/mosaic.hexxla -ratchet-config configs/ratchet.yaml
+# or: MOSAIC_RATCHET_CONFIG_FILE=configs/ratchet.yaml mosaic-mcp -db ./data/mosaic.hexxla
+```
+
+The supplied policy requires a fresh successful `mosaic_hexxla_list_tags` call before each `mosaic_hexxla_put_cell`. Context loads and deletes require one recent successful retrieval call. Tools absent from the policy remain unrestricted; repeated rules for a tool are alternatives (OR). State is process-local and resets on restart. Mosaic does not expose Ratchet tokens, sessions, event APIs, or additional observability endpoints.
+
+The gate controls call ordering, not client authentication or authorization. See **[`configs/ratchet.yaml`](configs/ratchet.yaml)** and **[`docs/mosaic/RATCHET_INTEGRATION.md`](docs/mosaic/RATCHET_INTEGRATION.md)** for the exact contract and limitations.
+
+---
+
 ## Reliable tool use from agents
 
 MCP **does not force** models to call tools. Reinforce behavior with **project rules**, **`retention.notes`** in your policy YAML (they are injected into server instructions), and **[`.cursor/rules/mosaic-mcp-agent.mdc`](.cursor/rules/mosaic-mcp-agent.mdc)** or **[docs/mosaic/AGENT_CLIENT_WORKFLOWS.md](docs/mosaic/AGENT_CLIENT_WORKFLOWS.md)**. The steady pattern is **discover** candidates, **assemble** a budgeted context pack, and **persist** only where policy permits. Runtime `tools/list` schemas are the authoritative payload contract.
-
-The repository also contains a **[Ratchet integration proposal](docs/mosaic/RATCHET_INTEGRATION.md)** and sample **[`configs/ratchet.yaml`](configs/ratchet.yaml)**. They are inactive design artifacts: `mosaic-mcp` does not load that file, enforce its prerequisites, or expose Ratchet observability endpoints.
 
 ---
 

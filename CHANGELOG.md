@@ -7,14 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Optional Ratchet enforcement** — `mosaic-mcp` can load an `mcp-ratchet` workflow with `-ratchet-config` or `MOSAIC_RATCHET_CONFIG_FILE`. Central MCP middleware isolates state by actual client session, enforces the supplied tag/retrieval prerequisites, and keeps tokens and state process-local without public observability endpoints.
+
 ### Changed
 
 - **Cell placement safety** ⚠️ **breaking write behavior** — `mosaic_hexxla_put_cell` now defaults to safe exact placement: writing over a live coordinate requires explicit `allow_overwrite: true`. New `placement: near_anchor` atomically composes HexxlaDB `FindFreeCellPlacement` with `PutCell` using a caller-owned anchor and bounded radius (default 8, maximum 32). Responses report the actual coordinate, placement mode, occupied probes, and whether an exact write replaced a live cell.
 
 - **HexxlaDB v0.6.0 compatibility** — context assembly now retrieves count-bounded candidates with `Tx.LoadContext`; Mosaic owns approximate-token conversion, UTF-8 byte accounting, outer-ring/low-confidence eviction, and compatibility byte aliases in MCP responses.
 - **Toolchain and storage defaults** — require Go **1.27.0**, depend on `github.com/hexxla/hexxladb` **v0.6.0**, and use HexxlaDB’s validated **4096-byte** page profile for newly created databases (existing files retain their persisted layout).
+- **MCP SDK** — update `github.com/modelcontextprotocol/go-sdk` to **v1.7.0** while retaining Mosaic's stateful Streamable HTTP session model.
 - **Context responses** — add authoritative `total_bytes` / `max_budget_bytes` fields and optional returned facet text; deprecated `total_tokens` / `max_tokens_budget` remain byte-valued compatibility aliases.
-- **Documentation, agent guidance, and seed corpus** — align current HexxlaDB retrieval, embeddings, authenticated-v3 encryption, changefeed, page allocation, retention, and tokenizer ownership; remove false claims that Ratchet is integrated; distinguish runtime MCP schemas from historical and aspirational blueprints; and document current missing-path and seed-policy credential limitations.
+- **Documentation, agent guidance, and seed corpus** — align current HexxlaDB retrieval, embeddings, authenticated-v3 encryption, changefeed, page allocation, retention, and tokenizer ownership; replace stale Ratchet and observability claims with the implemented opt-in enforcement contract; distinguish runtime MCP schemas from historical and aspirational blueprints; and document current missing-path and seed-policy credential limitations.
 
 ## [0.2.0] - 2026-05-05
 
