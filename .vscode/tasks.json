@@ -1,0 +1,53 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Mosaic: CI",
+      "type": "process",
+      "command": "task",
+      "args": ["ci"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": ["$go"],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "Mosaic: Test",
+      "type": "process",
+      "command": "task",
+      "args": ["test"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": ["$go"],
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "Mosaic: Build Commands",
+      "type": "process",
+      "command": "task",
+      "args": ["build-mosaic-mcp", "build-mosaic-create-db"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": ["$go"]
+    },
+    {
+      "label": "Mosaic: Build Seed Tool",
+      "type": "process",
+      "command": "task",
+      "args": ["build-mosaic-seed"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": ["$go"]
+    },
+    {
+      "label": "Mosaic: Integration Tests",
+      "type": "process",
+      "command": "task",
+      "args": ["integration"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": ["$go"]
+    }
+  ]
+}

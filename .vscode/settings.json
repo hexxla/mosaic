@@ -1,0 +1,15 @@
+{
+  "[go]": {
+    "editor.defaultFormatter": "golang.go",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit"
+    }
+  },
+  "gopls": {
+    "staticcheck": true,
+    "gofumpt": true
+  },
+  "chat.useAgentsMdFile": true,
+  "chat.useNestedAgentsMdFiles": true
+}

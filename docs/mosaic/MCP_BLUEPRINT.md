@@ -136,10 +136,10 @@ From **`mosaic` repo root**:
 
 ```bash
 cd /path/to/mosaic
-make mosaic-dev
+task mosaic-dev
 ```
 
-Or step by step (`make seed` then `make run-mosaic-mcp`), or:
+Or step by step (`task seed` then `task run-mosaic-mcp`), or:
 
 ```bash
 export MOSAIC_OLLAMA_URL=http://127.0.0.1:11434
@@ -151,7 +151,7 @@ export MOSAIC_MCP_PATH=/mcp
 go run ./cmd/mosaic-mcp
 ```
 
-Overrides: **`make mosaic-dev MOSAIC_DB_PATH=./other.hexxla MOSAIC_OLLAMA_URL=http://127.0.0.1:11434`**.
+Overrides: **`task mosaic-dev MOSAIC_DB_PATH=./other.hexxla MOSAIC_OLLAMA_URL=http://127.0.0.1:11434`**.
 
 Configure your LM client MCP entry to **`http://127.0.0.1:8787/mcp`**, then call **`mosaic_hexxla_health`**. Replace the seeded file with **`go run ./cmd/mosaic-seed -force`**.
 

@@ -31,4 +31,4 @@ This project follows security best practices including:
 - Secret scanning in CI/CD pipeline
 - Regular dependency updates
 
-For repository security expectations, see [`AGENTS.md`](AGENTS.md) and [`.cursor/rules/security.mdc`](.cursor/rules/security.mdc). The `make ci` pipeline runs vulnerability, static-security, and secret checks.
+For repository security expectations, see [`AGENTS.md`](AGENTS.md). The `task ci` pipeline runs vulnerability, static-security, and secret checks.

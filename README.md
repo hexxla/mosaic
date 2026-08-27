@@ -47,16 +47,16 @@ cd mosaic
 
 **Step 2 — Build**
 
-You need **[Go 1.27+](https://go.dev/dl/)**. From the repo root:
+You need **[Go 1.27+](https://go.dev/dl/)** and **[Task 3](https://taskfile.dev/installation/)**. From the repo root:
 
 ```bash
 go mod download
-make build-mosaic-mcp build-mosaic-create-db
+task build-mosaic-mcp build-mosaic-create-db
 ```
 
-After **`make`**, your programs are under **`bin/<platform>/`** (the command prints the paths). Later steps assume **`bin/linux-amd64/`** — use whatever folder **`make`** created on your machine (add **`.exe`** on Windows).
+After the build tasks run, your programs are under **`bin/<platform>/`** (the command prints the paths). Later steps assume **`bin/linux-amd64/`** — use the folder Task created on your machine (add **`.exe`** on Windows).
 
-**Developers:** **`make seed`** / **`make reseed`**; **`make build-mosaic-seed`** builds a **`mosaic-seed`** binary.
+**Developers:** **`task seed`** / **`task reseed`**; **`task build-mosaic-seed`** builds a **`mosaic-seed`** binary.
 
 ---
 
@@ -92,9 +92,9 @@ An example **`version: 1`** policy ships at **[configs/config.yaml](configs/conf
 
 **Step 6 — Point your MCP client at the URL**
 
-By default Mosaic serves Streamable HTTP at **`http://127.0.0.1:8787/mcp`**. Tune **`MOSAIC_MCP_ADDR`** / **`MOSAIC_MCP_PATH`** if needed ([Makefile](Makefile)).
+By default Mosaic serves Streamable HTTP at **`http://127.0.0.1:8787/mcp`**. Tune **`MOSAIC_MCP_ADDR`** / **`MOSAIC_MCP_PATH`** if needed ([Taskfile](Taskfile.yml)).
 
-**Cursor:** add a **`mcpServers`** entry (often **`.cursor/mcp.json`** next to your project):
+Configure your MCP client through its UI or configuration file. A typical `mcpServers` entry is:
 
 ```json
 {
@@ -106,7 +106,7 @@ By default Mosaic serves Streamable HTTP at **`http://127.0.0.1:8787/mcp`**. Tun
 }
 ```
 
-Other clients ship different config files or UIs — use their MCP documentation rather than copying this verbatim.
+Client configuration locations and schemas vary; use the documentation for your MCP host.
 
 ---
 
@@ -157,16 +157,16 @@ The gate controls call ordering, not client authentication or authorization. See
 
 ## Reliable tool use from agents
 
-MCP **does not force** models to call tools. Reinforce behavior with **project rules**, **`retention.notes`** in your policy YAML (they are injected into server instructions), and **[`.cursor/rules/mosaic-mcp-agent.mdc`](.cursor/rules/mosaic-mcp-agent.mdc)** or **[docs/mosaic/AGENT_CLIENT_WORKFLOWS.md](docs/mosaic/AGENT_CLIENT_WORKFLOWS.md)**. The steady pattern is **discover** candidates, **assemble** a budgeted context pack, and **persist** only where policy permits. Runtime `tools/list` schemas are the authoritative payload contract.
+MCP **does not force** models to call tools. Reinforce behavior with [`AGENTS.md`](AGENTS.md), **`retention.notes`** in your policy YAML (they are injected into server instructions), and **[docs/mosaic/DEVELOPMENT_TOOLING.md](docs/mosaic/DEVELOPMENT_TOOLING.md)**. The steady pattern is **discover** candidates, **assemble** a budgeted context pack, and **persist** only where policy permits. Runtime `tools/list` schemas are the authoritative payload contract.
 
 ---
 
 ## Development
 
 ```bash
-make ci          # full pipeline (same as CI)
-make test        # unit tests
-make integration # tagged integration tests
+task ci          # full pipeline (same as CI)
+task test        # unit tests
+task integration # tagged integration tests
 ```
 
 ---

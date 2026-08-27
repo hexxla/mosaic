@@ -47,11 +47,11 @@ This project uses **Hexagonal Architecture** (also known as **Ports & Adapters**
 - All external interactions must go through ports
 - Follow `.golangci.yml` (especially `depguard` rules)
 
-**Security is mandatory** — see [`.cursor/rules/security.mdc`](.cursor/rules/security.mdc)
+**Security is mandatory** — preserve the trust boundaries in this file and [`SECURITY.md`](SECURITY.md).
 
 ### Mosaic MCP (HexxlaDB tools)
 
-When assisting with **`cmd/mosaic-mcp`** or MCP tool behaviour: follow **retrieve → check `retrieval_hint` → `mosaic_hexxla_load_context_pack`** when neighbourhood / seam context is needed (not only ANN top‑K). Full blueprint → [`docs/mosaic/MCP_AGENT_BLUEPRINT.md`](docs/mosaic/MCP_AGENT_BLUEPRINT.md); Cursor rule → [`.cursor/rules/mosaic-mcp-agent.mdc`](.cursor/rules/mosaic-mcp-agent.mdc).
+When assisting with **`cmd/mosaic-mcp`** or MCP tool behaviour: follow **retrieve → check `retrieval_hint` → `mosaic_hexxla_load_context_pack`** when neighbourhood / seam context is needed (not only ANN top‑K). Full blueprint → [`docs/mosaic/MCP_AGENT_BLUEPRINT.md`](docs/mosaic/MCP_AGENT_BLUEPRINT.md).
 
 ### Full Documentation
 
@@ -95,8 +95,8 @@ This project separates unit and integration tests to maintain fast CI feedback.
 
 ### Test Types
 
-- **Unit tests** — Run on commit/PR (`make test`). Test logic in isolation with mocks.
-- **Integration tests** — Run on push (`make integration`). Add `//go:build integration` tag. Test with real dependencies.
+- **Unit tests** — Run on commit/PR (`task test`). Test logic in isolation with mocks.
+- **Integration tests** — Run on push (`task integration`). Add `//go:build integration` tag. Test with real dependencies.
 
 ### Test Guidelines
 
@@ -109,9 +109,9 @@ This project separates unit and integration tests to maintain fast CI feedback.
 ### Running Tests
 
 ```bash
-make test                    # Unit tests
+task test                    # Unit tests
 go test -race -count=1 ./...
-make integration             # Integration tests
+task integration             # Integration tests
 go test -race -tags=integration ./...
 go test -coverprofile=coverage.out ./...  # With coverage
 ```
@@ -132,7 +132,7 @@ This project uses centralized scripts for all quality checks, ensuring consisten
 
 ```bash
 # Run full CI pipeline (same as GitHub Actions)
-make ci
+task ci
 # or
 ./scripts/ci/ci.sh
 ```
@@ -170,3 +170,9 @@ Environment variables control behavior:
 ## Leveraging Go Package Documentation
 
 Use [pkg.go.dev](https://pkg.go.dev) for official Go package documentation. Visit `https://pkg.go.dev/<import-path>` for any package (e.g., https://pkg.go.dev/net/http). Check API docs before using unfamiliar packages to ensure idiomatic usage.
+
+---
+
+## Project skills
+
+Codex-compatible project skills live under `.agents/skills/<skill-name>/SKILL.md`. Add one only for a recurring Mosaic-specific workflow; keep general engineering policy in this file.

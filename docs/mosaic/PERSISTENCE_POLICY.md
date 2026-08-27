@@ -79,7 +79,7 @@ HexxlaDB **`Open`** creates the file when it does not exist. Mosaic wraps that i
 
 **Encryption** is never implicit: credentials come only from the command-specific mechanisms in the table above (`ApplyHexxlaEncryption` / `BuildHexxlaOpenOptions`). **Layout** (MVCC, page size, max value bytes, embedding dimension, distance metric) is optional on both commands—each flag defaults to the Mosaic values in **`DefaultMosaicDatabaseLayout`**. Plaintext MVCC creation uses format v2; supplying official encryption credentials creates authenticated format v3 regardless of the MVCC flag.
 
-**CLI and Make examples:** [DATABASE_CREATION.md](./DATABASE_CREATION.md).
+**CLI and Task examples:** [DATABASE_CREATION.md](./DATABASE_CREATION.md).
 
 ## Runtime gates (code)
 
@@ -100,6 +100,6 @@ HexxlaDB **`Open`** creates the file when it does not exist. Mosaic wraps that i
 
 A **flat** layout ( `version` plus `capture_mode` / `enforcement` / `notes` at the top level, no `retention` key) is still valid; no separate example file is shipped.
 
-## Cursor / IDE rules
+## Agent and IDE instructions
 
-Keep one canonical YAML; point rules at “call `mosaic_hexxla_get_persistence_policy`” or the repo file path to avoid drift.
+Keep one canonical YAML; point project instructions at “call `mosaic_hexxla_get_persistence_policy`” or the repository file path to avoid drift.

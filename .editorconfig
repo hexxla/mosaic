@@ -15,17 +15,6 @@ indent_style = tab
 indent_size = 8
 tab_width = 8
 
-# Makefiles — Critical: must use real tabs
-[Makefile]
-indent_style = tab
-indent_size = 4          # Visual width (usually 4 or 8)
-tab_width = 4
-
-[{*.mk,GNUmakefile,makefile}]
-indent_style = tab
-indent_size = 4
-tab_width = 4
-
 # Shell scripts
 [*.sh]
 indent_style = space

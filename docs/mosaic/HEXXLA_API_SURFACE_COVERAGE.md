@@ -112,4 +112,4 @@ When Hexxla adds exported APIs or Mosaic ships new MCP tools, update:
 
 1. This table (accuracy).
 2. [IMPLEMENTATION_PLAN.md](./IMPLEMENTATION_PLAN.md) session log when adding tools.
-3. [`.cursor/rules/mosaic-mcp-agent.mdc`](../../.cursor/rules/mosaic-mcp-agent.mdc) tool table (agent workflow).
+3. [`MCP_AGENT_BLUEPRINT.md`](./MCP_AGENT_BLUEPRINT.md) when agent workflow guidance changes.

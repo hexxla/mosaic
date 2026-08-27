@@ -1,0 +1,203 @@
+version: "3"
+
+vars:
+  GOOS:
+    sh: go env GOOS
+  GOARCH:
+    sh: go env GOARCH
+  BINDIR: bin/{{.GOOS}}-{{.GOARCH}}
+  EXE: '{{if eq .GOOS "windows"}}.exe{{end}}'
+  VERSION:
+    sh: git describe --tags --always --dirty 2>/dev/null || echo dev
+
+tasks:
+  default:
+    desc: Run the full CI pipeline
+    cmds:
+      - task: ci
+
+  help:
+    desc: List available tasks
+    cmds:
+      - task --list
+
+  build:
+    desc: Build mosaic-mcp for the selected OS and architecture
+    cmds:
+      - task: build-mosaic-mcp
+        vars: { GOOS: "{{.GOOS}}", GOARCH: "{{.GOARCH}}", BINDIR: "{{.BINDIR}}", EXE: "{{.EXE}}", VERSION: "{{.VERSION}}" }
+
+  build-mosaic-mcp:
+    desc: Build the local MCP Streamable HTTP server
+    cmds:
+      - mkdir -p "{{.BINDIR}}"
+      - GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -ldflags="-s -w -X main.version={{.VERSION}}" -o "{{.BINDIR}}/mosaic-mcp{{.EXE}}" ./cmd/mosaic-mcp
+      - 'echo "  → {{.BINDIR}}/mosaic-mcp{{.EXE}}"'
+
+  build-mosaic-seed:
+    desc: Build the demo-corpus database seeder
+    cmds:
+      - mkdir -p "{{.BINDIR}}"
+      - GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -ldflags="-s -w -X main.version={{.VERSION}}" -o "{{.BINDIR}}/mosaic-seed{{.EXE}}" ./cmd/mosaic-seed
+      - 'echo "  → {{.BINDIR}}/mosaic-seed{{.EXE}}"'
+
+  build-mosaic-create-db:
+    desc: Build the empty Mosaic-compatible database creator
+    cmds:
+      - mkdir -p "{{.BINDIR}}"
+      - GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -ldflags="-s -w -X main.version={{.VERSION}}" -o "{{.BINDIR}}/mosaic-create-db{{.EXE}}" ./cmd/mosaic-create-db
+      - 'echo "  → {{.BINDIR}}/mosaic-create-db{{.EXE}}"'
+
+  build-linux:
+    desc: Build mosaic-mcp for Linux using the selected architecture
+    cmds:
+      - task: build
+        vars: { GOOS: linux, GOARCH: "{{.GOARCH}}", BINDIR: 'bin/linux-{{.GOARCH}}', EXE: "", VERSION: "{{.VERSION}}" }
+
+  build-darwin:
+    desc: Build mosaic-mcp for macOS using the selected architecture
+    cmds:
+      - task: build
+        vars: { GOOS: darwin, GOARCH: "{{.GOARCH}}", BINDIR: 'bin/darwin-{{.GOARCH}}', EXE: "", VERSION: "{{.VERSION}}" }
+
+  build-windows:
+    desc: Build mosaic-mcp for Windows using the selected architecture
+    cmds:
+      - task: build
+        vars: { GOOS: windows, GOARCH: "{{.GOARCH}}", BINDIR: 'bin/windows-{{.GOARCH}}', EXE: ".exe", VERSION: "{{.VERSION}}" }
+
+  build-all:
+    desc: Build mosaic-mcp for Linux, macOS, and Windows
+    cmds:
+      - task: build-linux
+      - task: build-darwin
+      - task: build-windows
+      - 'echo "==> Built all platforms into bin/"'
+
+  test:
+    desc: Run unit tests with the race detector
+    cmds:
+      - go test -race -count=1 ./...
+
+  test-all:
+    desc: Run unit and integration tests with the race detector
+    cmds:
+      - echo "Running unit tests..."
+      - go test -race -count=1 ./...
+      - echo "Running integration tests..."
+      - go test -race -count=1 -tags=integration ./...
+
+  integration:
+    desc: Run integration tests with the race detector
+    cmds:
+      - go test -count=1 -race -tags=integration ./...
+
+  lint:
+    desc: Run golangci-lint
+    cmds:
+      - golangci-lint run --timeout=5m
+
+  fmt:
+    desc: Format Go source files
+    cmds:
+      - gofmt -l -s -w .
+      - goimports -l -w . 2>/dev/null || true
+
+  ci:
+    desc: Run the same full pipeline as GitHub Actions
+    cmds:
+      - ./scripts/ci/ci.sh
+
+  install-mosaic-mcp:
+    aliases: [install]
+    desc: Install mosaic-mcp to GOPATH/bin
+    cmds:
+      - go install ./cmd/mosaic-mcp
+
+  install-mosaic-seed:
+    desc: Install mosaic-seed to GOPATH/bin
+    cmds:
+      - go install ./cmd/mosaic-seed
+
+  install-mosaic-create-db:
+    desc: Install mosaic-create-db to GOPATH/bin
+    cmds:
+      - go install ./cmd/mosaic-create-db
+
+  seed:
+    aliases: [run-mosaic-seed]
+    desc: Seed the configured database with the demo corpus; skips an existing file
+    env:
+      MOSAIC_DB_PATH: '{{.MOSAIC_DB_PATH | default "./mosaic.hexxla"}}'
+      MOSAIC_OLLAMA_URL: '{{.MOSAIC_OLLAMA_URL | default "http://127.0.0.1:11434"}}'
+      MOSAIC_EMBED_MODEL: '{{.MOSAIC_EMBED_MODEL | default "all-minilm"}}'
+      MOSAIC_POLICY_FILE: '{{.MOSAIC_POLICY_FILE | default ""}}'
+    cmds:
+      - go run ./cmd/mosaic-seed -db "$MOSAIC_DB_PATH" {{.MOSAIC_SEED_FLAGS | default ""}}
+
+  reseed:
+    desc: Replace the configured database and seed it with the demo corpus
+    env:
+      MOSAIC_DB_PATH: '{{.MOSAIC_DB_PATH | default "./mosaic.hexxla"}}'
+      MOSAIC_OLLAMA_URL: '{{.MOSAIC_OLLAMA_URL | default "http://127.0.0.1:11434"}}'
+      MOSAIC_EMBED_MODEL: '{{.MOSAIC_EMBED_MODEL | default "all-minilm"}}'
+      MOSAIC_POLICY_FILE: '{{.MOSAIC_POLICY_FILE | default ""}}'
+    cmds:
+      - go run ./cmd/mosaic-seed -db "$MOSAIC_DB_PATH" -force {{.MOSAIC_SEED_FLAGS | default ""}}
+
+  mosaic-dev:
+    desc: Seed the database if needed, then run mosaic-mcp until interrupted
+    deps: [seed]
+    env:
+      MOSAIC_DB_PATH: '{{.MOSAIC_DB_PATH | default "./mosaic.hexxla"}}'
+      MOSAIC_MCP_ADDR: '{{.MOSAIC_MCP_ADDR | default "127.0.0.1:8787"}}'
+      MOSAIC_MCP_PATH: '{{.MOSAIC_MCP_PATH | default "/mcp"}}'
+      MOSAIC_POLICY_FILE: '{{.MOSAIC_POLICY_FILE | default ""}}'
+    cmds:
+      - go run ./cmd/mosaic-mcp {{.MOSAIC_MCP_FLAGS | default ""}}
+
+  run-mosaic-mcp:
+    desc: Run mosaic-mcp with the configured database and HTTP endpoint
+    env:
+      MOSAIC_DB_PATH: '{{.MOSAIC_DB_PATH | default "./mosaic.hexxla"}}'
+      MOSAIC_MCP_ADDR: '{{.MOSAIC_MCP_ADDR | default "127.0.0.1:8787"}}'
+      MOSAIC_MCP_PATH: '{{.MOSAIC_MCP_PATH | default "/mcp"}}'
+      MOSAIC_POLICY_FILE: '{{.MOSAIC_POLICY_FILE | default ""}}'
+    cmds:
+      - go run ./cmd/mosaic-mcp {{.MOSAIC_MCP_FLAGS | default ""}}
+
+  create-db:
+    aliases: [run-mosaic-create-db]
+    desc: Create an empty Mosaic-compatible HexxlaDB database
+    env:
+      MOSAIC_DB_PATH: '{{.MOSAIC_DB_PATH | default "./mosaic.hexxla"}}'
+      MOSAIC_POLICY_FILE: '{{.MOSAIC_POLICY_FILE | default ""}}'
+    cmds:
+      - go run ./cmd/mosaic-create-db -db "$MOSAIC_DB_PATH" {{.MOSAIC_CREATE_DB_FLAGS | default ""}}
+
+  clean:
+    desc: Remove local build artifacts and run go clean
+    cmds:
+      - rm -rf bin
+      - go clean
+
+  tidy:
+    desc: Synchronize module dependencies
+    cmds:
+      - go mod tidy
+
+  vet:
+    desc: Run go vet
+    cmds:
+      - go vet ./...
+
+  govulncheck:
+    desc: Scan dependencies for known vulnerabilities
+    cmds:
+      - go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+  update:
+    desc: Update module dependencies and tidy go.mod
+    cmds:
+      - go get -u ./...
+      - go mod tidy

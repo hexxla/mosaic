@@ -1,5 +1,5 @@
 # Slower `//go:build integration` tests — not in default PR CI (see README).
-# Weekly + manual; use `make integration` before releases.
+# Weekly + manual; use `task integration` before releases.
 name: Integration
 
 on:
@@ -19,5 +19,7 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - name: go test (integration, race)
-        run: go test -count=1 -race -tags=integration ./...
+      - name: Install Task
+        run: go install github.com/go-task/task/v3/cmd/task@v3.53.1
+      - name: Run integration tests
+        run: task integration

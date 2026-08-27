@@ -122,16 +122,16 @@ export MOSAIC_DB_PASSPHRASE='your-passphrase-here'
 go run ./cmd/mosaic-mcp -policy configs/config.yaml
 ```
 
-### Make (append flags; quote multiple arguments)
+### Task (append flags; quote multiple arguments)
 
 ```bash
-# New encrypted DB at Makefile MOSAIC_DB_PATH (no -replace unless file exists)
-make create-db MOSAIC_CREATE_DB_FLAGS='-db-passphrase your-passphrase-here'
+# New encrypted DB at Taskfile MOSAIC_DB_PATH (no -replace unless file exists)
+task create-db MOSAIC_CREATE_DB_FLAGS='-db-passphrase your-passphrase-here'
 
 # Overwrite existing file
-make create-db MOSAIC_CREATE_DB_FLAGS='-replace -db-passphrase your-passphrase-here'
+task create-db MOSAIC_CREATE_DB_FLAGS='-replace -db-passphrase your-passphrase-here'
 
-make run-mosaic-mcp MOSAIC_MCP_FLAGS='-policy configs/config.yaml -db-passphrase your-passphrase-here'
+task run-mosaic-mcp MOSAIC_MCP_FLAGS='-policy configs/config.yaml -db-passphrase your-passphrase-here'
 ```
 
 **Security:** **`-db-passphrase`** may appear in process listings (`ps`). Prefer **`MOSAIC_DB_PASSPHRASE`** or a secrets manager that injects env for production-like setups.
@@ -182,45 +182,45 @@ Layout and encryption flags are documented on **`go run ./cmd/mosaic-create-db -
 
 ---
 
-## Examples: Make
+## Examples: Task
 
-The Makefile sets **`MOSAIC_DB_PATH`** (default **`./mosaic.hexxla`** and passes it as **`-db`** to create-db/seed), Ollama URL/model for seed, and MCP listen options. Extra **`go run`** arguments are appended via:
+The Taskfile sets **`MOSAIC_DB_PATH`** (default **`./mosaic.hexxla`** and passes it as **`-db`** to create-db/seed), Ollama URL/model for seed, and MCP listen options. Extra **`go run`** arguments are appended via:
 
 | Variable | Used by |
 | -------- | ------- |
-| **`MOSAIC_CREATE_DB_FLAGS`** | **`make create-db`** / **`make run-mosaic-create-db`** |
-| **`MOSAIC_SEED_FLAGS`** | **`make seed`**, **`make reseed`**, **`make run-mosaic-seed`** |
-| **`MOSAIC_MCP_FLAGS`** | **`make run-mosaic-mcp`**, **`make mosaic-dev`** (MCP half only) |
+| **`MOSAIC_CREATE_DB_FLAGS`** | **`task create-db`** / **`task run-mosaic-create-db`** |
+| **`MOSAIC_SEED_FLAGS`** | **`task seed`**, **`task reseed`**, **`task run-mosaic-seed`** |
+| **`MOSAIC_MCP_FLAGS`** | **`task run-mosaic-mcp`**, **`task mosaic-dev`** (MCP half only) |
 
 Quote the value when passing multiple flags.
 
 ```bash
-# Empty DB at Makefile default path
-make create-db
+# Empty DB at Taskfile default path
+task create-db
 
 # Empty DB with force + policy file (YAML database.passphrase optional)
-make create-db MOSAIC_CREATE_DB_FLAGS='-force -policy configs/config.yaml'
+task create-db MOSAIC_CREATE_DB_FLAGS='-force -policy configs/config.yaml'
 
 # Custom DB path + explicit page size for new file
-make create-db MOSAIC_DB_PATH=./projects/custom.hexxla MOSAIC_CREATE_DB_FLAGS='-force -page-size 4096'
+task create-db MOSAIC_DB_PATH=./projects/custom.hexxla MOSAIC_CREATE_DB_FLAGS='-force -page-size 4096'
 
 # Seed (skips if DB exists unless you reseed)
-make seed
+task seed
 
-make reseed MOSAIC_SEED_FLAGS='-page-size 8192'
+task reseed MOSAIC_SEED_FLAGS='-page-size 8192'
 
 # MCP with persistence policy YAML
-make run-mosaic-mcp MOSAIC_MCP_FLAGS='-policy configs/config.yaml'
+task run-mosaic-mcp MOSAIC_MCP_FLAGS='-policy configs/config.yaml'
 
 # Encrypted DB / MCP (see "Encrypted database" section — use -replace only if path exists)
-make create-db MOSAIC_CREATE_DB_FLAGS='-db-passphrase your-passphrase-here'
-make run-mosaic-mcp MOSAIC_MCP_FLAGS='-policy configs/config.yaml -db-passphrase your-passphrase-here'
+task create-db MOSAIC_CREATE_DB_FLAGS='-db-passphrase your-passphrase-here'
+task run-mosaic-mcp MOSAIC_MCP_FLAGS='-policy configs/config.yaml -db-passphrase your-passphrase-here'
 
 # Dev loop: seed (if missing) then MCP — pass seed layout flags only on the seed step:
-make mosaic-dev MOSAIC_SEED_FLAGS='-embedding-dim 384' MOSAIC_MCP_FLAGS='-policy configs/config.yaml'
+task mosaic-dev MOSAIC_SEED_FLAGS='-embedding-dim 384' MOSAIC_MCP_FLAGS='-policy configs/config.yaml'
 ```
 
-**Note:** **`make mosaic-dev`** runs **`seed`** first. Only **`MOSAIC_SEED_FLAGS`** affects that step; **`MOSAIC_MCP_FLAGS`** applies when **`mosaic-mcp`** starts.
+**Note:** **`task mosaic-dev`** runs **`seed`** first. Only **`MOSAIC_SEED_FLAGS`** affects that step; **`MOSAIC_MCP_FLAGS`** applies when **`mosaic-mcp`** starts.
 
 ---
 

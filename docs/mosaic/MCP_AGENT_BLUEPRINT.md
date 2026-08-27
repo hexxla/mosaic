@@ -2,7 +2,7 @@
 
 **Audience:** Humans and AI assistants configuring or using the Mosaic MCP server (`cmd/mosaic-mcp`) against a HexxlaDB file.
 
-**Companion:** Cursor rule [`.cursor/rules/mosaic-mcp-agent.mdc`](../../.cursor/rules/mosaic-mcp-agent.mdc) (concise); this document expands rationale and references.
+**Companion:** Repository-wide agent policy in [`AGENTS.md`](../../AGENTS.md); this document contains the Mosaic-specific retrieval and persistence workflow.
 
 ---
 
@@ -79,13 +79,13 @@ When product policy is to **store every user/assistant exchange**, the agent sho
 2. Generate the reply (retrieval steps from [Recommended workflow](#recommended-workflow) as needed).
 3. After the assistant reply is finalized → **`put_cell`** with **`kind=assistant_response`** (same **`source_id`** and an explicit placement choice); retain the returned coordinate.
 
-YAML **`retention.capture_mode: save_all_turns`** matches “both sides in scope”; use **`mosaic_hexxla_get_persistence_policy`** and [`PERSISTENCE_POLICY.md`](./PERSISTENCE_POLICY.md) for enforcement details. Cursor does not provide built-in cross-session Memories (see [external memory note](https://omegamax.co/blog/cursor-removed-memories)); Mosaic MCP is one way to keep durable context **outside** the editor.
+YAML **`retention.capture_mode: save_all_turns`** matches “both sides in scope”; use **`mosaic_hexxla_get_persistence_policy`** and [`PERSISTENCE_POLICY.md`](./PERSISTENCE_POLICY.md) for enforcement details. Mosaic MCP keeps durable context outside any particular editor or agent client.
 
 ---
 
 ## Client-side instructions (non-repo)
 
-Cursor / IDE **rules** and team **playbooks** should repeat the short chain: **retrieve → read hints → load context pack if needed**. Tool descriptions and JSON hints in Mosaic already encode this; repeating it in the **system** or **project instructions** layer improves compliance from frontier models.
+Client or IDE project instructions should repeat the short chain: **retrieve → read hints → load context pack if needed**. Tool descriptions and JSON hints in Mosaic already encode this; repeating it in the system or project-instructions layer improves compliance.
 
 ---
 
@@ -100,7 +100,7 @@ Cursor / IDE **rules** and team **playbooks** should repeat the short chain: **r
 
 - [`HEXXLA_TROUBLESHOOTING.md`](./HEXXLA_TROUBLESHOOTING.md) — MCP deletes, **`mosaic_hexxla_health`** / **`integrity_ok`**, MVCC index semantics
 - [`../ROADMAP.md`](../ROADMAP.md) — roadmap themes; [`../../TODOS.md`](../../TODOS.md) — session scratchpad
-- [`AGENT_CLIENT_WORKFLOWS.md`](./AGENT_CLIENT_WORKFLOWS.md) — Windsurf workflows vs Cursor rules, committed paths, slash commands
+- [`DEVELOPMENT_TOOLING.md`](./DEVELOPMENT_TOOLING.md) — repository agent policy, project skill, and editor tasks
 - [`PERSISTENCE_POLICY.md`](./PERSISTENCE_POLICY.md) — YAML `retention` / `allow_delete_cell` (startup file, `mosaic_hexxla_get_persistence_policy`)
 - [`IMPLEMENTATION_PLAN.md`](./IMPLEMENTATION_PLAN.md) — phased checklist, shipped tools, session log (includes hybrid **`embed_query_text`** notes)
 - [`HEXXLA_API_SURFACE_COVERAGE.md`](./HEXXLA_API_SURFACE_COVERAGE.md) — Hexxla ↔ MCP capability matrix

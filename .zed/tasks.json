@@ -1,0 +1,27 @@
+[
+  {
+    "label": "Mosaic: CI",
+    "command": "task ci",
+    "save": "all"
+  },
+  {
+    "label": "Mosaic: Test",
+    "command": "task test",
+    "save": "all"
+  },
+  {
+    "label": "Mosaic: Build Commands",
+    "command": "task build-mosaic-mcp build-mosaic-create-db",
+    "save": "all"
+  },
+  {
+    "label": "Mosaic: Build Seed Tool",
+    "command": "task build-mosaic-seed",
+    "save": "all"
+  },
+  {
+    "label": "Mosaic: Integration Tests",
+    "command": "task integration",
+    "save": "all"
+  }
+]

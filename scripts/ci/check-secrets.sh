@@ -26,25 +26,25 @@ die() {
 # ======================
 
 echo "Checking for AWS credentials"
-if grep -rI --exclude-dir={.git,.cursor,.claude,.continue,bin,dist,node_modules,vendor} \
+if grep -rI --exclude-dir={.git,.cursor,.claude,.windsurf,.continue,.codex,bin,dist,node_modules,vendor} \
     -E 'AKIA[0-9A-Z]{16}' . 2>/dev/null | grep -q .; then
     die "Possible AWS Access Key ID found"
 fi
 
 echo "Checking for GitHub tokens"
-if grep -rI --exclude-dir={.git,.cursor,.claude,.continue,bin,dist,node_modules,vendor} \
+if grep -rI --exclude-dir={.git,.cursor,.claude,.windsurf,.continue,.codex,bin,dist,node_modules,vendor} \
     -E 'gh[pousr]_[A-Za-z0-9_]{20,}' . 2>/dev/null | grep -q .; then
     die "Possible GitHub Personal Access Token found"
 fi
 
 echo "Checking for private keys"
-if grep -rI --exclude-dir={.git,.cursor,.claude,.continue,bin,dist,node_modules,vendor} \
+if grep -rI --exclude-dir={.git,.cursor,.claude,.windsurf,.continue,.codex,bin,dist,node_modules,vendor} \
     -E '-----BEGIN (RSA |OPENSSH |EC |PGP )?PRIVATE KEY-----' . 2>/dev/null | grep -q .; then
     die "Private key material found"
 fi
 
 echo "Checking for OpenAI/Anthropic keys"
-if grep -rI --exclude-dir={.git,.cursor,.claude,.continue,bin,dist,node_modules,vendor} \
+if grep -rI --exclude-dir={.git,.cursor,.claude,.windsurf,.continue,.codex,bin,dist,node_modules,vendor} \
     -E 'sk-[A-Za-z0-9]{48}' . 2>/dev/null | grep -q .; then
     die "Possible OpenAI or Anthropic API key found"
 fi

@@ -67,7 +67,6 @@ credentials.json
 
 # Editor / IDE
 .idea/
-.vscode/
 *.swp
 *.swo
 *~
@@ -92,17 +91,11 @@ __debug_bin.exe
 TODO.md
 NOTES.md
 
-# Cursor — ignore local IDE noise; version-control agent rules under .cursor/rules/
-.cursor/*
-!.cursor/rules/
-!.cursor/rules/**
-
-# LLM tool configurations (other tools)
+# VS Code and Zed project settings are tracked in .vscode/ and .zed/.
+# Keep assistant-specific local state out of the repository; shared Codex skills
+# live under .agents/skills/.
+.cursor/
 .claude/
-.windsurf/*
-!.windsurf/rules/
-!.windsurf/rules/**
-!.windsurf/workflows/
-!.windsurf/workflows/**
+.windsurf/
 .continue/
 .codex/

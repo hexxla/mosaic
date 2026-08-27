@@ -16,12 +16,6 @@ Engineering polish aligned with Mosaic as the MCP orchestration layer over Hexxl
 - **MCP missing-path refusal** — `mosaic-mcp` currently inherits `hexxladb.Open`'s create-on-missing behavior, so a typo can start an empty database without Mosaic's embedding layout. **Implement:** require a pre-existing regular file before open, with focused command tests. [`TODOS.md`](../TODOS.md) *(Pending)*.
 - **Seed credential parity** — `mosaic-seed` loads Ollama fields from policy YAML but currently ignores `database.passphrase`. **Decide and implement:** wire the YAML passphrase with the same precedence as create/MCP, or remove the implied shared-policy behavior from the command contract. [`TODOS.md`](../TODOS.md) *(Pending)*.
 
-### Agent experience & host integration
-
-These reduce friction for assistants and humans wiring Mosaic into MCP clients (especially Cursor).
-
-- **MCP server identifier mismatch** — Cursor’s bridge may use an internal id (e.g. `project-0-mosaic-mosaic`) while config uses `mosaic`; mis-invocation causes “server does not exist.” **Improves Mosaic** by cutting setup/debug time and failed tool runs. **How:** Surface both ids in docs + optional tiny **Cursor** doc; see [`TODOS.md`](../TODOS.md) *(Pending)*.
-
 ## Future
 
 Spec or direction exists; scheduling TBD.

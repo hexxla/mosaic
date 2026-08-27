@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Single entry point for all quality checks.
-# Run locally with: ./scripts/ci/ci.sh or `make ci`
+# Run locally with: ./scripts/ci/ci.sh or `task ci`
 
 set -euo pipefail
 

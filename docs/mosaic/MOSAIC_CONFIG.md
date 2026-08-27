@@ -75,7 +75,7 @@ HTTP root and embedding model for **Ollama** (hybrid query/search, **`mosaic_hex
 
 **Precedence** (URL): **`mosaic-seed -ollama`** (flag) → YAML **`ollama.base_url`** → **`MOSAIC_OLLAMA_URL`** → default. Same for model: **`-embed-model`** → **`ollama.embed_model`** → **`MOSAIC_EMBED_MODEL`** → default.
 
-**`mosaic-mcp`** uses YAML → env → default (no Ollama CLI flags). The [Makefile](../../Makefile) commonly sets **`MOSAIC_OLLAMA_*`**; **`ollama:`** in policy YAML overrides those when the corresponding YAML field is non-empty.
+**`mosaic-mcp`** uses YAML → env → default (no Ollama CLI flags). The [Taskfile](../../Taskfile.yml) supplies **`MOSAIC_OLLAMA_*`** defaults to its seed tasks; **`ollama:`** in policy YAML overrides those when the corresponding YAML field is non-empty.
 
 ---
 

@@ -35,7 +35,7 @@ Foundation already in the repo; keep these stable when adding phases.
 - [x] `mosaic_hexxla_health` → `HealthCheck` + layout summary
 - [x] `mosaic_hexxla_search_embedding` → Ollama embed + `SearchByEmbedding` + `GetCell`
 - [x] `cmd/mosaic-seed` — spiral coords, `PutCell` + `PutEmbedding`, env `MOSAIC_OLLAMA_URL` / `MOSAIC_EMBED_MODEL`
-- [x] CI (`make ci`) and tests on touched packages
+- [x] CI (`task ci`) and tests on touched packages
 
 ---
 
@@ -60,11 +60,11 @@ Foundation already in the repo; keep these stable when adding phases.
 
 ### Quality
 
-- [x] Service tests with stub `CellReader`; MCP helpers tested (`cell_time_test.go`); `make ci` green
+- [x] Service tests with stub `CellReader`; MCP helpers tested (`cell_time_test.go`); `task ci` green
 - [x] **HEXXLA_API_SURFACE_COVERAGE** matrix updated
 - [x] Changelog `[Unreleased]` updated
 
-**Phase 1 exit criteria:** At least one MCP read path exercises **non-embedding** cell discovery against the seeded DB; `make ci` green.
+**Phase 1 exit criteria:** At least one MCP read path exercises **non-embedding** cell discovery against the seeded DB; `task ci` green.
 
 ---
 
