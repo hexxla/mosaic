@@ -36,10 +36,10 @@ func newMosaicRetentionPolicyJSON(r config.RetentionPolicy) mosaicRetentionPolic
 }
 
 // RegisterPersistencePolicyTool registers mosaic_hexxla_get_persistence_policy (read-only; reflects startup-loaded YAML or defaults).
-func RegisterPersistencePolicyTool(server *mcp.Server, rt config.MosaicRuntimeConfig, configFilePath string, log *slog.Logger) {
+func RegisterPersistencePolicyTool(server *mcp.Server, rt config.MosaicRuntimeConfig, configFilePath string, log *slog.Logger) error {
 	type empty struct{}
 
-	mcp.AddTool(server, &mcp.Tool{
+	return addTool(server, &mcp.Tool{
 		Name:        "mosaic_hexxla_get_persistence_policy",
 		Description: "Return the Mosaic config snapshot loaded at server startup (YAML via -policy or MOSAIC_POLICY_FILE). Includes retention (capture_mode, enforcement as boolean, notes), allow_delete_cell, and optional config path. persistence_policy in YAML is deprecated in favor of retention.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ empty) (*mcp.CallToolResult, MosaicConfigPolicyResponse, error) {

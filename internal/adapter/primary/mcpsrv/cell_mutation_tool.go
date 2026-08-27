@@ -27,14 +27,16 @@ type putCellInput struct {
 }
 
 // RegisterCellMutationTools registers write tools: mosaic_hexxla_put_cell, mosaic_hexxla_put_embedding, mosaic_hexxla_delete_cell.
-func RegisterCellMutationTools(server *mcp.Server, svc primary.CellMutation, gates config.MosaicRuntimeConfig, log *slog.Logger) {
-	registerPutCellTool(server, svc, gates, log)
-	registerPutEmbeddingTool(server, svc, log)
-	registerDeleteCellTool(server, svc, gates, log)
+func RegisterCellMutationTools(server *mcp.Server, svc primary.CellMutation, gates config.MosaicRuntimeConfig, log *slog.Logger) error {
+	return registerTools(
+		func() error { return registerPutCellTool(server, svc, gates, log) },
+		func() error { return registerPutEmbeddingTool(server, svc, log) },
+		func() error { return registerDeleteCellTool(server, svc, gates, log) },
+	)
 }
 
-func registerPutCellTool(server *mcp.Server, svc primary.CellMutation, gates config.MosaicRuntimeConfig, log *slog.Logger) {
-	mcp.AddTool(server, &mcp.Tool{
+func registerPutCellTool(server *mcp.Server, svc primary.CellMutation, gates config.MosaicRuntimeConfig, log *slog.Logger) error {
+	return addTool(server, &mcp.Tool{
 		Name: "mosaic_hexxla_put_cell",
 		Description: "Write one cell atomically via HexxlaDB. placement=exact (default) writes at (q,r) and refuses a live coordinate unless allow_overwrite=true. placement=near_anchor treats (q,r) as a caller-chosen semantic anchor and selects the first free coordinate in deterministic ring order within max_radius (default 8, maximum 32). The response always returns the actual coordinate, placement, occupied probes, and whether an exact write replaced a live cell. Mosaic does not infer semantic anchors. Before choosing tags, call mosaic_hexxla_list_tags (and mosaic_hexxla_tag_counts) when taxonomy is unknown — reuse existing tags when relevant instead of inventing near-duplicates. " +
 			"kind=fact uses a fact template; user_message / assistant_response match conversational_memory-style tags. source_id is required (provenance source for fact, session id for user/assistant templates).",
@@ -71,7 +73,7 @@ func putCellCommand(in *putCellInput, kind domain.CellPutKind) *domain.PutCellCo
 	}
 }
 
-func registerPutEmbeddingTool(server *mcp.Server, svc primary.CellMutation, log *slog.Logger) {
+func registerPutEmbeddingTool(server *mcp.Server, svc primary.CellMutation, log *slog.Logger) error {
 	type putEmbInput struct {
 		Q      int       `json:"q" jsonschema:"axial q"`
 		R      int       `json:"r" jsonschema:"axial r"`
@@ -79,7 +81,7 @@ func registerPutEmbeddingTool(server *mcp.Server, svc primary.CellMutation, log 
 		Vector []float32 `json:"vector,omitempty" jsonschema:"raw float32 embedding; length must match DB EmbeddingDimension"`
 	}
 
-	mcp.AddTool(server, &mcp.Tool{
+	return addTool(server, &mcp.Tool{
 		Name:        "mosaic_hexxla_put_embedding",
 		Description: "Store an embedding vector at axial (q,r) via HexxlaDB Tx.PutEmbedding. Provide either text (embedded with MOSAIC_EMBED_MODEL) or vector (full float32[], length must match the database embedding dimension). Requires embeddings enabled on the DB (same dimension as MOSAIC_DB_PATH database).",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in putEmbInput) (*mcp.CallToolResult, domain.MutationOK, error) {
@@ -98,13 +100,13 @@ func registerPutEmbeddingTool(server *mcp.Server, svc primary.CellMutation, log 
 	})
 }
 
-func registerDeleteCellTool(server *mcp.Server, svc primary.CellMutation, gates config.MosaicRuntimeConfig, log *slog.Logger) {
+func registerDeleteCellTool(server *mcp.Server, svc primary.CellMutation, gates config.MosaicRuntimeConfig, log *slog.Logger) error {
 	type deleteCellInput struct {
 		Q int `json:"q" jsonschema:"axial q"`
 		R int `json:"r" jsonschema:"axial r"`
 	}
 
-	mcp.AddTool(server, &mcp.Tool{
+	return addTool(server, &mcp.Tool{
 		Name: "mosaic_hexxla_delete_cell",
 		Description: "Delete the cell at axial (q,r) via HexxlaDB Tx.DeleteCell (MVCC tombstone semantics on v2 databases). " +
 			"Successful response includes cell_removed: true only when a visible cell existed and was removed; " +

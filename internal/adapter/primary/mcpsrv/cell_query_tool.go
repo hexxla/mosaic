@@ -13,7 +13,7 @@ import (
 )
 
 // RegisterCellQueryTool registers mosaic_hexxla_query_cells (Hexxla Tx.QueryCells: tags, time, spatial, sort, optional explain).
-func RegisterCellQueryTool(server *mcp.Server, svc primary.CellRetrieval, log *slog.Logger, budget *RetrievalBudgetTracker) {
+func RegisterCellQueryTool(server *mcp.Server, svc primary.CellRetrieval, log *slog.Logger, budget *RetrievalBudgetTracker) error {
 	type cellQueryInput struct {
 		Query          string   `json:"query,omitempty" jsonschema:"substring match on content, tags, or source_id"`
 		RequireTags    []string `json:"require_tags,omitempty" jsonschema:"all of these tags (AND)"`
@@ -34,7 +34,7 @@ func RegisterCellQueryTool(server *mcp.Server, svc primary.CellRetrieval, log *s
 		EmbedQueryText string   `json:"embed_query_text,omitempty" jsonschema:"when set, Ollama embeds this text and Hexxla uses ANN+filters hybrid QueryCells"`
 	}
 
-	mcp.AddTool(server, &mcp.Tool{
+	return addTool(server, &mcp.Tool{
 		Name: "mosaic_hexxla_query_cells",
 		Description: "Indexed cell query (HexxlaDB QueryCells): tags, source, time window, spatial radius, sort, explain. " +
 			"Use require_tags (e.g. preference) for structured slices instead of vague query-only search when fetching tagged memories. " +

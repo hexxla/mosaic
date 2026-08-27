@@ -1,7 +1,8 @@
 # Optional Ratchet workflow policy for mosaic-mcp.
 # Enable with -ratchet-config or MOSAIC_RATCHET_CONFIG_FILE.
-# Tools absent from this file remain unrestricted. Repeated rules for one tool
-# are alternatives (OR), not cumulative prerequisites.
+# Read-only tools absent from this file remain unrestricted. Every Mosaic
+# mutation must have a non-empty prerequisite or server startup fails. Repeated
+# rules for one tool are alternatives (OR), not cumulative prerequisites.
 
 rules:
   # Successful discovery calls issue session-local tokens valid for 10 minutes.
@@ -29,10 +30,70 @@ rules:
     error_message: ""
     one_time_use: false
 
+  - tool: "mosaic_hexxla_find_seams"
+    prerequisite: ""
+    expiry: "10m"
+    error_message: ""
+    one_time_use: false
+
   # Each cell write requires a fresh successful tag-list call.
   - tool: "mosaic_hexxla_put_cell"
     prerequisite: "mosaic_hexxla_list_tags"
     error_message: "Before saving a cell, call mosaic_hexxla_list_tags to review the current tag vocabulary."
+    one_time_use: true
+
+  # Embedding and facet writes require a recent successful cell retrieval. OR
+  # dependencies remain reusable because one-time OR consumption is ambiguous
+  # in the pinned mcp-ratchet version.
+  - tool: "mosaic_hexxla_put_embedding"
+    prerequisite: "mosaic_hexxla_search_embedding"
+    error_message: "Before storing an embedding, retrieve the target cell with mosaic_hexxla_search_embedding, mosaic_hexxla_query_cells, or mosaic_hexxla_search_cells."
+    one_time_use: false
+
+  - tool: "mosaic_hexxla_put_embedding"
+    prerequisite: "mosaic_hexxla_query_cells"
+    error_message: "Before storing an embedding, retrieve the target cell with mosaic_hexxla_search_embedding, mosaic_hexxla_query_cells, or mosaic_hexxla_search_cells."
+    one_time_use: false
+
+  - tool: "mosaic_hexxla_put_embedding"
+    prerequisite: "mosaic_hexxla_search_cells"
+    error_message: "Before storing an embedding, retrieve the target cell with mosaic_hexxla_search_embedding, mosaic_hexxla_query_cells, or mosaic_hexxla_search_cells."
+    one_time_use: false
+
+  - tool: "mosaic_hexxla_put_facet"
+    prerequisite: "mosaic_hexxla_search_embedding"
+    error_message: "Before storing a facet, retrieve the target cell with mosaic_hexxla_search_embedding, mosaic_hexxla_query_cells, or mosaic_hexxla_search_cells."
+    one_time_use: false
+
+  - tool: "mosaic_hexxla_put_facet"
+    prerequisite: "mosaic_hexxla_query_cells"
+    error_message: "Before storing a facet, retrieve the target cell with mosaic_hexxla_search_embedding, mosaic_hexxla_query_cells, or mosaic_hexxla_search_cells."
+    one_time_use: false
+
+  - tool: "mosaic_hexxla_put_facet"
+    prerequisite: "mosaic_hexxla_search_cells"
+    error_message: "Before storing a facet, retrieve the target cell with mosaic_hexxla_search_embedding, mosaic_hexxla_query_cells, or mosaic_hexxla_search_cells."
+    one_time_use: false
+
+  # Relationship and seam writes require a fresh view of the state they alter.
+  - tool: "mosaic_hexxla_link_cells"
+    prerequisite: "mosaic_hexxla_load_context_pack"
+    error_message: "Before linking cells, call mosaic_hexxla_load_context_pack for the relevant coordinates."
+    one_time_use: true
+
+  - tool: "mosaic_hexxla_mark_conflict"
+    prerequisite: "mosaic_hexxla_find_seams"
+    error_message: "Before marking a conflict, call mosaic_hexxla_find_seams near the relevant cells."
+    one_time_use: true
+
+  - tool: "mosaic_hexxla_mark_supersedes"
+    prerequisite: "mosaic_hexxla_find_seams"
+    error_message: "Before marking supersession, call mosaic_hexxla_find_seams near the relevant cells."
+    one_time_use: true
+
+  - tool: "mosaic_hexxla_resolve_seam"
+    prerequisite: "mosaic_hexxla_find_seams"
+    error_message: "Before resolving a seam, call mosaic_hexxla_find_seams and inspect its current state."
     one_time_use: true
 
   # Context loading and deletion require one recent successful retrieval. These

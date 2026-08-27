@@ -11,20 +11,22 @@ import (
 )
 
 // RegisterFacetEdgeBrowseTools registers read-only facet and edge lookup tools — View-only, no mutations.
-func RegisterFacetEdgeBrowseTools(server *mcp.Server, svc primary.FacetEdgeBrowse, log *slog.Logger, budget *RetrievalBudgetTracker) {
-	registerGetFacet(server, svc, log, budget)
-	registerListFacets(server, svc, log, budget)
-	registerGetEdge(server, svc, log, budget)
-	registerListEdgesFrom(server, svc, log, budget)
+func RegisterFacetEdgeBrowseTools(server *mcp.Server, svc primary.FacetEdgeBrowse, log *slog.Logger, budget *RetrievalBudgetTracker) error {
+	return registerTools(
+		func() error { return registerGetFacet(server, svc, log, budget) },
+		func() error { return registerListFacets(server, svc, log, budget) },
+		func() error { return registerGetEdge(server, svc, log, budget) },
+		func() error { return registerListEdgesFrom(server, svc, log, budget) },
+	)
 }
 
-func registerGetFacet(server *mcp.Server, svc primary.FacetEdgeBrowse, log *slog.Logger, budget *RetrievalBudgetTracker) {
+func registerGetFacet(server *mcp.Server, svc primary.FacetEdgeBrowse, log *slog.Logger, budget *RetrievalBudgetTracker) error {
 	type input struct {
 		Q       int  `json:"q"`
 		R       int  `json:"r"`
 		FacetID byte `json:"facet_id" jsonschema:"0..5 facet slot"`
 	}
-	mcp.AddTool(server, &mcp.Tool{
+	return addTool(server, &mcp.Tool{
 		Name:        "mosaic_hexxla_get_facet",
 		Description: "Read one facet slot at (q,r) via Tx.GetFacet — read-only snapshot. Pair with mosaic_hexxla_put_facet verification before overwriting.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in input) (*mcp.CallToolResult, domain.GetFacetResponse, error) {
@@ -38,12 +40,12 @@ func registerGetFacet(server *mcp.Server, svc primary.FacetEdgeBrowse, log *slog
 	})
 }
 
-func registerListFacets(server *mcp.Server, svc primary.FacetEdgeBrowse, log *slog.Logger, budget *RetrievalBudgetTracker) {
+func registerListFacets(server *mcp.Server, svc primary.FacetEdgeBrowse, log *slog.Logger, budget *RetrievalBudgetTracker) error {
 	type input struct {
 		Q int `json:"q"`
 		R int `json:"r"`
 	}
-	mcp.AddTool(server, &mcp.Tool{
+	return addTool(server, &mcp.Tool{
 		Name:        "mosaic_hexxla_list_facets",
 		Description: "List all visible facets at (q,r) via Tx.AscendFacetsForCell — read-only snapshot (slots returned in engine order).",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in input) (*mcp.CallToolResult, domain.ListFacetsForCellResponse, error) {
@@ -57,7 +59,7 @@ func registerListFacets(server *mcp.Server, svc primary.FacetEdgeBrowse, log *sl
 	})
 }
 
-func registerGetEdge(server *mcp.Server, svc primary.FacetEdgeBrowse, log *slog.Logger, budget *RetrievalBudgetTracker) {
+func registerGetEdge(server *mcp.Server, svc primary.FacetEdgeBrowse, log *slog.Logger, budget *RetrievalBudgetTracker) error {
 	type input struct {
 		FromQ        int    `json:"from_q"`
 		FromR        int    `json:"from_r"`
@@ -65,7 +67,7 @@ func registerGetEdge(server *mcp.Server, svc primary.FacetEdgeBrowse, log *slog.
 		ToR          int    `json:"to_r"`
 		RelationType string `json:"relation_type" jsonschema:"exact edge key label"`
 	}
-	mcp.AddTool(server, &mcp.Tool{
+	return addTool(server, &mcp.Tool{
 		Name:        "mosaic_hexxla_get_edge",
 		Description: "Read one directed edge (from_cell → to_cell, relation_type) via Tx.GetEdge — read-only. Direction matches mosaic_hexxla_link_cells / AscendEdgesFrom(from).",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in input) (*mcp.CallToolResult, domain.GetEdgeResponse, error) {
@@ -83,13 +85,13 @@ func registerGetEdge(server *mcp.Server, svc primary.FacetEdgeBrowse, log *slog.
 	})
 }
 
-func registerListEdgesFrom(server *mcp.Server, svc primary.FacetEdgeBrowse, log *slog.Logger, budget *RetrievalBudgetTracker) {
+func registerListEdgesFrom(server *mcp.Server, svc primary.FacetEdgeBrowse, log *slog.Logger, budget *RetrievalBudgetTracker) error {
 	type input struct {
 		FromQ    int `json:"from_q"`
 		FromR    int `json:"from_r"`
 		MaxEdges int `json:"max_edges,omitempty" jsonschema:"optional cap default 50 max 200; truncated flag if more existed"`
 	}
-	mcp.AddTool(server, &mcp.Tool{
+	return addTool(server, &mcp.Tool{
 		Name:        "mosaic_hexxla_list_edges_from",
 		Description: "List outbound edges whose from-cell equals (from_q,from_r) via Tx.AscendEdgesFrom — read-only. Bounded by max_edges (default 50, cap 200); truncated=true when scan stopped early at the cap.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in input) (*mcp.CallToolResult, domain.ListEdgesFromResponse, error) {

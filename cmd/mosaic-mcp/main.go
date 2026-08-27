@@ -169,19 +169,26 @@ func run(log *slog.Logger) error {
 	if ratchetGate != nil {
 		srv.AddReceivingMiddleware(ratchetGate.Middleware())
 	}
-	mcpsrv.RegisterHealthTool(srv, healthSvc, log, retrievalBudget)
-	mcpsrv.RegisterCellQueryTool(srv, cellRetrieval, log, retrievalBudget)
-	mcpsrv.RegisterCellSearchTool(srv, cellRetrieval, log, retrievalBudget)
-	mcpsrv.RegisterEmbeddingSearchTool(srv, embeddingSvc, log, retrievalBudget)
-	mcpsrv.RegisterContextPackTool(srv, contextAssembly, log, retrievalBudget)
-	mcpsrv.RegisterContextBudgetEstimateTool(srv, log)
-	mcpsrv.RegisterCellMutationTools(srv, mutationSvc, runtimeCfg, log)
-	mcpsrv.RegisterSeamTools(srv, seamSvc, log, retrievalBudget)
-	mcpsrv.RegisterFacetEdgeTools(srv, facetEdgeSvc, log)
-	mcpsrv.RegisterFacetEdgeBrowseTools(srv, facetEdgeBrowse, log, retrievalBudget)
-	mcpsrv.RegisterTagBrowseTools(srv, tagBrowseSvc, log, retrievalBudget)
-	mcpsrv.RegisterPersistencePolicyTool(srv, runtimeCfg, configPathUsed, log)
-	mcpsrv.RegisterRetrievalBudgetStatusTool(srv, retrievalBudget, log)
+	registrations := [...]func() error{
+		func() error { return mcpsrv.RegisterHealthTool(srv, healthSvc, log, retrievalBudget) },
+		func() error { return mcpsrv.RegisterCellQueryTool(srv, cellRetrieval, log, retrievalBudget) },
+		func() error { return mcpsrv.RegisterCellSearchTool(srv, cellRetrieval, log, retrievalBudget) },
+		func() error { return mcpsrv.RegisterEmbeddingSearchTool(srv, embeddingSvc, log, retrievalBudget) },
+		func() error { return mcpsrv.RegisterContextPackTool(srv, contextAssembly, log, retrievalBudget) },
+		func() error { return mcpsrv.RegisterContextBudgetEstimateTool(srv, log) },
+		func() error { return mcpsrv.RegisterCellMutationTools(srv, mutationSvc, runtimeCfg, log) },
+		func() error { return mcpsrv.RegisterSeamTools(srv, seamSvc, log, retrievalBudget) },
+		func() error { return mcpsrv.RegisterFacetEdgeTools(srv, facetEdgeSvc, log) },
+		func() error { return mcpsrv.RegisterFacetEdgeBrowseTools(srv, facetEdgeBrowse, log, retrievalBudget) },
+		func() error { return mcpsrv.RegisterTagBrowseTools(srv, tagBrowseSvc, log, retrievalBudget) },
+		func() error { return mcpsrv.RegisterPersistencePolicyTool(srv, runtimeCfg, configPathUsed, log) },
+		func() error { return mcpsrv.RegisterRetrievalBudgetStatusTool(srv, retrievalBudget, log) },
+	}
+	for _, register := range registrations {
+		if err := register(); err != nil {
+			return fmt.Errorf("register MCP tools: %w", err)
+		}
+	}
 	h := mcpsrv.StreamableHTTPHandler(srv, log)
 
 	mux := http.NewServeMux()
@@ -256,6 +263,10 @@ func loadRatchetGate(path string, log *slog.Logger) (*mcpsrv.RatchetGate, error)
 		return nil, fmt.Errorf("close ratchet config: %w", closeErr)
 	}
 
+	gate := mcpsrv.NewRatchetGate(service, sessions, rules, log)
+	if err := gate.ValidateProtectedTools(mcpsrv.MutationToolNames()); err != nil {
+		return nil, err
+	}
 	log.Info("ratchet enforcement enabled", "config_file", loaded.Path, "rules", len(rules))
-	return mcpsrv.NewRatchetGate(service, sessions, rules, log), nil
+	return gate, nil
 }

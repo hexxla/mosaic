@@ -59,8 +59,8 @@ func validateContextPackBudgetInput(in *contextPackInput) error {
 }
 
 // RegisterContextPackTool registers mosaic_hexxla_load_context_pack.
-func RegisterContextPackTool(server *mcp.Server, svc primary.ContextAssembly, log *slog.Logger, budget *RetrievalBudgetTracker) {
-	mcp.AddTool(server, &mcp.Tool{
+func RegisterContextPackTool(server *mcp.Server, svc primary.ContextAssembly, log *slog.Logger, budget *RetrievalBudgetTracker) error {
+	return addTool(server, &mcp.Tool{
 		Name: "mosaic_hexxla_load_context_pack",
 		Description: "Expand hex-neighbourhood context from seed coordinates using HexxlaDB LoadContext; Mosaic applies the UTF-8 byte budget and outer-ring/low-confidence eviction (optional seams & supersession filtering). " +
 			"Typical flow: mosaic_hexxla_search_embedding (or query/search cells) → use match coords as seeds here. " +

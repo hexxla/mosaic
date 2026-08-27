@@ -62,6 +62,24 @@ Keep this distinction explicit in docs and agent instructions so expectations do
 - Mosaic **does not** auto-save chat turns. Long-lived store of user/model text is explicit: tools that **write** cells (**`mosaic_hexxla_put_cell`**, **`mosaic_hexxla_put_embedding`**, etc.) persist data the client chooses to submit (e.g. **`kind`** `user_message` / `assistant_response`, **`source_id`** for session/session key). There is **no** default “record everything”; retrieval/query tools only **read**.
 - Decide your product policy (what to store, TTL, PIIs) **above** Mosaic; expose only via mutation calls.
 
+### Ratchet prerequisites when enabled
+
+An operator may enable the supplied Ratchet workflow. In that deployment, use
+the prerequisite named by a denial instead of retrying the mutation:
+
+- `put_cell` follows a fresh `list_tags`;
+- `put_embedding`, `put_facet`, and `delete_cell` follow a successful cell
+  retrieval;
+- `link_cells` follows `load_context_pack`; and
+- `mark_conflict`, `mark_supersedes`, and `resolve_seam` follow `find_seams`.
+
+Single-prerequisite write tokens are consumed once. Retrieval alternatives are
+reusable until their token expires. The state belongs to the current MCP
+session and is lost when the server restarts. See
+[`RATCHET_INTEGRATION.md`](./RATCHET_INTEGRATION.md) for the exact operator
+contract; Ratchet ordering does not replace authorization or persistence
+policy.
+
 ### Cell placement on writes
 
 `mosaic_hexxla_put_cell` supports two explicit modes:

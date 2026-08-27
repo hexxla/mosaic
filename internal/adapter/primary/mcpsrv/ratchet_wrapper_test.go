@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -45,6 +46,29 @@ func TestRatchetGateDoesNotAuthorizeFailedTool(t *testing.T) {
 
 	if got := mutationCalls.Load(); got != 0 {
 		t.Fatalf("mutation handler calls = %d, want 0", got)
+	}
+}
+
+func TestRatchetGateValidatesProtectedToolCoverage(t *testing.T) {
+	rules := []ratchetdomain.Rule{
+		{Tool: "protected", Prerequisite: "discover"},
+		{Tool: "free-pass"},
+		{Tool: "mixed", Prerequisite: "discover"},
+		{Tool: "mixed"},
+	}
+	gate := NewRatchetGate(nil, nil, rules, nil)
+
+	if err := gate.ValidateProtectedTools([]string{"protected"}); err != nil {
+		t.Fatalf("validate protected tool: %v", err)
+	}
+	err := gate.ValidateProtectedTools([]string{"protected", "missing", "free-pass", "mixed"})
+	if err == nil {
+		t.Fatal("validate coverage unexpectedly succeeded")
+	}
+	for _, name := range []string{"free-pass", "missing", "mixed"} {
+		if !strings.Contains(err.Error(), name) {
+			t.Errorf("coverage error %q does not name %q", err, name)
+		}
 	}
 }
 

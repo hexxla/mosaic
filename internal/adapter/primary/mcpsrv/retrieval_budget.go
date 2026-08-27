@@ -162,8 +162,8 @@ func (t *RetrievalBudgetTracker) Status(req *mcp.CallToolRequest) RetrievalBudge
 }
 
 // RegisterRetrievalBudgetStatusTool registers mosaic_hexxla_retrieval_budget_status (read-only; never charged against the budget).
-func RegisterRetrievalBudgetStatusTool(server *mcp.Server, tracker *RetrievalBudgetTracker, log *slog.Logger) {
-	mcp.AddTool(server, &mcp.Tool{
+func RegisterRetrievalBudgetStatusTool(server *mcp.Server, tracker *RetrievalBudgetTracker, log *slog.Logger) error {
+	return addTool(server, &mcp.Tool{
 		Name:        "mosaic_hexxla_retrieval_budget_status",
 		Description: "Answer: how much approximate retrieval (JSON from HexxlaDB read tools) this MCP session has accumulated. metering_enabled true when the server tracks usage. budgeting_enabled true when session_approx_token_budget > 0 (hard cap). When budgeting is off, usage is still metered for observability. Stateless clients without Mcp-Session-Id may share the empty session key.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, RetrievalBudgetStatus, error) {

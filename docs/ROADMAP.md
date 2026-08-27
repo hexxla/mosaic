@@ -28,6 +28,11 @@ Spec or direction exists; scheduling TBD.
 Interesting but unvalidated; needs product signal.
 
 - **Metrics export** — Prometheus/OpenTelemetry counters for `approx_tokens_used` per session or globally (today: in-process + `mosaic_hexxla_retrieval_budget_status`).
+- **Bounded taxonomy analytics (recommended first read-only experiment)** — Evaluate `TagCooccurrences(min_count)` and radius-bounded `UntaggedCells` tools. They directly improve tag reuse and memory hygiene, require no Ollama, and can be hard-capped by minimum count, radius, and result count.
+- **Bounded relationship traversal (recommended second read-only experiment)** — Evaluate `FindEdgePath` and `WalkEdgeCoords` behind strict `max_hops`, `max_nodes`/`max_coords`, relation filters, and response-size caps. Validate a real agent navigation workflow before exposing weighted-path details.
+- **Lattice density diagnostics** — Evaluate a small `RingDensityMap` response for placement/coverage decisions. Keep rendered grids and super-hex derived indexes in native/operator tooling unless a concrete agent workflow demonstrates value.
+- **Snapshot/time-travel reads** — Evaluate list/read/diff operations only after specifying retained-history availability, authorization, maximum sequence/time span, and response caps. Snapshot creation/deletion remains operator-only.
+- **Bounded changelog peek** — Evaluate `ReadChangelogFiltered` only for a demonstrated audit workflow with strict sequence, operation, record-count, and byte limits. Consumer cursor mutation and retention coordination remain operator-only.
 
 ## Out of Scope
 

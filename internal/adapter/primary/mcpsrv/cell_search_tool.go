@@ -12,7 +12,7 @@ import (
 )
 
 // RegisterCellSearchTool registers mosaic_hexxla_search_cells (Hexxla Tx.SearchCells: lexical relevance + filters).
-func RegisterCellSearchTool(server *mcp.Server, svc primary.CellRetrieval, log *slog.Logger, budget *RetrievalBudgetTracker) {
+func RegisterCellSearchTool(server *mcp.Server, svc primary.CellRetrieval, log *slog.Logger, budget *RetrievalBudgetTracker) error {
 	type cellSearchInput struct {
 		Query          string   `json:"query,omitempty" jsonschema:"matches content, tags, source_id; empty matches all with filters"`
 		RequireTags    []string `json:"require_tags,omitempty"`
@@ -28,7 +28,7 @@ func RegisterCellSearchTool(server *mcp.Server, svc primary.CellRetrieval, log *
 		EmbedQueryText string   `json:"embed_query_text,omitempty" jsonschema:"when set, Ollama embeds then hybrid ANN+lexical SearchCells"`
 	}
 
-	mcp.AddTool(server, &mcp.Tool{
+	return addTool(server, &mcp.Tool{
 		Name: "mosaic_hexxla_search_cells",
 		Description: "Lexical relevance search (HexxlaDB SearchCells): scored substring/tag/source matches; optional scan radius; optional embed_query_text for ANN-accelerated hybrid retrieval. " +
 			"Substring match can return zero hits if that phrase is not stored literally — try mosaic_hexxla_search_embedding for semantic discovery. " +

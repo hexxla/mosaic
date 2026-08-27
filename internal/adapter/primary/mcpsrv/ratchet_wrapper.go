@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"hash/maphash"
 	"log/slog"
+	"slices"
+	"strings"
 	"sync"
 
 	ratchetdomain "github.com/hexxla/mcp-ratchet/pkg/ratchet/domain"
@@ -20,6 +22,7 @@ type RatchetGate struct {
 	service    ratchetprimary.RatchetService
 	sessions   ratchetsecondary.SessionStore
 	configured map[ratchetdomain.ToolName]struct{}
+	protected  map[ratchetdomain.ToolName]struct{}
 	lockSeed   maphash.Seed
 	locks      [ratchetLockStripes]sync.Mutex
 	log        *slog.Logger
@@ -33,16 +36,46 @@ func NewRatchetGate(
 	log *slog.Logger,
 ) *RatchetGate {
 	configured := make(map[ratchetdomain.ToolName]struct{}, len(rules))
+	withPrerequisite := make(map[ratchetdomain.ToolName]struct{}, len(rules))
+	withFreePass := make(map[ratchetdomain.ToolName]struct{}, len(rules))
 	for _, rule := range rules {
 		configured[rule.Tool] = struct{}{}
+		if rule.Prerequisite == "" {
+			withFreePass[rule.Tool] = struct{}{}
+		} else {
+			withPrerequisite[rule.Tool] = struct{}{}
+		}
+	}
+	protected := make(map[ratchetdomain.ToolName]struct{}, len(withPrerequisite))
+	for tool := range withPrerequisite {
+		if _, unrestricted := withFreePass[tool]; !unrestricted {
+			protected[tool] = struct{}{}
+		}
 	}
 	return &RatchetGate{
 		service:    service,
 		sessions:   sessions,
 		configured: configured,
+		protected:  protected,
 		lockSeed:   maphash.MakeSeed(),
 		log:        log,
 	}
+}
+
+// ValidateProtectedTools fails when any required tool is absent from the
+// Ratchet rules or has a free-pass rule that makes its prerequisites optional.
+func (g *RatchetGate) ValidateProtectedTools(required []string) error {
+	missing := make([]string, 0)
+	for _, name := range required {
+		if _, ok := g.protected[ratchetdomain.ToolName(name)]; !ok {
+			missing = append(missing, name)
+		}
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+	slices.Sort(missing)
+	return fmt.Errorf("ratchet policy leaves mutation tools unprotected: %s", strings.Join(missing, ", "))
 }
 
 // Middleware returns MCP receiving middleware that gates configured tool calls.

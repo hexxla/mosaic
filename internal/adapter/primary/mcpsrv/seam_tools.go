@@ -11,14 +11,16 @@ import (
 )
 
 // RegisterSeamTools wires seam discovery and writes: find_seams, mark_conflict, mark_supersedes, resolve_seam.
-func RegisterSeamTools(server *mcp.Server, svc primary.SeamLifecycle, log *slog.Logger, budget *RetrievalBudgetTracker) {
-	registerFindSeamsTool(server, svc, log, budget)
-	registerMarkConflictTool(server, svc, log)
-	registerMarkSupersedesTool(server, svc, log)
-	registerResolveSeamTool(server, svc, log)
+func RegisterSeamTools(server *mcp.Server, svc primary.SeamLifecycle, log *slog.Logger, budget *RetrievalBudgetTracker) error {
+	return registerTools(
+		func() error { return registerFindSeamsTool(server, svc, log, budget) },
+		func() error { return registerMarkConflictTool(server, svc, log) },
+		func() error { return registerMarkSupersedesTool(server, svc, log) },
+		func() error { return registerResolveSeamTool(server, svc, log) },
+	)
 }
 
-func registerFindSeamsTool(server *mcp.Server, svc primary.SeamLifecycle, log *slog.Logger, budget *RetrievalBudgetTracker) {
+func registerFindSeamsTool(server *mcp.Server, svc primary.SeamLifecycle, log *slog.Logger, budget *RetrievalBudgetTracker) error {
 	type findSeamsInput struct {
 		CenterQ        int  `json:"center_q" jsonschema:"axial q of search center"`
 		CenterR        int  `json:"center_r" jsonschema:"axial r of search center"`
@@ -26,7 +28,7 @@ func registerFindSeamsTool(server *mcp.Server, svc primary.SeamLifecycle, log *s
 		UnresolvedOnly bool `json:"unresolved_only,omitempty" jsonschema:"only seams with empty resolution_status"`
 	}
 
-	mcp.AddTool(server, &mcp.Tool{
+	return addTool(server, &mcp.Tool{
 		Name:        "mosaic_hexxla_find_seams",
 		Description: "List seams HexxlaDB.FindSeams: endpoints within hex distance radius of (center_q, center_r). Set unresolved_only to focus on seams not yet ResolveSeam'd. Larger radii scan more neighbouring cells.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in findSeamsInput) (*mcp.CallToolResult, domain.FindSeamsResponse, error) {
@@ -51,7 +53,7 @@ func registerFindSeamsTool(server *mcp.Server, svc primary.SeamLifecycle, log *s
 	})
 }
 
-func registerMarkConflictTool(server *mcp.Server, svc primary.SeamLifecycle, log *slog.Logger) {
+func registerMarkConflictTool(server *mcp.Server, svc primary.SeamLifecycle, log *slog.Logger) error {
 	type markConflictInput struct {
 		Aq     int    `json:"aq" jsonschema:"cell A axial q"`
 		Ar     int    `json:"ar" jsonschema:"cell A axial r"`
@@ -60,7 +62,7 @@ func registerMarkConflictTool(server *mcp.Server, svc primary.SeamLifecycle, log
 		Reason string `json:"reason,omitempty" jsonschema:"human-readable conflict reason"`
 	}
 
-	mcp.AddTool(server, &mcp.Tool{
+	return addTool(server, &mcp.Tool{
 		Name:        "mosaic_hexxla_mark_conflict",
 		Description: "Create a contradiction seam Tx.MarkConflict between two axial cells — canonical endpoints, SeamType mark_conflict — for review or resolution workflows.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in markConflictInput) (*mcp.CallToolResult, domain.MutationOK, error) {
@@ -79,7 +81,7 @@ func registerMarkConflictTool(server *mcp.Server, svc primary.SeamLifecycle, log
 	})
 }
 
-func registerMarkSupersedesTool(server *mcp.Server, svc primary.SeamLifecycle, log *slog.Logger) {
+func registerMarkSupersedesTool(server *mcp.Server, svc primary.SeamLifecycle, log *slog.Logger) error {
 	type markSupInput struct {
 		SupersederQ int    `json:"superseder_q" jsonschema:"current-truth cell q"`
 		SupersederR int    `json:"superseder_r" jsonschema:"current-truth cell r"`
@@ -88,7 +90,7 @@ func registerMarkSupersedesTool(server *mcp.Server, svc primary.SeamLifecycle, l
 		Reason      string `json:"reason,omitempty"`
 	}
 
-	mcp.AddTool(server, &mcp.Tool{
+	return addTool(server, &mcp.Tool{
 		Name:        "mosaic_hexxla_mark_supersedes",
 		Description: "Record supersession Tx.MarkSupersedes: superseder_* is current truth, superseded_* is stale. SeamType supersedes — used by mosaic_hexxla_load_context_pack when FilterSuperseded is enabled.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in markSupInput) (*mcp.CallToolResult, domain.MutationOK, error) {
@@ -107,14 +109,14 @@ func registerMarkSupersedesTool(server *mcp.Server, svc primary.SeamLifecycle, l
 	})
 }
 
-func registerResolveSeamTool(server *mcp.Server, svc primary.SeamLifecycle, log *slog.Logger) {
+func registerResolveSeamTool(server *mcp.Server, svc primary.SeamLifecycle, log *slog.Logger) error {
 	type resolveInput struct {
 		SeamID           string `json:"seam_id" jsonschema:"26-char ULID from find_seams"`
 		ResolutionStatus string `json:"resolution_status" jsonschema:"non-empty status label"`
 		ResolutionNote   string `json:"resolution_note,omitempty"`
 	}
 
-	mcp.AddTool(server, &mcp.Tool{
+	return addTool(server, &mcp.Tool{
 		Name:        "mosaic_hexxla_resolve_seam",
 		Description: "Update resolution fields on an existing seam Tx.ResolveSeam. Fails with seam not found if the id is unknown.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in resolveInput) (*mcp.CallToolResult, domain.MutationOK, error) {

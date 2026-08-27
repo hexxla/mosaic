@@ -149,9 +149,21 @@ mosaic-mcp -db ./data/mosaic.hexxla -ratchet-config configs/ratchet.yaml
 # or: MOSAIC_RATCHET_CONFIG_FILE=configs/ratchet.yaml mosaic-mcp -db ./data/mosaic.hexxla
 ```
 
-The supplied policy requires a fresh successful `mosaic_hexxla_list_tags` call before each `mosaic_hexxla_put_cell`. Context loads and deletes require one recent successful retrieval call. Tools absent from the policy remain unrestricted; repeated rules for a tool are alternatives (OR). State is process-local and resets on restart. Mosaic does not expose Ratchet tokens, sessions, event APIs, or additional observability endpoints.
+The supplied policy governs all eight mutation tools: taxonomy discovery before
+cell writes; cell retrieval before embedding/facet writes or deletion; context
+assembly before linking; and seam inspection before conflict, supersession, or
+resolution. When Ratchet is enabled, Mosaic refuses to start if any mutation is
+missing a real prerequisite or has a free-pass rule. Unlisted read-only tools
+remain unrestricted; repeated rules for a tool are alternatives (OR). State is
+process-local and resets on restart. Mosaic does not expose Ratchet tokens,
+sessions, event APIs, or additional observability endpoints.
 
-The gate controls call ordering, not client authentication or authorization. See **[`configs/ratchet.yaml`](configs/ratchet.yaml)** and **[`docs/mosaic/RATCHET_INTEGRATION.md`](docs/mosaic/RATCHET_INTEGRATION.md)** for the exact contract and limitations.
+All 23 tools also publish explicit MCP safety hints from one fail-closed
+classification inventory. Those hints support client presentation and
+approval; the Ratchet gate controls call ordering, not client authentication or
+authorization. See **[`configs/ratchet.yaml`](configs/ratchet.yaml)** and
+**[`docs/mosaic/RATCHET_INTEGRATION.md`](docs/mosaic/RATCHET_INTEGRATION.md)**
+for the exact contract and limitations.
 
 ---
 

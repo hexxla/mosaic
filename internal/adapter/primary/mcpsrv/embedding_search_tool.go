@@ -11,14 +11,14 @@ import (
 )
 
 // RegisterEmbeddingSearchTool registers mosaic_hexxla_search_embedding (Ollama query embed + Hexxla SearchByEmbedding).
-func RegisterEmbeddingSearchTool(server *mcp.Server, svc primary.EmbeddingSearch, log *slog.Logger, budget *RetrievalBudgetTracker) {
+func RegisterEmbeddingSearchTool(server *mcp.Server, svc primary.EmbeddingSearch, log *slog.Logger, budget *RetrievalBudgetTracker) error {
 	type embeddingSearchInput struct {
 		Query      string  `json:"query" jsonschema:"natural language query to embed and match against stored embeddings"`
 		MaxResults int     `json:"max_results,omitempty" jsonschema:"max hits (default 10, cap 50)"`
 		MinScore   float64 `json:"min_score,omitempty" jsonschema:"minimum similarity score (0 = no filter)"`
 	}
 
-	mcp.AddTool(server, &mcp.Tool{
+	return addTool(server, &mcp.Tool{
 		Name:        "mosaic_hexxla_search_embedding",
 		Description: "Semantic retrieval: embed the query via Ollama (MOSAIC_EMBED_MODEL) and run HexxlaDB SearchByEmbedding ANN — returns top-K similar cells (coords, scores, text, tags). Use as a first step to get seed coordinates; then call mosaic_hexxla_load_context_pack with 1-3 of those {q,r} to expand hex-neighbourhood context. This tool alone is NOT full conversational context: neighbours, seams, and supersession may be missing. response JSON includes retrieval_hint.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in embeddingSearchInput) (*mcp.CallToolResult, domain.EmbeddingSearchResponse, error) {
