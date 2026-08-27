@@ -15,6 +15,7 @@ import (
 
 	"github.com/hexxla/hexxladb"
 	ratchetadapters "github.com/hexxla/mcp-ratchet/pkg/ratchet/adapters"
+	ratchetsecondary "github.com/hexxla/mcp-ratchet/pkg/ratchet/ports/secondary"
 	ratchetservices "github.com/hexxla/mcp-ratchet/pkg/ratchet/services"
 
 	"github.com/sploitzberg/mosaic/internal/adapter/primary/mcpsrv"
@@ -43,6 +44,8 @@ func run(log *slog.Logger) error {
 	nameFlag := flag.String("name", "", "base name: <db-dir>/<name>.hexxla (overrides "+config.EnvDBPath+"; mutually exclusive with -db)")
 	dbDirFlag := flag.String("db-dir", "", "parent directory when using -name (default: from "+config.EnvMosaicDBDir+" or .tmp)")
 	ratchetConfigFlag := flag.String("ratchet-config", "", "path to Ratchet workflow YAML (overrides "+config.EnvRatchetConfigFile+"); omitted disables Ratchet")
+	ratchetObservabilityTokenFileFlag := flag.String("ratchet-observability-token-file", "", "private bearer-token file; enables the authenticated live Ratchet WebSocket stream")
+	ratchetObservabilityPathFlag := flag.String("ratchet-observability-path", config.DefaultRatchetObservabilityPath, "live Ratchet WebSocket endpoint path")
 	flag.Parse()
 
 	mcpCfg, err := config.LoadMCPFromEnv()
@@ -72,7 +75,25 @@ func run(log *slog.Logger) error {
 		configPathUsed = ""
 	}
 
-	ratchetGate, err := loadRatchetGate(config.ResolveRatchetConfigPath(*ratchetConfigFlag), log)
+	ratchetConfigPath := config.ResolveRatchetConfigPath(*ratchetConfigFlag)
+	ratchetObservability, err := config.LoadRatchetObservability(*ratchetObservabilityTokenFileFlag, *ratchetObservabilityPathFlag)
+	if err != nil {
+		return fmt.Errorf("ratchet observability setup: %w", err)
+	}
+	if ratchetObservability.Enabled && ratchetConfigPath == "" {
+		return errors.New("ratchet observability requires -ratchet-config or " + config.EnvRatchetConfigFile)
+	}
+	if ratchetObservability.Enabled && ratchetObservability.Path == mcpCfg.Path {
+		return fmt.Errorf("ratchet observability path must differ from MCP path %q", mcpCfg.Path)
+	}
+
+	var ratchetObserver *mcpsrv.RatchetObserver
+	var ratchetEventStore ratchetsecondary.EventStore
+	if ratchetObservability.Enabled {
+		ratchetObserver = mcpsrv.NewRatchetObserver(ratchetObservability.BearerToken)
+		ratchetEventStore = ratchetObserver
+	}
+	ratchetGate, err := loadRatchetGate(ratchetConfigPath, log, ratchetEventStore)
 	if err != nil {
 		return fmt.Errorf("ratchet setup: %w", err)
 	}
@@ -195,6 +216,10 @@ func run(log *slog.Logger) error {
 	for _, method := range [...]string{http.MethodGet, http.MethodPost, http.MethodDelete} {
 		mux.Handle(method+" "+mcpCfg.Path, h)
 	}
+	if ratchetObserver != nil {
+		mux.Handle("GET "+ratchetObservability.Path, ratchetObserver)
+		log.Info("Ratchet live observability enabled", "path", ratchetObservability.Path)
+	}
 
 	httpSrv := &http.Server{
 		Addr:              mcpCfg.Addr,
@@ -231,7 +256,7 @@ func run(log *slog.Logger) error {
 	return nil
 }
 
-func loadRatchetGate(path string, log *slog.Logger) (*mcpsrv.RatchetGate, error) {
+func loadRatchetGate(path string, log *slog.Logger, eventStore ratchetsecondary.EventStore) (*mcpsrv.RatchetGate, error) {
 	loaded, err := config.LoadRatchetConfig(path)
 	if err != nil {
 		return nil, fmt.Errorf("ratchet config: %w", err)
@@ -247,13 +272,14 @@ func loadRatchetGate(path string, log *slog.Logger) (*mcpsrv.RatchetGate, error)
 	}
 
 	sessions := ratchetadapters.NewMemorySessionStore()
-	service := ratchetservices.NewRatchetService(
-		ratchetadapters.NewYAMLConfigLoader(),
-		ratchetadapters.NewMemoryTokenStore(),
-		sessions,
-		ratchetadapters.NewCryptoRandomGenerator(),
-		ratchetadapters.NewRealClock(),
-	)
+	configLoader := ratchetadapters.NewYAMLConfigLoader()
+	tokenStore := ratchetadapters.NewMemoryTokenStore()
+	randomGenerator := ratchetadapters.NewCryptoRandomGenerator()
+	clock := ratchetadapters.NewRealClock()
+	service := ratchetservices.NewRatchetService(configLoader, tokenStore, sessions, randomGenerator, clock)
+	if eventStore != nil {
+		service = ratchetservices.NewRatchetServiceWithObservability(configLoader, tokenStore, sessions, randomGenerator, clock, eventStore)
+	}
 	rules, loadErr := service.LoadConfiguration(context.Background(), configFile)
 	closeErr := configFile.Close()
 	if loadErr != nil {

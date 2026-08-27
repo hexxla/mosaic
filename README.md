@@ -51,7 +51,7 @@ You need **[Go 1.27+](https://go.dev/dl/)** and **[Task 3](https://taskfile.dev/
 
 ```bash
 go mod download
-task build-mosaic-mcp build-mosaic-create-db
+task build-mosaic-mcp build-mosaic-create-db build-mosaic-observe
 ```
 
 After the build tasks run, your programs are under **`bin/<platform>/`** (the command prints the paths). Later steps assume **`bin/linux-amd64/`** — use the folder Task created on your machine (add **`.exe`** on Windows).
@@ -155,8 +155,11 @@ assembly before linking; and seam inspection before conflict, supersession, or
 resolution. When Ratchet is enabled, Mosaic refuses to start if any mutation is
 missing a real prerequisite or has a free-pass rule. Unlisted read-only tools
 remain unrestricted; repeated rules for a tool are alternatives (OR). State is
-process-local and resets on restart. Mosaic does not expose Ratchet tokens,
-sessions, event APIs, or additional observability endpoints.
+process-local and resets on restart. Ratchet tokens, historical events, and
+statistics are not exposed. Operators can opt into an authenticated,
+redacted, live-only WebSocket stream with
+`-ratchet-observability-token-file`; it remains on the loopback listener and
+is consumed with the bundled `mosaic-observe` command.
 
 All 23 tools also publish explicit MCP safety hints from one fail-closed
 classification inventory. Those hints support client presentation and

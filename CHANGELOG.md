@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Optional Ratchet enforcement** — `mosaic-mcp` can load an `mcp-ratchet` workflow with `-ratchet-config` or `MOSAIC_RATCHET_CONFIG_FILE`. Central MCP middleware isolates state by actual client session, enforces the supplied tag/retrieval prerequisites, and keeps tokens and state process-local without public observability endpoints.
 - **MCP tool safety inventory** — all 23 tools publish explicit read-only, destructive, idempotent, and open-world hints from one fail-closed registration inventory; tests prevent production registrations from bypassing it.
+- **Secure Ratchet live observability** — an opt-in, bearer-authenticated WebSocket stream shares the loopback MCP listener and emits a redacted live event shape without Ratchet capability tokens, metadata, or history. The bounded `mosaic-observe` CLI provides a self-contained operator workflow.
 
 ### Changed
 
@@ -23,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Build tooling** — replace GNU Make with Task while retaining build, cross-compile, test, integration, install, database setup, MCP development, and maintenance commands.
 - **Context responses** — add authoritative `total_bytes` / `max_budget_bytes` fields and optional returned facet text; deprecated `total_tokens` / `max_tokens_budget` remain byte-valued compatibility aliases.
 - **Documentation, agent guidance, and seed corpus** — align current HexxlaDB retrieval, embeddings, authenticated-v3 encryption, changefeed, page allocation, retention, and tokenizer ownership; reconcile branch-divergent Ratchet documentation with the implemented opt-in enforcement contract; distinguish runtime MCP schemas from historical and aspirational blueprints; and document current missing-path and seed-policy credential limitations.
-- **Ratchet observability boundary** — the development branch's unauthenticated HTTP event/statistics handlers and cross-origin WebSocket stream were not retained in the audited merge. Ratchet enforcement remains available without exposing session events or token lifecycle data over additional network endpoints.
+- **Ratchet observability boundary** — the development branch's unauthenticated HTTP event/statistics handlers and cross-origin WebSocket were replaced by an explicit opt-in live stream that rejects browser origins, requires a private bearer-token file, redacts credential-bearing fields, retains no event history, and never blocks enforcement for slow observers.
 - **Ratchet mutation coverage** — when Ratchet is enabled, startup now fails unless every Mosaic mutation has a real prerequisite and no free-pass rule. The supplied policy governs all eight mutation tools through taxonomy, retrieval, context, or seam-inspection workflows.
 - **HexxlaDB API coverage documentation** — map every v0.6.0 public feature family to an MCP, composition, native, candidate, or operator-only disposition; record bounded read-only experiments without exposing maintenance, retention, migration, encryption, or raw-KV operations.
 

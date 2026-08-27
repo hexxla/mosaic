@@ -3,6 +3,7 @@ module github.com/sploitzberg/mosaic
 go 1.27.0
 
 require (
+	github.com/gorilla/websocket v1.5.3
 	github.com/hexxla/hexxladb v0.6.0
 	github.com/hexxla/mcp-ratchet v0.0.0-20260505003403-f4303c8bf0cb
 	github.com/modelcontextprotocol/go-sdk v1.7.0

@@ -48,6 +48,13 @@ tasks:
       - GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -ldflags="-s -w -X main.version={{.VERSION}}" -o "{{.BINDIR}}/mosaic-create-db{{.EXE}}" ./cmd/mosaic-create-db
       - 'echo "  → {{.BINDIR}}/mosaic-create-db{{.EXE}}"'
 
+  build-mosaic-observe:
+    desc: Build the authenticated Ratchet live-event observer
+    cmds:
+      - mkdir -p "{{.BINDIR}}"
+      - GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -ldflags="-s -w" -o "{{.BINDIR}}/mosaic-observe{{.EXE}}" ./cmd/mosaic-observe
+      - 'echo "  → {{.BINDIR}}/mosaic-observe{{.EXE}}"'
+
   build-linux:
     desc: Build mosaic-mcp for Linux using the selected architecture
     cmds:
@@ -123,6 +130,11 @@ tasks:
     desc: Install mosaic-create-db to GOPATH/bin
     cmds:
       - go install ./cmd/mosaic-create-db
+
+  install-mosaic-observe:
+    desc: Install the authenticated Ratchet live-event observer to GOPATH/bin
+    cmds:
+      - go install ./cmd/mosaic-observe
 
   seed:
     aliases: [run-mosaic-seed]

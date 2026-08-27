@@ -85,13 +85,45 @@ that bypass the classification wrapper.
 
 Ratchet is workflow ordering, not authentication, authorization, or a substitute for Mosaic's write/delete policy. Continue to bind Mosaic to a trusted interface and apply the normal transport/access controls described in the operator documentation.
 
-Mosaic does not expose Ratchet's tokens, session store, event store, HTTP statistics, or WebSocket stream. It also does not log session IDs or token values. This avoids adding public state-inspection endpoints or credential-like material to logs.
+Mosaic does not expose Ratchet's tokens, session store, historical event store, or HTTP statistics. It also does not log session IDs or token values. An operator may explicitly enable a live-only WebSocket stream; it requires a private bearer-token file, shares Mosaic's loopback-only listener, rejects requests carrying a browser `Origin`, and omits capability tokens and event metadata from every event.
+
+## Live WebSocket observability
+
+Observability is disabled unless both Ratchet and a bearer-token file are configured. Create a random private token, start the server, and run the bundled observer in a second terminal:
+
+```bash
+umask 077
+openssl rand -hex 32 > ./observer.token
+
+mosaic-mcp \
+  -db ./data/mosaic.hexxla \
+  -ratchet-config configs/ratchet.yaml \
+  -ratchet-observability-token-file ./observer.token
+```
+
+```bash
+mosaic-observe -token-file ./observer.token
+```
+
+The default stream URL is `ws://127.0.0.1:8787/observability/stream`.
+Use `-ratchet-observability-path` on the server and `-url` on the observer to
+change it. The observer receives all live sessions by default; use
+`-session-id <mcp-session-id>` to filter one session. Events are NDJSON with
+only `id`, `type`, `session_id`, optional `tool_name`, and `timestamp`.
+
+The stream is operational telemetry, not a durable audit log: it retains no
+history, accepts at most 16 simultaneous observers, and drops events for a
+subscriber whose bounded buffer is full rather than delaying MCP enforcement.
+The bearer token is accepted only in the `Authorization` header; Mosaic never
+accepts it in a URL or command-line value. Keep the token file private (`0600`
+on Unix-like systems) and rotate it by replacing the file and restarting the
+server.
 
 ## Current limitations
 
 - State is local to one Mosaic process; it is not shared across replicas and does not survive restart.
 - Rules are loaded only at startup; there is no hot reload.
-- Mosaic exposes no Ratchet observability API.
+- Ratchet observability is live-only and process-local; there is no replay, durable event store, aggregate statistics endpoint, or browser dashboard.
 - Repeated rules implement OR semantics. AND workflows require a separate policy design or upstream Ratchet support.
 - Multi-prerequisite one-time OR enforcement is not enabled for the reason described above.
 - Tokens attest only that a prerequisite tool succeeded in the same session;

@@ -8,7 +8,7 @@ import (
 
 func TestLoadRatchetGateFromSuppliedConfig(t *testing.T) {
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	gate, err := loadRatchetGate("../../configs/ratchet.yaml", log)
+	gate, err := loadRatchetGate("../../configs/ratchet.yaml", log, nil)
 	if err != nil {
 		t.Fatalf("load supplied Ratchet config: %v", err)
 	}
@@ -18,7 +18,7 @@ func TestLoadRatchetGateFromSuppliedConfig(t *testing.T) {
 }
 
 func TestLoadRatchetGateDisabled(t *testing.T) {
-	gate, err := loadRatchetGate("", slog.Default())
+	gate, err := loadRatchetGate("", slog.Default(), nil)
 	if err != nil {
 		t.Fatalf("load disabled Ratchet gate: %v", err)
 	}
