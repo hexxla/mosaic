@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Codex development setup** — document local MCP registration and verification, clarify host ownership of transcript capture, and focus the repository instructions and Go skill on project-specific guidance.
+- **Codex development setup** — document local MCP registration and verification, clarify host ownership of transcript capture, and use the JetBrains Modern Go Guidelines plugin for version-specific idioms.
 - **Cell placement safety** ⚠️ **breaking write behavior** — `mosaic_hexxla_put_cell` now defaults to safe exact placement: writing over a live coordinate requires explicit `allow_overwrite: true`. New `placement: near_anchor` atomically composes HexxlaDB `FindFreeCellPlacement` with `PutCell` using a caller-owned anchor and bounded radius (default 8, maximum 32). Responses report the actual coordinate, placement mode, occupied probes, and whether an exact write replaced a live cell.
 
 - **HexxlaDB v0.6.0 compatibility** — context assembly now retrieves count-bounded candidates with `Tx.LoadContext`; Mosaic owns approximate-token conversion, UTF-8 byte accounting, outer-ring/low-confidence eviction, and compatibility byte aliases in MCP responses.

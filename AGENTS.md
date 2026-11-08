@@ -8,7 +8,7 @@
 
 ## Go and verification
 
-- Honor the `go.mod` baseline and use the [project Go skill](.agents/skills/use-modern-go/SKILL.md) when it applies. Match surrounding style, format Go changes, and preserve inspectable error causes with `%w`.
+- Honor the target module's `go.mod` and any file-specific build constraints. In Codex, use the [JetBrains Modern Go Guidelines plugin](https://github.com/JetBrains/go-modern-guidelines#codex) when available. Preserve tool and JSON contracts, match surrounding style, format Go changes, and preserve inspectable error causes with `%w`.
 - Run the narrowest relevant checks first. Use `task test` for unit tests, `task integration` for tests that need the integration build tag, and `task ci` before pushing. Follow the existing coverage gate.
 - See the [development tooling guide](docs/mosaic/DEVELOPMENT_TOOLING.md) for editor and local Codex MCP setup.
 

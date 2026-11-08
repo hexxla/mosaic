@@ -8,7 +8,7 @@ Mosaic keeps shared engineering instructions and editor automation small and rep
 | --- | --- |
 | [`AGENTS.md`](../../AGENTS.md) | Architecture, security, Go, testing, documentation, and repository workflow agreements for humans and agents. |
 | [`MCP_AGENT_BLUEPRINT.md`](./MCP_AGENT_BLUEPRINT.md) | Mosaic-specific retrieval, context assembly, persistence, and client guidance. |
-| [`.agents/skills/use-modern-go/SKILL.md`](../../.agents/skills/use-modern-go/SKILL.md) | Reusable Codex guidance keyed to the Go version declared in `go.mod`. |
+| [JetBrains Modern Go Guidelines](https://github.com/JetBrains/go-modern-guidelines#codex) | Optional Codex plugin for version-specific Go idioms. |
 | Runtime MCP `tools/list` | Authoritative tool names, input schemas, output schemas, and descriptions. |
 
 MCP client connection settings remain local because configuration locations and schemas differ between hosts. Point the chosen client at Mosaic's Streamable HTTP URL, normally `http://127.0.0.1:8787/mcp`.
