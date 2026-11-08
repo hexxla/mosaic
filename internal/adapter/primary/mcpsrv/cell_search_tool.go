@@ -54,7 +54,7 @@ func RegisterCellSearchTool(server *mcp.Server, svc primary.CellRetrieval, log *
 			MaxScanRadius:  in.MaxScanRadius,
 			EmbedQueryText: strings.TrimSpace(in.EmbedQueryText),
 		}
-		out, err := RunBudgetedRead(budget, req, func() (domain.CellHitsResponse, error) {
+		out, err := budget.RunBudgetedRead(req, func() (domain.CellHitsResponse, error) {
 			hits, err2 := svc.SearchCells(ctx, cmd)
 			if err2 != nil {
 				return domain.CellHitsResponse{}, err2

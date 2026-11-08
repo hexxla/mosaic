@@ -39,6 +39,14 @@ linters:
           deny:
             - pkg: "github.com/sploitzberg/mosaic/internal/adapter"
               desc: Dependencies must point toward the core.
+            - pkg: "github.com/sploitzberg/mosaic/internal/config"
+              desc: Startup maps settings into application-owned values.
+        storage_embedder_boundary:
+          files:
+            - "**/internal/adapter/secondary/hexxlastore/**.go"
+          deny:
+            - pkg: "github.com/sploitzberg/mosaic/internal/ollama"
+              desc: The application composes embedding and vector search.
 
         port_clean:
           files:

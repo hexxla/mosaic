@@ -17,7 +17,6 @@ database:
   auto_maintain_after_cell_delete:
     enabled: true
     prune: true
-    compact: true
     debounce_after_delete_ms: 2000
     prune_profile: balanced
     max_prune_rounds_per_delete: 256

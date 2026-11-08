@@ -31,7 +31,16 @@ func TestNewRetrievalBudgetTracker_disabled(t *testing.T) {
 func TestRunBudgetedRead_whenBudgetDisabled(t *testing.T) {
 	t.Parallel()
 	rb := NewRetrievalBudgetTracker(config.RetrievalBudgetConfig{})
-	out, err := RunBudgetedRead(rb, nil, func() (int, error) { return 42, nil })
+	out, err := rb.RunBudgetedRead(nil, func() (int, error) { return 42, nil })
+	if err != nil || out != 42 {
+		t.Fatalf("got %v err=%v", out, err)
+	}
+}
+
+func TestRunBudgetedRead_nilTracker(t *testing.T) {
+	t.Parallel()
+	var tracker *RetrievalBudgetTracker
+	out, err := tracker.RunBudgetedRead(nil, func() (int, error) { return 42, nil })
 	if err != nil || out != 42 {
 		t.Fatalf("got %v err=%v", out, err)
 	}
@@ -41,7 +50,7 @@ func TestRunBudgetedRead_fnError(t *testing.T) {
 	t.Parallel()
 	rb := NewRetrievalBudgetTracker(config.RetrievalBudgetConfig{})
 	want := errors.New("boom")
-	_, err := RunBudgetedRead(rb, nil, func() (int, error) { return 0, want })
+	_, err := rb.RunBudgetedRead(nil, func() (int, error) { return 0, want })
 	if !errors.Is(err, want) {
 		t.Fatalf("got %v want %v", err, want)
 	}
@@ -50,7 +59,7 @@ func TestRunBudgetedRead_fnError(t *testing.T) {
 func TestRunBudgetedRead_singleResponseExceedsSessionBudget(t *testing.T) {
 	t.Parallel()
 	rb := NewRetrievalBudgetTracker(config.RetrievalBudgetConfig{SessionApproxTokenBudget: 2, BytesPerApproxToken: 1})
-	_, err := RunBudgetedRead(rb, nil, func() (string, error) { return "hello", nil })
+	_, err := rb.RunBudgetedRead(nil, func() (string, error) { return "hello", nil })
 	if err == nil {
 		t.Fatal("expected error when one response JSON exceeds session budget")
 	}
@@ -62,7 +71,7 @@ func TestMetering_accumulatesWhenBudgetZero(t *testing.T) {
 	if st := rb.Status(nil); st.ApproxTokensUsed != 0 || !st.MeteringEnabled {
 		t.Fatalf("initial status: %+v", st)
 	}
-	_, err := RunBudgetedRead(rb, nil, func() (map[string]string, error) {
+	_, err := rb.RunBudgetedRead(nil, func() (map[string]string, error) {
 		return map[string]string{"k": "v"}, nil
 	})
 	if err != nil {

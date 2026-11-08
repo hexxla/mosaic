@@ -49,3 +49,19 @@ tagged commit and rehearses packaging before the publishing job can run.
 The archives contain `mosaic-mcp`, `mosaic-create-db`, and `mosaic-observe`.
 Run the workflow manually on a candidate reachable from `main` to download
 the rehearsal archives and checksums.
+
+
+## Cross-repository checks
+
+Mosaic CI uses the versions in `go.mod`. To verify coordinated source changes
+before publishing dependencies, create a temporary Go workspace outside the
+repositories.
+
+```sh
+workspace_dir=$(mktemp -d)
+(cd "$workspace_dir" && go work init /path/to/mosaic /path/to/mcp-ratchet /path/to/hexxladb)
+GOWORK="$workspace_dir/go.work" go test -race ./internal/adapter/primary/mcpsrv
+```
+
+Run the test command from the Mosaic root. Once the Ratchet workflow release is
+available, update Mosaic's pin and run `task ci` with `GOWORK=off`.

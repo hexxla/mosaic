@@ -22,7 +22,7 @@ func RegisterTagBrowseTools(server *mcp.Server, svc primary.TagBrowse, log *slog
 			if log != nil {
 				log.Debug("mcp mosaic_hexxla_list_tags")
 			}
-			out, err := RunBudgetedRead(budget, req, func() (domain.DistinctTagsResult, error) {
+			out, err := budget.RunBudgetedRead(req, func() (domain.DistinctTagsResult, error) {
 				return svc.ListDistinctTags(ctx)
 			})
 			if err != nil {
@@ -39,7 +39,7 @@ func RegisterTagBrowseTools(server *mcp.Server, svc primary.TagBrowse, log *slog
 			if log != nil {
 				log.Debug("mcp mosaic_hexxla_tag_counts")
 			}
-			out, err := RunBudgetedRead(budget, req, func() (domain.TagCountsResult, error) {
+			out, err := budget.RunBudgetedRead(req, func() (domain.TagCountsResult, error) {
 				return svc.TagCounts(ctx)
 			})
 			if err != nil {

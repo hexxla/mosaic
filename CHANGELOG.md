@@ -15,9 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Reject unsupported one-time Ratchet alternatives with the pinned dependency. Delegate to Ratchet workflow execution when available.
+- Report committed deletes separately from pruning errors. Live database replacement is an offline operator procedure. Existing configurations that enable live compaction must remove `compact: true` before startup.
+
 - **Dependency security** — build Mosaic with the fixed Go crypto module version used by HexxlaDB.
 
 ### Changed
+
+- Move write policy into application values and compose text embedding with vector search through separate ports.
 
 - **Go toolchain** — require Go 1.27.3 or newer. GitHub Actions uses the version in `go.mod`.
 

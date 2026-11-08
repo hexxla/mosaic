@@ -63,8 +63,7 @@ New **`PutCell`** data often fits into **slack** inside pages already allocated 
 | Check | Why it matters |
 | ----- | -------------- |
 | **`allow_delete_cell: true`** and policy loaded | Otherwise deletes never run. |
-| **`database.auto_maintain_after_cell_delete`** with **`prune: true`** and **`compact: true`** | **`Compact`** is what rewrites the primary to a tight layout; pruning drops **old** versions only. |
-| Custom **test client** vs **`mosaic-mcp`** | Post-delete **`CompactSwap`** runs in the Mosaic **[`CellWriterAdapter`](../../internal/adapter/secondary/hexxlastore/cell_writer.go)** after a delete that actually removed a cell. A client that opens HexxlaDB directly never runs that path unless **you** call **`Compact`**. |
-| **`stat` both `*.hexxla` and `*.hexxla-wal`** | Total footprint includes the WAL until checkpoint/truncate; Mosaic’s compact swap **removes** the stale WAL after publishing a new primary. |
+| **`database.auto_maintain_after_cell_delete`** with **`prune: true`** | **`Compact`** is what rewrites the primary to a tight layout; pruning drops **old** versions only. |
+| **`stat` both `*.hexxla` and `*.hexxla-wal`** | Total footprint includes the WAL until checkpoint/truncate; Preserve the primary and sidecars together during offline replacement. |
 
 If you need a **smaller minimum footprint** for tiny databases, create the file with a **smaller `page-size`** (e.g. `4096`) via **`mosaic-create-db` / `mosaic-seed`** flags — **page size is fixed at creation** ([`DATABASE_CREATION.md`](./DATABASE_CREATION.md)).

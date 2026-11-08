@@ -17,17 +17,19 @@ const (
 
 // EmbeddingSearchService implements [primary.EmbeddingSearch] by delegating to [secondary.EmbeddingANN].
 type EmbeddingSearchService struct {
-	ann secondary.EmbeddingANN
+	ann       secondary.EmbeddingANN
+	embedder  secondary.TextEmbedder
+	dimension uint16
 }
 
 // NewEmbeddingSearchService constructs an EmbeddingSearchService.
-func NewEmbeddingSearchService(ann secondary.EmbeddingANN) *EmbeddingSearchService {
-	return &EmbeddingSearchService{ann: ann}
+func NewEmbeddingSearchService(ann secondary.EmbeddingANN, embedder secondary.TextEmbedder, dimension uint16) *EmbeddingSearchService {
+	return &EmbeddingSearchService{ann: ann, embedder: embedder, dimension: dimension}
 }
 
 // Search implements [primary.EmbeddingSearch].
 func (s *EmbeddingSearchService) Search(ctx context.Context, q domain.EmbeddingSearchQuery) (domain.EmbeddingSearchResponse, error) {
-	if s == nil || s.ann == nil {
+	if s == nil || s.ann == nil || s.embedder == nil {
 		return domain.EmbeddingSearchResponse{}, fmt.Errorf("embedding search: nil dependencies")
 	}
 	text := strings.TrimSpace(q.Text)
@@ -41,17 +43,18 @@ func (s *EmbeddingSearchService) Search(ctx context.Context, q domain.EmbeddingS
 	if limit > maxEmbeddingMaxResults {
 		limit = maxEmbeddingMaxResults
 	}
-	q2 := domain.EmbeddingSearchQuery{
-		Text:       text,
-		MaxResults: limit,
-		MinScore:   q.MinScore,
+	if s.dimension == 0 {
+		return domain.EmbeddingSearchResponse{}, fmt.Errorf("embedding search: database has no configured embedding dimension")
 	}
-	out, err := s.ann.Search(ctx, q2)
+	vector, err := s.embedder.Embed(ctx, text, int(s.dimension))
+	if err != nil {
+		return domain.EmbeddingSearchResponse{}, fmt.Errorf("query embed: %w", err)
+	}
+	matches, err := s.ann.Search(ctx, vector, limit, q.MinScore)
 	if err != nil {
 		return domain.EmbeddingSearchResponse{}, fmt.Errorf("embedding search: %w", err)
 	}
-	out.RetrievalHint = domain.RetrievalHintLexicalOrANN
-	return out, nil
+	return domain.EmbeddingSearchResponse{Query: text, Matches: matches, RetrievalHint: domain.RetrievalHintLexicalOrANN}, nil
 }
 
 // Ensure EmbeddingSearchService implements primary.EmbeddingSearch.

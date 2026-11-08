@@ -102,7 +102,7 @@ func approximateTokensFromJSONBytes(n int, bytesPer float64) int64 {
 
 // RunBudgetedRead runs fn, then records approximate retrieval tokens for out (metering).
 // When enforcement is enabled (positive session budget), BeforeRead gates the call and RecordStructuredOutput rejects overshoots.
-func RunBudgetedRead[T any](rb *RetrievalBudgetTracker, req *mcp.CallToolRequest, fn func() (T, error)) (T, error) {
+func (rb *RetrievalBudgetTracker) RunBudgetedRead[T any](req *mcp.CallToolRequest, fn func() (T, error)) (T, error) {
 	if rb == nil {
 		return fn()
 	}

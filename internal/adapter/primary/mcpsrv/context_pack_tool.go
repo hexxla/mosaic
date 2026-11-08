@@ -96,7 +96,7 @@ func RegisterContextPackTool(server *mcp.Server, svc primary.ContextAssembly, lo
 			IncludeFacetText:    in.IncludeFacetText,
 			Explain:             in.Explain,
 		}
-		out, err := RunBudgetedRead(budget, req, func() (domain.ContextPackResponse, error) {
+		out, err := budget.RunBudgetedRead(req, func() (domain.ContextPackResponse, error) {
 			return svc.LoadFromSeeds(ctx, cmd)
 		})
 		if err != nil {

@@ -58,12 +58,7 @@ Ratchet is enabled. Multiple rules with the same `tool` are alternatives (OR),
 not cumulative requirements. An empty `prerequisite` makes that rule
 immediately callable and allows it to issue a token after success.
 
-`one_time_use` belongs to the protected tool rule. The supplied
-multi-prerequisite OR rules deliberately use reusable tokens: the pinned
-mcp-ratchet version consumes the first matching rule's prerequisite for
-one-time dependencies, which cannot safely represent one-time OR consumption.
-A single prerequisite such as `list_tags`, `load_context_pack`, or `find_seams`
-does not have that ambiguity.
+A one-time prerequisite is reserved before the handler runs. With the current pinned Ratchet version, Mosaic rejects policies that combine multiple rules for one tool with any one-time rule. The supplied multi-prerequisite rules use reusable tokens. With a Ratchet build that exposes workflow execution, Mosaic delegates selection and reservation to that operation.
 
 ## Tool safety inventory
 
@@ -125,7 +120,7 @@ server.
 - Rules are loaded only at startup; there is no hot reload.
 - Ratchet observability is live-only and process-local; there is no replay, durable event store, aggregate statistics endpoint, or browser dashboard.
 - Repeated rules implement OR semantics. AND workflows require a separate policy design or upstream Ratchet support.
-- Multi-prerequisite one-time OR enforcement is not enabled for the reason described above.
+- Multi-prerequisite one-time OR enforcement requires a Ratchet build with workflow execution.
 - Tokens attest only that a prerequisite tool succeeded in the same session;
   they do not bind returned coordinates or records to a later mutation's
   arguments. Clients must inspect the relevant cell/context/seam, and Mosaic's

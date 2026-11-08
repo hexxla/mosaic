@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/sploitzberg/mosaic/internal/config"
 	"github.com/sploitzberg/mosaic/internal/core/domain"
 	"github.com/sploitzberg/mosaic/internal/core/ports/primary"
 	"github.com/sploitzberg/mosaic/internal/core/ports/secondary"
@@ -23,16 +22,16 @@ type CellMutationService struct {
 	writer    secondary.CellWriter
 	embedText secondary.TextEmbedder
 	embedDim  uint16
-	runtime   config.MosaicRuntimeConfig
+	policy    domain.MutationPolicy
 }
 
 // CellMutationOption configures [NewCellMutationService].
 type CellMutationOption func(*CellMutationService)
 
-// WithMosaicRuntime attaches startup config gates ([config.MosaicRuntimeConfig]) for put_cell policy checks.
-func WithMosaicRuntime(c config.MosaicRuntimeConfig) CellMutationOption {
+// WithMutationPolicy sets the application policy for cell writes.
+func WithMutationPolicy(policy domain.MutationPolicy) CellMutationOption {
 	return func(s *CellMutationService) {
-		s.runtime = c
+		s.policy = policy
 	}
 }
 
@@ -57,7 +56,7 @@ func (s *CellMutationService) PutCell(ctx context.Context, cmd *domain.PutCellCo
 	if err != nil {
 		return domain.PutCellMutationResult{}, fmt.Errorf("cell mutation: %w", err)
 	}
-	if err := s.runtime.PutCellDenied(c.Kind); err != nil {
+	if err := s.policy.PutCellDenied(c.Kind); err != nil {
 		return domain.PutCellMutationResult{}, fmt.Errorf("cell mutation: %w", err)
 	}
 	result, err := s.writer.PutCell(ctx, c)
@@ -116,7 +115,7 @@ func (s *CellMutationService) DeleteCell(ctx context.Context, cmd *domain.Delete
 	if cmd == nil {
 		return false, fmt.Errorf("cell mutation: nil command")
 	}
-	if err := s.runtime.DeleteCellDenied(); err != nil {
+	if err := s.policy.DeleteCellDenied(); err != nil {
 		return false, fmt.Errorf("cell mutation: %w", err)
 	}
 	cellRemoved, err = s.writer.DeleteCell(ctx, cmd)

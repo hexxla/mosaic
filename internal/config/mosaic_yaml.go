@@ -185,12 +185,11 @@ func ParseMosaicConfigYAML(data []byte) (MosaicConfigLoaded, error) {
 			delMaintain.Enabled = am.Enabled
 			if am.Enabled {
 				delMaintain.Prune = true
-				delMaintain.Compact = true
 				if am.Prune != nil {
 					delMaintain.Prune = *am.Prune
 				}
-				if am.Compact != nil {
-					delMaintain.Compact = *am.Compact
+				if am.Compact != nil && *am.Compact {
+					return MosaicConfigLoaded{}, errors.New("mosaic config: automatic live compaction is unavailable; use offline HexxlaDB maintenance")
 				}
 				if am.MaxPruneRoundsPerDelete != nil && *am.MaxPruneRoundsPerDelete > 0 {
 					delMaintain.MaxPruneRoundsPerDel = *am.MaxPruneRoundsPerDelete

@@ -17,15 +17,20 @@ import (
 
 const ratchetLockStripes = 64
 
+type workflowExecutor interface {
+	ExecuteToolCall(context.Context, ratchetdomain.SessionID, ratchetdomain.ToolName, func() (bool, error)) error
+}
+
 // RatchetGate enforces configured tool prerequisites for each MCP session.
 type RatchetGate struct {
-	service    ratchetprimary.RatchetService
-	sessions   ratchetsecondary.SessionStore
-	configured map[ratchetdomain.ToolName]struct{}
-	protected  map[ratchetdomain.ToolName]struct{}
-	lockSeed   maphash.Seed
-	locks      [ratchetLockStripes]sync.Mutex
-	log        *slog.Logger
+	service                   ratchetprimary.RatchetService
+	sessions                  ratchetsecondary.SessionStore
+	configured                map[ratchetdomain.ToolName]struct{}
+	legacyOneTimeAlternatives []string
+	protected                 map[ratchetdomain.ToolName]struct{}
+	lockSeed                  maphash.Seed
+	locks                     [ratchetLockStripes]sync.Mutex
+	log                       *slog.Logger
 }
 
 // NewRatchetGate constructs a session-isolated Ratchet middleware.
@@ -38,8 +43,12 @@ func NewRatchetGate(
 	configured := make(map[ratchetdomain.ToolName]struct{}, len(rules))
 	withPrerequisite := make(map[ratchetdomain.ToolName]struct{}, len(rules))
 	withFreePass := make(map[ratchetdomain.ToolName]struct{}, len(rules))
+	counts := make(map[ratchetdomain.ToolName]int)
+	oneTime := make(map[ratchetdomain.ToolName]bool)
 	for _, rule := range rules {
 		configured[rule.Tool] = struct{}{}
+		counts[rule.Tool]++
+		oneTime[rule.Tool] = oneTime[rule.Tool] || rule.OneTimeUse
 		if rule.Prerequisite == "" {
 			withFreePass[rule.Tool] = struct{}{}
 		} else {
@@ -52,19 +61,32 @@ func NewRatchetGate(
 			protected[tool] = struct{}{}
 		}
 	}
+	var unsupported []string
+	if _, ok := service.(workflowExecutor); !ok {
+		for tool, count := range counts {
+			if count > 1 && oneTime[tool] {
+				unsupported = append(unsupported, string(tool))
+			}
+		}
+		slices.Sort(unsupported)
+	}
 	return &RatchetGate{
-		service:    service,
-		sessions:   sessions,
-		configured: configured,
-		protected:  protected,
-		lockSeed:   maphash.MakeSeed(),
-		log:        log,
+		legacyOneTimeAlternatives: unsupported,
+		service:                   service,
+		sessions:                  sessions,
+		configured:                configured,
+		protected:                 protected,
+		lockSeed:                  maphash.MakeSeed(),
+		log:                       log,
 	}
 }
 
 // ValidateProtectedTools fails when any required tool is absent from the
 // Ratchet rules or has a free-pass rule that makes its prerequisites optional.
 func (g *RatchetGate) ValidateProtectedTools(required []string) error {
+	if len(g.legacyOneTimeAlternatives) > 0 {
+		return fmt.Errorf("ratchet dependency cannot reserve one-time alternatives for: %s", strings.Join(g.legacyOneTimeAlternatives, ", "))
+	}
 	missing := make([]string, 0)
 	for _, name := range required {
 		if _, ok := g.protected[ratchetdomain.ToolName(name)]; !ok {
@@ -113,6 +135,24 @@ func (g *RatchetGate) execute(
 	tool ratchetdomain.ToolName,
 	next func() (mcp.Result, error),
 ) (mcp.Result, error) {
+	if workflow, ok := g.service.(workflowExecutor); ok {
+		var result mcp.Result
+		var handlerErr error
+		err := workflow.ExecuteToolCall(ctx, sessionID, tool, func() (bool, error) {
+			result, handlerErr = next()
+			return handlerErr == nil && !toolResultFailed(result), handlerErr
+		})
+		if handlerErr != nil {
+			return result, handlerErr
+		}
+		if err != nil {
+			return ratchetToolError(err)
+		}
+		return result, nil
+	}
+	if len(g.legacyOneTimeAlternatives) > 0 {
+		return ratchetToolError(fmt.Errorf("ratchet: one-time alternatives require workflow execution"))
+	}
 	lockIndex := maphash.String(g.lockSeed, string(sessionID)) % uint64(len(g.locks))
 	lock := &g.locks[lockIndex]
 	lock.Lock()

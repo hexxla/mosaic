@@ -22,7 +22,7 @@ func TestCellWriterAdapter_exact_and_near_anchor_placement(t *testing.T) {
 	}
 	live := NewLiveDB(db)
 	t.Cleanup(func() { _ = live.Close() })
-	writer := NewCellWriterAdapter(live, path, opts, config.DeleteAutoMaintainConfig{})
+	writer := NewCellWriterAdapter(live, config.DeleteAutoMaintainConfig{})
 
 	base := domain.PutCellCommand{
 		Coord:      domain.AxialCoord{Q: 2, R: -1},
@@ -99,5 +99,34 @@ func assertCellContent(t *testing.T, db *hexxladb.DB, coord domain.AxialCoord, w
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestCellWriterReportsCommittedDeleteWhenPruningFails(t *testing.T) {
+	t.Parallel()
+	db, err := hexxladb.Open(filepath.Join(t.TempDir(), "delete.hexxla"), &hexxladb.Options{
+		EnableMVCC:    true,
+		MVCCRetention: hexxladb.MVCCRetention{RetainCommitsBehindHead: 1},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	live := NewLiveDB(db)
+	t.Cleanup(func() { _ = live.Close() })
+	maintenance := config.DeleteAutoMaintainConfig{Enabled: true, Prune: true, MVCCPruneProfile: "invalid-profile"}
+	if err := runPostDeleteMaintain(t.Context(), live, maintenance); !errors.Is(err, hexxladb.ErrInvalidArgument) {
+		t.Fatalf("test configuration did not produce a pruning error: %v", err)
+	}
+	writer := NewCellWriterAdapter(live, maintenance)
+	if _, err := writer.PutCell(t.Context(), &domain.PutCellCommand{RawContent: "test", SourceID: "test"}); err != nil {
+		t.Fatal(err)
+	}
+	removed, err := writer.DeleteCell(t.Context(), &domain.DeleteCellCommand{})
+	if err != nil || !removed {
+		t.Fatalf("delete returned removed=%t, err=%v", removed, err)
+	}
+	removed, err = writer.DeleteCell(t.Context(), &domain.DeleteCellCommand{})
+	if err != nil || removed {
+		t.Fatalf("repeat delete returned removed=%t, err=%v", removed, err)
 	}
 }

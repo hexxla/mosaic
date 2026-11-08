@@ -1,6 +1,7 @@
 package mcpsrv
 
 import (
+	"bytes"
 	"context"
 	"crypto/subtle"
 	"net/http"
@@ -53,7 +54,7 @@ type RatchetObserver struct {
 func NewRatchetObserver(token []byte) *RatchetObserver {
 	return &RatchetObserver{
 		subscribers: make(map[uint64]ratchetSubscriber),
-		token:       append([]byte(nil), token...),
+		token:       bytes.Clone(token),
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,

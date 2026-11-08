@@ -156,3 +156,55 @@ func assertToolError(t *testing.T, result *mcp.CallToolResult) {
 		t.Fatalf("tool unexpectedly succeeded: %+v", result.Content)
 	}
 }
+
+func TestRatchetGateRejectsOneTimeAlternativesOnLegacyDependency(t *testing.T) {
+	rules := []ratchetdomain.Rule{
+		{Tool: "mutate", Prerequisite: "discover-a", OneTimeUse: true},
+		{Tool: "mutate", Prerequisite: "discover-b", OneTimeUse: true},
+	}
+	gate := NewRatchetGate(nil, nil, rules, nil)
+	if err := gate.ValidateProtectedTools([]string{"mutate"}); err == nil {
+		t.Fatal("accepted an unsupported one-time alternative policy")
+	}
+}
+
+func TestRatchetGateDelegatesOneTimeAlternatives(t *testing.T) {
+	rules := []ratchetdomain.Rule{
+		{Tool: "discover_b"},
+		{Tool: "mutate", Prerequisite: "discover_a", OneTimeUse: true},
+		{Tool: "mutate", Prerequisite: "discover_b", OneTimeUse: true},
+	}
+	sessions := ratchetadapters.NewMemorySessionStore()
+	service := ratchetservices.NewRatchetService(ratchetadapters.NewYAMLConfigLoader(), ratchetadapters.NewMemoryTokenStore(), sessions, ratchetadapters.NewCryptoRandomGenerator(), ratchetadapters.NewRealClock())
+	if _, supported := service.(workflowExecutor); !supported {
+		t.Skip("requires a Ratchet module with workflow execution")
+	}
+	for _, rule := range rules {
+		if err := service.RegisterRule(t.Context(), rule); err != nil {
+			t.Fatal(err)
+		}
+	}
+	gate := NewRatchetGate(service, sessions, rules, nil)
+	if err := gate.ValidateProtectedTools([]string{"mutate"}); err != nil {
+		t.Fatal(err)
+	}
+	var calls int
+	for i, tool := range []ratchetdomain.ToolName{"discover_b", "mutate", "mutate"} {
+		result, err := gate.execute(t.Context(), "test-session", tool, func() (mcp.Result, error) {
+			if tool == "mutate" {
+				calls++
+			}
+			return new(mcp.CallToolResult), nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		callResult, ok := result.(*mcp.CallToolResult)
+		if !ok || callResult.IsError != (i == 2) {
+			t.Fatalf("call %d returned unexpected result: %v", i, result)
+		}
+	}
+	if calls != 1 {
+		t.Fatalf("one-time prerequisite authorized %d mutations", calls)
+	}
+}

@@ -21,7 +21,7 @@ func RegisterHealthTool(server *mcp.Server, health primary.Health, log *slog.Log
 		if log != nil {
 			log.DebugContext(ctx, "mosaic_hexxla_health invoked")
 		}
-		out, err := RunBudgetedRead(budget, req, func() (domain.HealthSummary, error) {
+		out, err := budget.RunBudgetedRead(req, func() (domain.HealthSummary, error) {
 			return health.Status(ctx)
 		})
 		if err != nil {

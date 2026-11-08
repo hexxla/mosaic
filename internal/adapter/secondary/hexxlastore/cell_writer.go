@@ -3,7 +3,6 @@ package hexxlastore
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"slices"
 	"strings"
 	"sync"
@@ -19,20 +18,19 @@ import (
 // CellWriterAdapter implements [secondary.CellWriter] using (*hexxladb.DB).Update,
 // [hexxladb.Pack], and HexxlaDB template helpers for stored cell records.
 type CellWriterAdapter struct {
-	live        *LiveDB
-	primaryPath string
-	reopenOpts  *hexxladb.Options
+	live *LiveDB
 
 	maintain config.DeleteAutoMaintainConfig
 
-	maintainMu    sync.Mutex
-	debounceTimer *time.Timer
+	maintainMu            sync.Mutex
+	debounceTimer         *time.Timer
+	maintenanceGeneration uint64
+	maintenanceStopped    bool
 }
 
-// NewCellWriterAdapter wraps a [LiveDB]. primaryPath must be the Hexxla primary file path passed to [hexxladb.Open]
-// (used for post-delete compaction rename). reopenOpts should match the merged open options (encryption + MVCC retention).
-func NewCellWriterAdapter(live *LiveDB, primaryPath string, reopenOpts *hexxladb.Options, maintain config.DeleteAutoMaintainConfig) *CellWriterAdapter {
-	return &CellWriterAdapter{live: live, primaryPath: primaryPath, reopenOpts: reopenOpts, maintain: maintain}
+// NewCellWriterAdapter wraps the live database and its optional pruning policy.
+func NewCellWriterAdapter(live *LiveDB, maintain config.DeleteAutoMaintainConfig) *CellWriterAdapter {
+	return &CellWriterAdapter{live: live, maintain: maintain}
 }
 
 // PutCell implements [secondary.CellWriter].
@@ -169,77 +167,18 @@ func (a *CellWriterAdapter) DeleteCell(ctx context.Context, cmd *domain.DeleteCe
 	var removed bool
 	delErr := a.live.WithRead(func(db *hexxladb.DB) error {
 		return db.Update(func(tx *hexxladb.Tx) error {
-			_, had, err := tx.GetCell(pk)
-			if err != nil {
-				return fmt.Errorf("tx GetCell: %w", err)
-			}
-			if !had {
-				return nil
-			}
-			if err := tx.DeleteCell(ctx, pk); err != nil {
-				return fmt.Errorf("tx DeleteCell: %w", err)
-			}
-			removed = true
-			return nil
+			var err error
+			removed, err = tx.DeleteCellWithOutcome(ctx, pk)
+			return err
 		})
 	})
 	if delErr != nil {
 		return false, fmt.Errorf("hexxlastore delete cell: %w", delErr)
 	}
-	// Maintain after WithRead completes so prune/compact do not nest RLocks on LiveDB.mu.
-	if !removed || !a.maintain.Enabled {
-		return removed, nil
+	if removed && a.maintain.Enabled && a.maintain.Prune {
+		a.scheduleMaintenance(ctx)
 	}
-	if a.maintain.DebounceAfterDelete <= 0 {
-		if err := runPostDeleteMaintain(ctx, a.live, a.primaryPath, a.reopenOpts, a.maintain); err != nil {
-			return removed, err
-		}
-		return removed, nil
-	}
-	a.scheduleDebouncedMaintain()
 	return removed, nil
-}
-
-// scheduleDebouncedMaintain resets a timer so rapid deletes coalesce into one prune/compact pass.
-func (a *CellWriterAdapter) scheduleDebouncedMaintain() {
-	d := a.maintain.DebounceAfterDelete
-	if d <= 0 {
-		return
-	}
-	a.maintainMu.Lock()
-	defer a.maintainMu.Unlock()
-	if a.debounceTimer != nil {
-		a.debounceTimer.Stop()
-	}
-	a.debounceTimer = time.AfterFunc(d, a.fireDebouncedMaintain)
-}
-
-func (a *CellWriterAdapter) fireDebouncedMaintain() {
-	a.maintainMu.Lock()
-	a.debounceTimer = nil
-	a.maintainMu.Unlock()
-	runCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer cancel()
-	if err := runPostDeleteMaintain(runCtx, a.live, a.primaryPath, a.reopenOpts, a.maintain); err != nil {
-		slog.Default().Error("hexxlastore debounced post-delete maintain", "err", err)
-	}
-}
-
-// FlushPostDeleteMaintain stops any pending debounced maintenance and runs prune/compact once before shutdown.
-// Call while the database is still open (e.g. defer before [LiveDB.Close]).
-func (a *CellWriterAdapter) FlushPostDeleteMaintain(ctx context.Context) error {
-	if a == nil || !a.maintain.Enabled {
-		return nil
-	}
-	a.maintainMu.Lock()
-	t := a.debounceTimer
-	a.debounceTimer = nil
-	a.maintainMu.Unlock()
-	if t == nil {
-		return nil
-	}
-	t.Stop()
-	return runPostDeleteMaintain(ctx, a.live, a.primaryPath, a.reopenOpts, a.maintain)
 }
 
 func mergeTagLists(base, extra []string) []string {

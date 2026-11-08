@@ -39,7 +39,7 @@ func registerFindSeamsTool(server *mcp.Server, svc primary.SeamLifecycle, log *s
 		if in.Radius != nil {
 			radius = *in.Radius
 		}
-		out, err := RunBudgetedRead(budget, req, func() (domain.FindSeamsResponse, error) {
+		out, err := budget.RunBudgetedRead(req, func() (domain.FindSeamsResponse, error) {
 			return svc.FindSeams(ctx, &domain.FindSeamsQuery{
 				Center:         domain.AxialCoord{Q: in.CenterQ, R: in.CenterR},
 				Radius:         radius,

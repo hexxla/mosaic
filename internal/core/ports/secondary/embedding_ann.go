@@ -6,8 +6,7 @@ import (
 	"github.com/sploitzberg/mosaic/internal/core/domain"
 )
 
-// EmbeddingANN performs query embedding + [Tx.SearchByEmbedding]-style retrieval against the engine.
-// Implemented only at the Hexxla adapter edge (Ollama + hexxladb).
+// EmbeddingANN searches stored vectors and resolves their application payloads.
 type EmbeddingANN interface {
-	Search(ctx context.Context, q domain.EmbeddingSearchQuery) (domain.EmbeddingSearchResponse, error)
+	Search(ctx context.Context, vector []float32, maxResults int, minScore float64) ([]domain.EmbeddingMatch, error)
 }

@@ -33,7 +33,7 @@ func registerGetFacet(server *mcp.Server, svc primary.FacetEdgeBrowse, log *slog
 		if log != nil {
 			log.DebugContext(ctx, "mosaic_hexxla_get_facet")
 		}
-		out, err := RunBudgetedRead(budget, req, func() (domain.GetFacetResponse, error) {
+		out, err := budget.RunBudgetedRead(req, func() (domain.GetFacetResponse, error) {
 			return svc.GetFacet(ctx, domain.AxialCoord{Q: in.Q, R: in.R}, in.FacetID)
 		})
 		return nil, out, err
@@ -52,7 +52,7 @@ func registerListFacets(server *mcp.Server, svc primary.FacetEdgeBrowse, log *sl
 		if log != nil {
 			log.DebugContext(ctx, "mosaic_hexxla_list_facets")
 		}
-		out, err := RunBudgetedRead(budget, req, func() (domain.ListFacetsForCellResponse, error) {
+		out, err := budget.RunBudgetedRead(req, func() (domain.ListFacetsForCellResponse, error) {
 			return svc.ListFacetsForCell(ctx, domain.AxialCoord{Q: in.Q, R: in.R})
 		})
 		return nil, out, err
@@ -74,7 +74,7 @@ func registerGetEdge(server *mcp.Server, svc primary.FacetEdgeBrowse, log *slog.
 		if log != nil {
 			log.DebugContext(ctx, "mosaic_hexxla_get_edge")
 		}
-		out, err := RunBudgetedRead(budget, req, func() (domain.GetEdgeResponse, error) {
+		out, err := budget.RunBudgetedRead(req, func() (domain.GetEdgeResponse, error) {
 			return svc.GetEdge(ctx,
 				domain.AxialCoord{Q: in.FromQ, R: in.FromR},
 				domain.AxialCoord{Q: in.ToQ, R: in.ToR},
@@ -98,7 +98,7 @@ func registerListEdgesFrom(server *mcp.Server, svc primary.FacetEdgeBrowse, log 
 		if log != nil {
 			log.DebugContext(ctx, "mosaic_hexxla_list_edges_from")
 		}
-		out, err := RunBudgetedRead(budget, req, func() (domain.ListEdgesFromResponse, error) {
+		out, err := budget.RunBudgetedRead(req, func() (domain.ListEdgesFromResponse, error) {
 			return svc.ListEdgesFrom(ctx, domain.AxialCoord{Q: in.FromQ, R: in.FromR}, in.MaxEdges)
 		})
 		return nil, out, err

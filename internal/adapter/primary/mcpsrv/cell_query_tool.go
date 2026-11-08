@@ -78,7 +78,7 @@ func RegisterCellQueryTool(server *mcp.Server, svc primary.CellRetrieval, log *s
 			Explain:        in.Explain,
 			EmbedQueryText: strings.TrimSpace(in.EmbedQueryText),
 		}
-		out, err := RunBudgetedRead(budget, req, func() (domain.CellHitsResponse, error) {
+		out, err := budget.RunBudgetedRead(req, func() (domain.CellHitsResponse, error) {
 			hits, err2 := svc.QueryCells(ctx, cmd)
 			if err2 != nil {
 				return domain.CellHitsResponse{}, err2

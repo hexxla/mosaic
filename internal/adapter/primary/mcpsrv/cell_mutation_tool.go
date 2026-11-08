@@ -2,13 +2,11 @@ package mcpsrv
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/sploitzberg/mosaic/internal/config"
 	"github.com/sploitzberg/mosaic/internal/core/domain"
 	"github.com/sploitzberg/mosaic/internal/core/ports/primary"
 )
@@ -27,15 +25,15 @@ type putCellInput struct {
 }
 
 // RegisterCellMutationTools registers write tools: mosaic_hexxla_put_cell, mosaic_hexxla_put_embedding, mosaic_hexxla_delete_cell.
-func RegisterCellMutationTools(server *mcp.Server, svc primary.CellMutation, gates config.MosaicRuntimeConfig, log *slog.Logger) error {
+func RegisterCellMutationTools(server *mcp.Server, svc primary.CellMutation, log *slog.Logger) error {
 	return registerTools(
-		func() error { return registerPutCellTool(server, svc, gates, log) },
+		func() error { return registerPutCellTool(server, svc, log) },
 		func() error { return registerPutEmbeddingTool(server, svc, log) },
-		func() error { return registerDeleteCellTool(server, svc, gates, log) },
+		func() error { return registerDeleteCellTool(server, svc, log) },
 	)
 }
 
-func registerPutCellTool(server *mcp.Server, svc primary.CellMutation, gates config.MosaicRuntimeConfig, log *slog.Logger) error {
+func registerPutCellTool(server *mcp.Server, svc primary.CellMutation, log *slog.Logger) error {
 	return addTool(server, &mcp.Tool{
 		Name: "mosaic_hexxla_put_cell",
 		Description: "Write one cell atomically via HexxlaDB. placement=exact (default) writes at (q,r) and refuses a live coordinate unless allow_overwrite=true. placement=near_anchor treats (q,r) as a caller-chosen semantic anchor and selects the first free coordinate in deterministic ring order within max_radius (default 8, maximum 32). The response always returns the actual coordinate, placement, occupied probes, and whether an exact write replaced a live cell. Mosaic does not infer semantic anchors. Before choosing tags, call mosaic_hexxla_list_tags (and mosaic_hexxla_tag_counts) when taxonomy is unknown — reuse existing tags when relevant instead of inventing near-duplicates. " +
@@ -47,9 +45,6 @@ func registerPutCellTool(server *mcp.Server, svc primary.CellMutation, gates con
 		kind := domain.CellPutKind(strings.TrimSpace(in.Kind))
 		if kind == "" {
 			kind = domain.CellPutKindFact
-		}
-		if err := gates.PutCellDenied(kind); err != nil {
-			return nil, domain.PutCellMutationResult{}, fmt.Errorf("mosaic_hexxla_put_cell: %w", err)
 		}
 		result, err := svc.PutCell(ctx, putCellCommand(&in, kind))
 		if err != nil {
@@ -100,7 +95,7 @@ func registerPutEmbeddingTool(server *mcp.Server, svc primary.CellMutation, log 
 	})
 }
 
-func registerDeleteCellTool(server *mcp.Server, svc primary.CellMutation, gates config.MosaicRuntimeConfig, log *slog.Logger) error {
+func registerDeleteCellTool(server *mcp.Server, svc primary.CellMutation, log *slog.Logger) error {
 	type deleteCellInput struct {
 		Q int `json:"q" jsonschema:"axial q"`
 		R int `json:"r" jsonschema:"axial r"`
@@ -114,9 +109,6 @@ func registerDeleteCellTool(server *mcp.Server, svc primary.CellMutation, gates 
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in deleteCellInput) (*mcp.CallToolResult, domain.DeleteCellMutationResult, error) {
 		if log != nil {
 			log.DebugContext(ctx, "mosaic_hexxla_delete_cell invoked", "q", in.Q, "r", in.R)
-		}
-		if err := gates.DeleteCellDenied(); err != nil {
-			return nil, domain.DeleteCellMutationResult{}, fmt.Errorf("mosaic_hexxla_delete_cell: %w", err)
 		}
 		removed, err := svc.DeleteCell(ctx, &domain.DeleteCellCommand{
 			Coord: domain.AxialCoord{Q: in.Q, R: in.R},

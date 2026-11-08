@@ -21,8 +21,8 @@ allow_delete_cell: false
 	if !cfg.DeleteAutoMaintain.Enabled {
 		t.Fatal("want auto maintain enabled")
 	}
-	if !cfg.DeleteAutoMaintain.Prune || !cfg.DeleteAutoMaintain.Compact {
-		t.Fatalf("want default prune and compact enabled, got prune=%v compact=%v", cfg.DeleteAutoMaintain.Prune, cfg.DeleteAutoMaintain.Compact)
+	if !cfg.DeleteAutoMaintain.Prune {
+		t.Fatal("want pruning enabled by default")
 	}
 	if cfg.MVCCRetainCommitsBehindHead != config.DefaultAutoMaintainRetainCommits {
 		t.Fatalf("retain commits: got %d want %d", cfg.MVCCRetainCommitsBehindHead, config.DefaultAutoMaintainRetainCommits)
@@ -58,5 +58,18 @@ func TestParseMVCCPruneProfile(t *testing.T) {
 	}
 	if string(p) != "low-latency" {
 		t.Fatalf("got %q", p)
+	}
+}
+
+func TestParseMosaicConfigYAMLRejectsLiveCompaction(t *testing.T) {
+	t.Parallel()
+	const raw = `version: 1
+database:
+  auto_maintain_after_cell_delete:
+    enabled: true
+    compact: true
+`
+	if _, err := config.ParseMosaicConfigYAML([]byte(raw)); err == nil {
+		t.Fatal("accepted an unsafe live compaction setting")
 	}
 }

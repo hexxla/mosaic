@@ -157,10 +157,10 @@ func run(log *slog.Logger) error {
 	contextPackLoader := hexxlastore.NewContextPackAdapter(live)
 	contextAssembly := services.NewContextAssemblyService(contextPackLoader)
 
-	embeddingANN := hexxlastore.NewEmbeddingANNAdapter(live, ollamaClient)
-	embeddingSvc := services.NewEmbeddingSearchService(embeddingANN)
+	embeddingANN := hexxlastore.NewEmbeddingANNAdapter(live)
+	embeddingSvc := services.NewEmbeddingSearchService(embeddingANN, ollamaembed.NewTextEmbedder(ollamaClient), embeddingDimAtBoot)
 
-	cellWriter := hexxlastore.NewCellWriterAdapter(live, dbCfg.Path, openOpts, mosaicLoaded.DeleteAutoMaintain)
+	cellWriter := hexxlastore.NewCellWriterAdapter(live, mosaicLoaded.DeleteAutoMaintain)
 	defer func() {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 		defer cancel()
@@ -172,7 +172,7 @@ func run(log *slog.Logger) error {
 	runtimeCfg := config.NewMosaicRuntimeConfig(mosaicLoaded.Retention, mosaicLoaded.AllowDeleteCell)
 	mutationSvc := services.NewCellMutationService(
 		cellWriter, ollamaembed.NewTextEmbedder(ollamaClient), embeddingDimAtBoot,
-		services.WithMosaicRuntime(runtimeCfg),
+		services.WithMutationPolicy(runtimeCfg.MutationPolicy()),
 	)
 
 	seamStore := hexxlastore.NewSeamStoreAdapter(live)
@@ -197,7 +197,7 @@ func run(log *slog.Logger) error {
 		func() error { return mcpsrv.RegisterEmbeddingSearchTool(srv, embeddingSvc, log, retrievalBudget) },
 		func() error { return mcpsrv.RegisterContextPackTool(srv, contextAssembly, log, retrievalBudget) },
 		func() error { return mcpsrv.RegisterContextBudgetEstimateTool(srv, log) },
-		func() error { return mcpsrv.RegisterCellMutationTools(srv, mutationSvc, runtimeCfg, log) },
+		func() error { return mcpsrv.RegisterCellMutationTools(srv, mutationSvc, log) },
 		func() error { return mcpsrv.RegisterSeamTools(srv, seamSvc, log, retrievalBudget) },
 		func() error { return mcpsrv.RegisterFacetEdgeTools(srv, facetEdgeSvc, log) },
 		func() error { return mcpsrv.RegisterFacetEdgeBrowseTools(srv, facetEdgeBrowse, log, retrievalBudget) },

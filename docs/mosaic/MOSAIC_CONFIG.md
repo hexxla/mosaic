@@ -29,7 +29,7 @@ Restart **`mosaic-mcp`** after editing YAML.
 | **`allow_delete_cell`** | No | Default **`false`**. When **`false`**, **`mosaic_hexxla_delete_cell`** errors. |
 | **`retrieval`** | No | Optional cumulative session read budget (metering / cap). |
 | **`ollama`** | No | Optional **`base_url`** and **`embed_model`** — override **`MOSAIC_OLLAMA_URL`** / **`MOSAIC_EMBED_MODEL`** when set (see precedence below). |
-| **`database`** | No | Optional passphrase hint, MVCC retention, post-delete prune/compact. |
+| **`database`** | No | Optional passphrase hint, MVCC retention, post-delete pruning. |
 
 Legacy/alternate shapes (`persistence_policy`, flat `capture_mode` at root) are accepted by the parser; prefer the **`retention`** block.
 
@@ -101,14 +101,14 @@ Keep this **below** typical peak **`CommitSeq`** for your workload: while **`Com
 
 ### `auto_maintain_after_cell_delete`
 
-Runs bounded **`PruneScheduler.Tick`** and/or **`(*DB).Compact`** after a successful cell delete (**`cell_removed: true`**), then swaps the live DB handle ([`LiveDB`](../../internal/adapter/secondary/hexxlastore/livedb.go)).
+Runs bounded **`PruneScheduler.Tick`** after a successful cell delete. A prune failure is logged separately from the committed delete result. Stop Mosaic and follow the [HexxlaDB operations guide](https://github.com/hexxla/hexxladb/blob/main/docs/hexxladb/OPERATIONS.md) for offline compaction and validated replacement.
 
 | Field | Type | Notes |
 | ----- | ---- | ----- |
 | **`enabled`** | bool | Master switch |
 | **`prune`** | bool | Default **`true`** when **`enabled`** |
-| **`compact`** | bool | Default **`true`**; exclusive rewrite, briefly blocks readers |
-| **`debounce_after_delete_ms`** | int | Milliseconds. **`0`** = run maintain immediately after **each** delete. **Omitted** when **`enabled: true`** defaults to **2000** ms — coalesces rapid deletes into one burst |
+| **`compact`** | bool | Omit or set **`false`**. Enabling live compaction is rejected at startup. |
+| **`debounce_after_delete_ms`** | int | Milliseconds. **`0`** = run pruning immediately after **each** delete. **Omitted** when **`enabled: true`** defaults to **2000** ms — coalesces rapid deletes into one burst |
 | **`prune_profile`** | string | **`balanced`** (default), **`low-latency`**, **`long-history`** → Hexxla **`MVCCPruneProfile`** batch sizes |
 | **`max_prune_rounds_per_delete`** | int | Cap on prune **`Tick`** iterations per **maintenance burst** (not per delete when debounced); default **64** if omitted or invalid |
 

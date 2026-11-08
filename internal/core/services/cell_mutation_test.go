@@ -2,9 +2,9 @@ package services
 
 import (
 	"context"
+	"errors"
 	"testing"
 
-	"github.com/sploitzberg/mosaic/internal/config"
 	"github.com/sploitzberg/mosaic/internal/core/domain"
 )
 
@@ -109,13 +109,9 @@ func TestCellMutationService_PutCell_validation(t *testing.T) {
 
 	t.Run("persistence_policy_reject_assistant_when_user_only", func(t *testing.T) {
 		t.Parallel()
-		pol := config.RetentionPolicy{
-			Version:     1,
-			CaptureMode: config.CaptureModeUserOnly,
-			Enforcement: config.PolicyEnforcementReject,
-		}
 		w := &stubCellWriter{}
-		svc := NewCellMutationService(w, nil, 384, WithMosaicRuntime(config.NewMosaicRuntimeConfig(pol, false)))
+		policy := domain.MutationPolicy{AssistantResponseDenied: errors.New("retention policy denied assistant response")}
+		svc := NewCellMutationService(w, nil, 384, WithMutationPolicy(policy))
 		_, err := svc.PutCell(t.Context(), &domain.PutCellCommand{
 			Coord:      domain.AxialCoord{Q: 0, R: 0},
 			RawContent: "reply",
@@ -134,8 +130,7 @@ func TestCellMutationService_PutCell_validation(t *testing.T) {
 	t.Run("delete_cell_denied_when_config_disallows", func(t *testing.T) {
 		t.Parallel()
 		w := &stubCellWriter{}
-		rt := config.NewMosaicRuntimeConfig(config.DefaultRetentionPolicy(), false)
-		svc := NewCellMutationService(w, nil, 384, WithMosaicRuntime(rt))
+		svc := NewCellMutationService(w, nil, 384)
 		_, err := svc.DeleteCell(t.Context(), &domain.DeleteCellCommand{
 			Coord: domain.AxialCoord{Q: 0, R: 0},
 		})

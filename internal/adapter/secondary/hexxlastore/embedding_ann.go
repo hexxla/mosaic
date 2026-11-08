@@ -8,55 +8,34 @@ import (
 
 	"github.com/sploitzberg/mosaic/internal/core/domain"
 	"github.com/sploitzberg/mosaic/internal/core/ports/secondary"
-	ollamac "github.com/sploitzberg/mosaic/internal/ollama"
 )
 
-// EmbeddingANNAdapter implements [secondary.EmbeddingANN] using Ollama for query vectors and
+// EmbeddingANNAdapter implements [secondary.EmbeddingANN] with
 // [hexxladb.Tx.SearchByEmbedding] for ANN retrieval, then [hexxladb.Tx.GetCell] for payloads.
 type EmbeddingANNAdapter struct {
-	live         *LiveDB
-	ollamaClient *ollamac.Client
+	live *LiveDB
 }
 
-// NewEmbeddingANNAdapter wires a [LiveDB] and Ollama client (callers own HTTP + URL lifecycle).
-func NewEmbeddingANNAdapter(live *LiveDB, oc *ollamac.Client) *EmbeddingANNAdapter {
-	return &EmbeddingANNAdapter{live: live, ollamaClient: oc}
+// NewEmbeddingANNAdapter wires the vector index to a [LiveDB].
+func NewEmbeddingANNAdapter(live *LiveDB) *EmbeddingANNAdapter {
+	return &EmbeddingANNAdapter{live: live}
 }
 
 // Search implements [secondary.EmbeddingANN].
-func (a *EmbeddingANNAdapter) Search(ctx context.Context, q domain.EmbeddingSearchQuery) (domain.EmbeddingSearchResponse, error) {
+func (a *EmbeddingANNAdapter) Search(ctx context.Context, vector []float32, limit int, minScore float64) ([]domain.EmbeddingMatch, error) {
 	if a == nil || a.live == nil {
-		return domain.EmbeddingSearchResponse{}, fmt.Errorf("hexxlastore embedding: nil database")
+		return nil, fmt.Errorf("hexxlastore embedding: nil database")
 	}
-	if a.ollamaClient == nil {
-		return domain.EmbeddingSearchResponse{}, fmt.Errorf("hexxlastore embedding: nil ollama client")
-	}
-	var dim uint16
-	err := a.live.WithRead(func(db *hexxladb.DB) error {
-		dim = db.EmbeddingDimension()
-		return nil
-	})
-	if err != nil {
-		return domain.EmbeddingSearchResponse{}, fmt.Errorf("hexxlastore embedding: %w", err)
-	}
-	if dim == 0 {
-		return domain.EmbeddingSearchResponse{}, fmt.Errorf("hexxlastore embedding: database has no configured embedding dimension")
-	}
-	vec, err := a.ollamaClient.Embed(ctx, q.Text, int(dim))
-	if err != nil {
-		return domain.EmbeddingSearchResponse{}, fmt.Errorf("query embed: %w", err)
-	}
-	limit := q.MaxResults
-	if limit <= 0 {
-		limit = 10
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 
 	var matches []domain.EmbeddingMatch
-	err = a.live.WithRead(func(db *hexxladb.DB) error {
+	err := a.live.WithRead(func(db *hexxladb.DB) error {
 		return db.View(func(tx *hexxladb.Tx) error {
-			hits, err := tx.SearchByEmbedding(vec, hexxladb.EmbeddingSearchConfig{
+			hits, err := tx.SearchByEmbedding(vector, hexxladb.EmbeddingSearchConfig{
 				MaxResults: limit,
-				MinScore:   q.MinScore,
+				MinScore:   minScore,
 			})
 			if err != nil {
 				return fmt.Errorf("search by embedding: %w", err)
@@ -91,12 +70,9 @@ func (a *EmbeddingANNAdapter) Search(ctx context.Context, q domain.EmbeddingSear
 		})
 	})
 	if err != nil {
-		return domain.EmbeddingSearchResponse{}, fmt.Errorf("hexxlastore embedding search: %w", err)
+		return nil, fmt.Errorf("hexxlastore embedding search: %w", err)
 	}
-	return domain.EmbeddingSearchResponse{
-		Query:   q.Text,
-		Matches: matches,
-	}, nil
+	return matches, nil
 }
 
 // Ensure EmbeddingANNAdapter implements secondary.EmbeddingANN.

@@ -1,8 +1,6 @@
 package config
 
 import (
-	"errors"
-
 	"github.com/sploitzberg/mosaic/internal/core/domain"
 )
 
@@ -31,15 +29,11 @@ func (c MosaicRuntimeConfig) PutCellDenied(kind domain.CellPutKind) error {
 	return (&c.Retention).CheckPutCell(kind)
 }
 
-// AllowsDeleteCell reports whether mosaic_hexxla_delete_cell is permitted (config allow_delete_cell).
-func (c MosaicRuntimeConfig) AllowsDeleteCell() bool {
-	return c.AllowDeleteCell
-}
-
-// DeleteCellDenied returns nil if delete is allowed, otherwise an error (default: deletes disabled).
-func (c MosaicRuntimeConfig) DeleteCellDenied() error {
-	if c.AllowDeleteCell {
-		return nil
+// MutationPolicy maps loaded configuration into the application write policy.
+func (c MosaicRuntimeConfig) MutationPolicy() domain.MutationPolicy {
+	return domain.MutationPolicy{
+		UserMessageDenied:       c.PutCellDenied(domain.CellPutKindUserMessage),
+		AssistantResponseDenied: c.PutCellDenied(domain.CellPutKindAssistantResponse),
+		AllowDeleteCell:         c.AllowDeleteCell,
 	}
-	return errors.New("mosaic config: delete_cell not allowed (allow_delete_cell is false)")
 }

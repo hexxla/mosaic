@@ -25,7 +25,7 @@ func RegisterEmbeddingSearchTool(server *mcp.Server, svc primary.EmbeddingSearch
 		if log != nil {
 			log.DebugContext(ctx, "mosaic_hexxla_search_embedding invoked")
 		}
-		out, err := RunBudgetedRead(budget, req, func() (domain.EmbeddingSearchResponse, error) {
+		out, err := budget.RunBudgetedRead(req, func() (domain.EmbeddingSearchResponse, error) {
 			return svc.Search(ctx, domain.EmbeddingSearchQuery{
 				Text:       in.Query,
 				MaxResults: in.MaxResults,
