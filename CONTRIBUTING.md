@@ -65,3 +65,12 @@ Please be respectful and constructive in all interactions.
 ## Questions
 
 If you are unsure where to start, open an issue to discuss the change before implementing it.
+
+
+## GitHub repository settings
+
+After the new workflow passes on a pull request, configure the `main` ruleset
+to require pull requests and the **Required CI** check from GitHub Actions.
+Block force pushes and branch deletion. Protect version tags matching
+`v*.*.*` so only release maintainers can create them. Configure the GitHub
+`release` environment to require approval before publication.

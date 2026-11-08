@@ -1,6 +1,6 @@
 # Development tooling
 
-Mosaic keeps shared engineering instructions and editor automation small and repository-native. It does not generate per-client rule trees, hooks, slash-command workflows, or local MCP configuration.
+Mosaic keeps shared engineering instructions and development commands in the repository. Editor and MCP client settings are local.
 
 ## Sources of truth
 
@@ -29,16 +29,23 @@ In the desktop app, the same endpoint can be added under Settings → MCP server
 See [Codex MCP configuration](https://learn.chatgpt.com/docs/extend/mcp?surface=cli)
 for project-scoped settings and tool allowlists.
 
-## VS Code
+## Editors
 
-Tracked files under [`.vscode/`](../../.vscode/) provide recommended Go, YAML, ShellCheck, and Markdown extensions; format/import settings; and tasks for CI, tests, builds, and integration tests. VS Code is configured to consume `AGENTS.md` rather than a duplicated editor-specific ruleset.
-
-## Zed
-
-Tracked files under [`.zed/`](../../.zed/) configure Go formatting and `gopls`, exclude generated or temporary trees from scanning, and expose the same Mosaic CI, test, build, and integration commands.
+Use any editor with the shared formatting conventions in [`.editorconfig`](../../.editorconfig).
+Run `task build`, `task test`, or `task ci` from the repository root.
+See [`Taskfile.yml`](../../Taskfile.yml) for the full command list.
 
 ## Agent policy versus runtime policy
 
 Repository instructions guide development. Mosaic runtime policy is separate: `retention.notes` from the operator YAML is injected into MCP server instructions, while Ratchet can enforce configured tool prerequisites. Neither mechanism makes an MCP host call tools automatically.
 
 For the recommended tool sequence, see [`MCP_AGENT_BLUEPRINT.md`](./MCP_AGENT_BLUEPRINT.md). For configuration enforcement, see [`PERSISTENCE_POLICY.md`](./PERSISTENCE_POLICY.md) and [`RATCHET_INTEGRATION.md`](./RATCHET_INTEGRATION.md).
+
+
+## Releases
+
+The [Release workflow](../../.github/workflows/release.yml) validates the exact
+tagged commit and rehearses packaging before the publishing job can run.
+The archives contain `mosaic-mcp`, `mosaic-create-db`, and `mosaic-observe`.
+Run the workflow manually on a candidate reachable from `main` to download
+the rehearsal archives and checksums.

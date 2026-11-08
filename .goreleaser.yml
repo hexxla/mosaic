@@ -1,33 +1,41 @@
-# .goreleaser.yml
-# GoReleaser configuration for automated releases
-
+version: 2
 project_name: mosaic
 
-before:
-  hooks:
-    - go mod tidy
-    - go mod download
-
 builds:
-  - env:
-      - CGO_ENABLED=0
-    goos:
-      - linux
-      - darwin
-      - windows
-    goarch:
-      - amd64
-      - arm64
-    ldflags:
-      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
+  - id: mcp
     main: ./cmd/mosaic-mcp
+    binary: mosaic-mcp
+    env: [CGO_ENABLED=0]
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags: ["-s -w -X main.version={{.Version}}"]
+
+  - id: create-db
+    main: ./cmd/mosaic-create-db
+    binary: mosaic-create-db
+    env: [CGO_ENABLED=0]
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags: ["-s -w"]
+
+  - id: observe
+    main: ./cmd/mosaic-observe
+    binary: mosaic-observe
+    env: [CGO_ENABLED=0]
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags: ["-s -w"]
 
 archives:
-  - format: tar.gz
+  - ids: [mcp, create-db, observe]
+    formats: [tar.gz]
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     format_overrides:
       - goos: windows
-        format: zip
+        formats: [zip]
 
 checksum:
   name_template: "{{ .ProjectName }}_{{ .Version }}_SHA256SUMS"

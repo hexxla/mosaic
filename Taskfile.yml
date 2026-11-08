@@ -86,23 +86,10 @@ tasks:
     cmds:
       - go test -race -count=1 ./...
 
-  test-all:
-    desc: Run unit and integration tests with the race detector
-    cmds:
-      - echo "Running unit tests..."
-      - go test -race -count=1 ./...
-      - echo "Running integration tests..."
-      - go test -race -count=1 -tags=integration ./...
-
-  integration:
-    desc: Run integration tests with the race detector
-    cmds:
-      - go test -count=1 -race -tags=integration ./...
-
   lint:
     desc: Run golangci-lint
     cmds:
-      - golangci-lint run --timeout=5m
+      - scripts/tool.sh golangci-lint run ./...
 
   fmt:
     desc: Format Go source files
@@ -111,9 +98,9 @@ tasks:
       - goimports -l -w . 2>/dev/null || true
 
   ci:
-    desc: Run the same full pipeline as GitHub Actions
+    desc: Run the shared CI validation checks
     cmds:
-      - ./scripts/ci/ci.sh
+      - ./scripts/ci.sh
 
   install-mosaic-mcp:
     aliases: [install]

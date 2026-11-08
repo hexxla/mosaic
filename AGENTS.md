@@ -9,7 +9,7 @@
 ## Go and verification
 
 - Honor the target module's `go.mod` and any file-specific build constraints. In Codex, use the [JetBrains Modern Go Guidelines plugin](https://github.com/JetBrains/go-modern-guidelines#codex) when available. Preserve tool and JSON contracts, match surrounding style, format Go changes, and preserve inspectable error causes with `%w`.
-- Run the narrowest relevant checks first. Use `task test` for unit tests, `task integration` for tests that need the integration build tag, and `task ci` before pushing. Follow the existing coverage gate.
+- Run the narrowest relevant checks first. Use `task test` for race tests, including the MCP integration cases, and `task ci` before pushing.
 - See the [development tooling guide](docs/mosaic/DEVELOPMENT_TOOLING.md) for editor and local Codex MCP setup.
 
 ## Repository workflow

@@ -91,7 +91,10 @@ __debug_bin.exe
 TODO.md
 NOTES.md
 
-# VS Code and Zed project settings are tracked in .vscode/ and .zed/.
+# Local editor settings
+/.vscode/
+/.zed/
+
 # Keep assistant-specific local state out of the repository; shared Codex skills
 # live under .agents/skills/.
 .cursor/

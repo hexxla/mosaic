@@ -1,8 +1,0 @@
-{
-  "recommendations": [
-    "golang.go",
-    "redhat.vscode-yaml",
-    "timonwong.shellcheck",
-    "DavidAnson.vscode-markdownlint"
-  ]
-}

@@ -1,12 +1,14 @@
-# Git Hooks
+# Optional Git hook
 
-This directory contains [Git hooks](https://git-scm.com/docs/githooks) for this project.
+The pre-commit hook scans staged changes for secrets. Install the pinned scanner
+with `scripts/tool.sh install-gitleaks` and add Go’s bin directory to your PATH.
+Run the same check directly with `scripts/check-secrets.sh --staged`.
 
-All hooks are version-controlled and shared with the team.
+To enable the repository hook in this clone, run:
 
-## Setup
+```sh
+git config --local core.hooksPath .githooks
+```
 
-Run the following command once after cloning the repository:
-
-```bash
-git config core.hooksPath .githooks
+Enable it only if you want this clone to use the repository hook directory.
+CI checks the pushed commits independently.

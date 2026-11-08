@@ -13,7 +13,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **MCP tool safety inventory** — all 23 tools publish explicit read-only, destructive, idempotent, and open-world hints from one fail-closed registration inventory; tests prevent production registrations from bypassing it.
 - **Secure Ratchet live observability** — an opt-in, bearer-authenticated WebSocket stream shares the loopback MCP listener and emits a redacted live event shape without Ratchet capability tokens, metadata, or history. The bounded `mosaic-observe` CLI provides a self-contained operator workflow.
 
+### Fixed
+
+- **Dependency security** — build Mosaic with the fixed Go crypto module version used by HexxlaDB.
+
 ### Changed
+
+- **Go toolchain** — require Go 1.27.3 or newer. GitHub Actions uses the version in `go.mod`.
+
+- **CI and releases** — validate tagged commits before publishing and include the server, database creator, and observer in release archives.
+
+- **Editor configuration** — keep Zed and VS Code settings local and use the shared Taskfile for development commands.
 
 - **Codex development setup** — document local MCP registration and verification, clarify host ownership of transcript capture, and use the JetBrains Modern Go Guidelines plugin for version-specific idioms.
 - **Cell placement safety** ⚠️ **breaking write behavior** — `mosaic_hexxla_put_cell` now defaults to safe exact placement: writing over a live coordinate requires explicit `allow_overwrite: true`. New `placement: near_anchor` atomically composes HexxlaDB `FindFreeCellPlacement` with `PutCell` using a caller-owned anchor and bounded radius (default 8, maximum 32). Responses report the actual coordinate, placement mode, occupied probes, and whether an exact write replaced a live cell.
@@ -21,7 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **HexxlaDB v0.6.0 compatibility** — context assembly now retrieves count-bounded candidates with `Tx.LoadContext`; Mosaic owns approximate-token conversion, UTF-8 byte accounting, outer-ring/low-confidence eviction, and compatibility byte aliases in MCP responses.
 - **Toolchain and storage defaults** — require Go **1.27.0**, depend on `github.com/hexxla/hexxladb` **v0.6.0**, and use HexxlaDB’s validated **4096-byte** page profile for newly created databases (existing files retain their persisted layout).
 - **MCP SDK** — update `github.com/modelcontextprotocol/go-sdk` to **v1.7.0** while retaining Mosaic's stateful Streamable HTTP session model.
-- **Repository agent tooling** — replace generated Cursor/Windsurf rules, workflow installers, and platform hook scripts with shared `AGENTS.md` guidance, the `.agents/skills/use-modern-go` project skill, and tracked VS Code/Zed settings and tasks.
+- **Repository agent tooling** — replace generated Cursor/Windsurf rules, workflow installers, and platform hook scripts with shared `AGENTS.md` guidance.
 - **Build tooling** — replace GNU Make with Task while retaining build, cross-compile, test, integration, install, database setup, MCP development, and maintenance commands.
 - **Context responses** — add authoritative `total_bytes` / `max_budget_bytes` fields and optional returned facet text; deprecated `total_tokens` / `max_tokens_budget` remain byte-valued compatibility aliases.
 - **Documentation, agent guidance, and seed corpus** — align current HexxlaDB retrieval, embeddings, authenticated-v3 encryption, changefeed, page allocation, retention, and tokenizer ownership; reconcile branch-divergent Ratchet documentation with the implemented opt-in enforcement contract; distinguish runtime MCP schemas from historical and aspirational blueprints; and document current missing-path and seed-policy credential limitations.
