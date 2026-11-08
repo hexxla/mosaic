@@ -13,6 +13,22 @@ Mosaic keeps shared engineering instructions and editor automation small and rep
 
 MCP client connection settings remain local because configuration locations and schemas differ between hosts. Point the chosen client at Mosaic's Streamable HTTP URL, normally `http://127.0.0.1:8787/mcp`.
 
+## Codex MCP setup
+
+Start Mosaic using the [server quick start](../../README.md#step-5--run-the-mcp-server), then register its local Streamable HTTP endpoint:
+
+```bash
+codex mcp add mosaic --url http://127.0.0.1:8787/mcp
+codex mcp list
+```
+
+Start a new Codex session and use `/mcp` to confirm Mosaic is connected.
+For a read-only smoke check, call `mosaic_hexxla_get_persistence_policy` and
+confirm the active policy matches the intended deployment.
+In the desktop app, the same endpoint can be added under Settings → MCP servers.
+See [Codex MCP configuration](https://learn.chatgpt.com/docs/extend/mcp?surface=cli)
+for project-scoped settings and tool allowlists.
+
 ## VS Code
 
 Tracked files under [`.vscode/`](../../.vscode/) provide recommended Go, YAML, ShellCheck, and Markdown extensions; format/import settings; and tasks for CI, tests, builds, and integration tests. VS Code is configured to consume `AGENTS.md` rather than a duplicated editor-specific ruleset.

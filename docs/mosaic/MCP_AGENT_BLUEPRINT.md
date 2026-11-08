@@ -91,7 +91,12 @@ The response always reports **`coord`**, **`placement`**, **`probes`**, and **`r
 
 ### Full-turn persistence (explicit agent workflow)
 
-When product policy is to **store every user/assistant exchange**, the agent should treat **`mosaic_hexxla_put_cell`** as the **bookends** of each turn:
+When the host explicitly authorizes full-turn capture, it can submit the two
+messages through `mosaic_hexxla_put_cell`. If every exchange must be captured,
+the host should own that workflow and handle failed writes. The active server
+policy controls the kinds accepted for submitted calls.
+
+For an authorized client-managed write sequence:
 
 1. Right after the user message is known → **`put_cell`** with **`kind=user_message`** (session **`source_id`**, tags, and either an exact coordinate or `near_anchor` placement); retain the returned coordinate.
 2. Generate the reply (retrieval steps from [Recommended workflow](#recommended-workflow) as needed).
@@ -103,7 +108,7 @@ YAML **`retention.capture_mode: save_all_turns`** matches “both sides in scope
 
 ## Client-side instructions (non-repo)
 
-Client or IDE project instructions should repeat the short chain: **retrieve → read hints → load context pack if needed**. Tool descriptions and JSON hints in Mosaic already encode this; repeating it in the system or project-instructions layer improves compliance.
+Use the retrieval sequence above when configuring a client for Mosaic. Tool descriptions and JSON hints carry the same guidance. For local Codex setup, see the [development tooling guide](./DEVELOPMENT_TOOLING.md#codex-mcp-setup).
 
 ---
 

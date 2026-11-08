@@ -106,7 +106,7 @@ Configure your MCP client through its UI or configuration file. A typical `mcpSe
 }
 ```
 
-Client configuration locations and schemas vary; use the documentation for your MCP host.
+For Codex, see the [local MCP setup](docs/mosaic/DEVELOPMENT_TOOLING.md#codex-mcp-setup). Other clients use their own configuration locations and schemas.
 
 ---
 
