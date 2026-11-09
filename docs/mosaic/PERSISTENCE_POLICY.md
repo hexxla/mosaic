@@ -49,7 +49,7 @@ Strings **`off`** / **`reject`** are still accepted for backward compatibility.
 
 If the **`retention`** key is **omitted** entirely, defaults match [`DefaultRetentionPolicy`](../../internal/config/retention.go) (`llm_curates`, enforcement **false** / `"off"` in JSON). You may also use a **flat** legacy file with `version`, `capture_mode`, `enforcement`, `notes` at the top level (no `retention` key).
 
-**Deprecated:** `persistence_policy:` — same shape as `retention:`. Do not set both `retention` and `persistence_policy` with a `capture_mode` in the same file.
+**Deprecated:** `persistence_policy:` — same shape as `retention:`. Choose exactly one form when configuring retention. Mosaic rejects a file that combines `retention:`, `persistence_policy:`, or top-level `capture_mode`, `enforcement`, and `notes` fields.
 
 ### `allow_delete_cell`
 

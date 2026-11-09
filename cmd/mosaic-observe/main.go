@@ -3,6 +3,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/hex"
 	"errors"
 	"flag"
 	"fmt"
@@ -30,7 +31,7 @@ func main() {
 func run(log *slog.Logger) error {
 	streamURLFlag := flag.String("url", "ws://127.0.0.1:8787"+config.DefaultRatchetObservabilityPath, "loopback Ratchet observability WebSocket URL")
 	tokenFileFlag := flag.String("token-file", "", "private bearer-token file (required)")
-	sessionIDFlag := flag.String("session-id", "", "optional MCP session ID filter")
+	sessionIDFlag := flag.String("session-id", "", "optional observer correlation ID filter")
 	flag.Parse()
 
 	if strings.TrimSpace(*tokenFileFlag) == "" {
@@ -41,7 +42,10 @@ func run(log *slog.Logger) error {
 		return fmt.Errorf("observer URL: %w", err)
 	}
 	if sessionID := strings.TrimSpace(*sessionIDFlag); sessionID != "" {
-		query := streamURL.Query()
+		query, err := url.ParseQuery(streamURL.RawQuery)
+		if err != nil {
+			return fmt.Errorf("parse observer URL query: %w", err)
+		}
 		if query.Has("session_id") {
 			return errors.New("session_id must be supplied either in -url or -session-id, not both")
 		}
@@ -112,10 +116,16 @@ func validateObserverURL(raw string) (*url.URL, error) {
 }
 
 func validateObserverQuery(u *url.URL) error {
-	query := u.Query()
+	query, err := url.ParseQuery(u.RawQuery)
+	if err != nil {
+		return err
+	}
 	for key, values := range query {
-		if key != "session_id" || len(values) != 1 || strings.TrimSpace(values[0]) == "" || len(values[0]) > 256 {
-			return errors.New("observer URL query may contain one non-empty session_id only")
+		if key != "session_id" || len(values) != 1 || len(values[0]) != 32 {
+			return errors.New("observer URL query may contain one 32-character hexadecimal session_id only")
+		}
+		if _, err := hex.DecodeString(values[0]); err != nil {
+			return errors.New("observer session_id must be hexadecimal")
 		}
 	}
 	return nil

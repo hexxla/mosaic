@@ -19,11 +19,6 @@ func NewMosaicRuntimeConfig(r RetentionPolicy, allowDeleteCell bool) MosaicRunti
 	}
 }
 
-// AllowsPutCell reports whether put_cell for kind is permitted under retention policy.
-func (c MosaicRuntimeConfig) AllowsPutCell(kind domain.CellPutKind) bool {
-	return c.PutCellDenied(kind) == nil
-}
-
 // PutCellDenied returns nil if allowed, otherwise the retention enforcement error.
 func (c MosaicRuntimeConfig) PutCellDenied(kind domain.CellPutKind) error {
 	return (&c.Retention).CheckPutCell(kind)

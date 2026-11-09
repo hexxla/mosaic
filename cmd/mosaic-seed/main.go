@@ -11,7 +11,6 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -26,7 +25,7 @@ import (
 func main() {
 	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
-	policyFlag := flag.String("policy", "", "path to Mosaic config YAML (optional ollama: base_url, embed_model — override "+config.EnvOllamaURL+" / "+config.EnvEmbedModel+" when CLI -ollama / -embed-model are empty)")
+	policyFlag := flag.String("policy", "", "path to Mosaic config YAML for Ollama and database credentials")
 	dbFlag := flag.String("db", "", "path to HexxlaDB file (overrides -name; default: "+config.EnvDBPath+", else "+config.MosaicDefaultRelDBFile+")")
 	nameFlag := flag.String("name", "", "base name for the file: <db-dir>/<name>.hexxla (mutually exclusive with -db; directory from -db-dir or "+config.EnvMosaicDBDir+")")
 	dbDirFlag := flag.String("db-dir", "", "parent directory when using -name (default: from "+config.EnvMosaicDBDir+" or .tmp)")
@@ -57,6 +56,7 @@ func main() {
 		FlagBaseURL:    *ollamaFlag,
 		FlagEmbedModel: *embedModel,
 	}
+	credentials := config.HexxlaOpenParams{FlagPassphrase: *dbPassphrase}
 	configPath := config.ResolveMosaicConfigPath(*policyFlag)
 	if strings.TrimSpace(configPath) != "" {
 		loaded, err := config.LoadMosaicConfigFromFile(configPath)
@@ -64,6 +64,7 @@ func main() {
 			log.Error(err.Error())
 			os.Exit(2)
 		}
+		credentials.YAMLPassphrase = loaded.DatabasePassphrase
 		ollIn.YAMLBaseURL = loaded.OllamaBaseURL
 		ollIn.YAMLEmbedModel = loaded.OllamaEmbedModel
 	}
@@ -80,9 +81,8 @@ func main() {
 	}
 
 	oc := ollamac.NewClient(ollamaCfg.Base, ollamaCfg.Model)
-	oc.HTTP = &http.Client{Timeout: ollamac.DefaultEmbedTimeout}
 
-	if err := run(log, dbPath, replaceExisting, oc, *dbPassphrase, layout); err != nil {
+	if err := run(log, dbPath, replaceExisting, oc, credentials, layout); err != nil {
 		log.Error(err.Error())
 		os.Exit(1)
 	}
@@ -93,7 +93,7 @@ func run(
 	dbPath string,
 	force bool,
 	oc *ollamac.Client,
-	dbPassphraseFlag string,
+	credentials config.HexxlaOpenParams,
 	layout config.MosaicDatabaseLayout,
 ) error {
 	ctx := context.Background()
@@ -108,10 +108,8 @@ func run(
 		return fmt.Errorf("stat database: %w", err)
 	}
 
-	opts := config.NewMosaicDatabaseOptions(layout)
-	if err := config.ApplyHexxlaEncryption(opts, config.HexxlaOpenParams{
-		FlagPassphrase: dbPassphraseFlag,
-	}); err != nil {
+	opts, err := config.BuildMosaicCreateOptions(layout, credentials)
+	if err != nil {
 		return fmt.Errorf("database encryption options: %w", err)
 	}
 

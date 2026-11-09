@@ -3,93 +3,62 @@ package mcpsrv
 import (
 	"context"
 	"fmt"
-	"hash/maphash"
-	"log/slog"
 	"slices"
 	"strings"
-	"sync"
 
 	ratchetdomain "github.com/hexxla/mcp-ratchet/pkg/ratchet/domain"
 	ratchetprimary "github.com/hexxla/mcp-ratchet/pkg/ratchet/ports/primary"
-	ratchetsecondary "github.com/hexxla/mcp-ratchet/pkg/ratchet/ports/secondary"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-const ratchetLockStripes = 64
-
-type workflowExecutor interface {
-	ExecuteToolCall(context.Context, ratchetdomain.SessionID, ratchetdomain.ToolName, func() (bool, error)) error
-}
-
 // RatchetGate enforces configured tool prerequisites for each MCP session.
 type RatchetGate struct {
-	service                   ratchetprimary.RatchetService
-	sessions                  ratchetsecondary.SessionStore
-	configured                map[ratchetdomain.ToolName]struct{}
-	legacyOneTimeAlternatives []string
-	protected                 map[ratchetdomain.ToolName]struct{}
-	lockSeed                  maphash.Seed
-	locks                     [ratchetLockStripes]sync.Mutex
-	log                       *slog.Logger
+	executor   ratchetprimary.WorkflowExecutor
+	configured map[ratchetdomain.ToolName]bool
 }
 
-// NewRatchetGate constructs a session-isolated Ratchet middleware.
-func NewRatchetGate(
-	service ratchetprimary.RatchetService,
-	sessions ratchetsecondary.SessionStore,
-	rules []ratchetdomain.Rule,
-	log *slog.Logger,
-) *RatchetGate {
-	configured := make(map[ratchetdomain.ToolName]struct{}, len(rules))
-	withPrerequisite := make(map[ratchetdomain.ToolName]struct{}, len(rules))
-	withFreePass := make(map[ratchetdomain.ToolName]struct{}, len(rules))
-	counts := make(map[ratchetdomain.ToolName]int)
-	oneTime := make(map[ratchetdomain.ToolName]bool)
+// NewRatchetGate wires Ratchet's executor into the MCP tool boundary.
+func NewRatchetGate(executor ratchetprimary.WorkflowExecutor, rules []ratchetdomain.Rule) *RatchetGate {
+	configured := make(map[ratchetdomain.ToolName]bool, len(rules))
+	unrestricted := make(map[ratchetdomain.ToolName]struct{})
 	for _, rule := range rules {
-		configured[rule.Tool] = struct{}{}
-		counts[rule.Tool]++
-		oneTime[rule.Tool] = oneTime[rule.Tool] || rule.OneTimeUse
+		configured[rule.Tool] = rule.Prerequisite != ""
 		if rule.Prerequisite == "" {
-			withFreePass[rule.Tool] = struct{}{}
-		} else {
-			withPrerequisite[rule.Tool] = struct{}{}
+			unrestricted[rule.Tool] = struct{}{}
 		}
-	}
-	protected := make(map[ratchetdomain.ToolName]struct{}, len(withPrerequisite))
-	for tool := range withPrerequisite {
-		if _, unrestricted := withFreePass[tool]; !unrestricted {
-			protected[tool] = struct{}{}
-		}
-	}
-	var unsupported []string
-	if _, ok := service.(workflowExecutor); !ok {
-		for tool, count := range counts {
-			if count > 1 && oneTime[tool] {
-				unsupported = append(unsupported, string(tool))
+		if rule.Prerequisite != "" {
+			if _, ok := configured[rule.Prerequisite]; !ok {
+				configured[rule.Prerequisite] = false
 			}
 		}
-		slices.Sort(unsupported)
 	}
-	return &RatchetGate{
-		legacyOneTimeAlternatives: unsupported,
-		service:                   service,
-		sessions:                  sessions,
-		configured:                configured,
-		protected:                 protected,
-		lockSeed:                  maphash.MakeSeed(),
-		log:                       log,
+	for tool := range unrestricted {
+		configured[tool] = false
 	}
+	return &RatchetGate{executor: executor, configured: configured}
+}
+
+// ValidateToolNames rejects policy entries outside Mosaic's tool inventory.
+func (g *RatchetGate) ValidateToolNames() error {
+	var unknown []string
+	for tool := range g.configured {
+		if _, ok := mcpToolPolicies[string(tool)]; !ok {
+			unknown = append(unknown, string(tool))
+		}
+	}
+	if len(unknown) == 0 {
+		return nil
+	}
+	slices.Sort(unknown)
+	return fmt.Errorf("ratchet policy names unknown Mosaic tools: %s", strings.Join(unknown, ", "))
 }
 
 // ValidateProtectedTools fails when any required tool is absent from the
 // Ratchet rules or has a free-pass rule that makes its prerequisites optional.
 func (g *RatchetGate) ValidateProtectedTools(required []string) error {
-	if len(g.legacyOneTimeAlternatives) > 0 {
-		return fmt.Errorf("ratchet dependency cannot reserve one-time alternatives for: %s", strings.Join(g.legacyOneTimeAlternatives, ", "))
-	}
 	missing := make([]string, 0)
 	for _, name := range required {
-		if _, ok := g.protected[ratchetdomain.ToolName(name)]; !ok {
+		if !g.configured[ratchetdomain.ToolName(name)] {
 			missing = append(missing, name)
 		}
 	}
@@ -135,72 +104,19 @@ func (g *RatchetGate) execute(
 	tool ratchetdomain.ToolName,
 	next func() (mcp.Result, error),
 ) (mcp.Result, error) {
-	if workflow, ok := g.service.(workflowExecutor); ok {
-		var result mcp.Result
-		var handlerErr error
-		err := workflow.ExecuteToolCall(ctx, sessionID, tool, func() (bool, error) {
-			result, handlerErr = next()
-			return handlerErr == nil && !toolResultFailed(result), handlerErr
-		})
-		if handlerErr != nil {
-			return result, handlerErr
-		}
-		if err != nil {
-			return ratchetToolError(err)
-		}
-		return result, nil
+	var result mcp.Result
+	var handlerErr error
+	err := g.executor.ExecuteToolCall(ctx, sessionID, tool, func() (bool, error) {
+		result, handlerErr = next()
+		return handlerErr == nil && !toolResultFailed(result), handlerErr
+	})
+	if handlerErr != nil {
+		return result, handlerErr
 	}
-	if len(g.legacyOneTimeAlternatives) > 0 {
-		return ratchetToolError(fmt.Errorf("ratchet: one-time alternatives require workflow execution"))
-	}
-	lockIndex := maphash.String(g.lockSeed, string(sessionID)) % uint64(len(g.locks))
-	lock := &g.locks[lockIndex]
-	lock.Lock()
-	defer lock.Unlock()
-
-	if _, err := g.service.CreateSession(ctx, sessionID); err != nil {
-		g.warn("create session", tool, err)
-		return ratchetToolError(fmt.Errorf("ratchet session: %w", err))
-	}
-	if err := g.service.ValidateToolCall(ctx, sessionID, tool, ""); err != nil {
-		return ratchetToolError(fmt.Errorf("ratchet prerequisite: %w", err))
-	}
-
-	// Reserve a one-time prerequisite before executing the protected handler so
-	// concurrent calls cannot both use the same token. A failed handler therefore
-	// requires the caller to repeat its prerequisite before retrying.
-	if err := g.service.ConsumePrerequisiteToken(ctx, sessionID, tool); err != nil {
-		g.warn("consume prerequisite", tool, err)
-		return ratchetToolError(fmt.Errorf("ratchet prerequisite consumption: %w", err))
-	}
-
-	result, err := next()
-	if err != nil || toolResultFailed(result) {
-		return result, err
-	}
-
-	session, err := g.sessions.Get(ctx, sessionID)
 	if err != nil {
-		g.warn("read session", tool, err)
-		return ratchetToolError(fmt.Errorf("ratchet session read: %w", err))
+		return ratchetToolError(err)
 	}
-	session.RecordToolCall(tool)
-	if err := g.sessions.Update(ctx, session); err != nil {
-		g.warn("record tool call", tool, err)
-		return ratchetToolError(fmt.Errorf("ratchet session update: %w", err))
-	}
-	if _, err := g.service.IssueToken(ctx, sessionID, tool); err != nil {
-		g.warn("issue token", tool, err)
-		return ratchetToolError(fmt.Errorf("ratchet token issuance: %w", err))
-	}
-
 	return result, nil
-}
-
-func (g *RatchetGate) warn(operation string, tool ratchetdomain.ToolName, err error) {
-	if g.log != nil {
-		g.log.Warn("ratchet enforcement failure", "operation", operation, "tool", tool, "err", err)
-	}
 }
 
 func toolResultFailed(result mcp.Result) bool {

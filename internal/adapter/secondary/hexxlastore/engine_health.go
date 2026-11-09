@@ -24,17 +24,24 @@ func NewEngineHealthAdapter(live *LiveDB, primaryPath string) *EngineHealthAdapt
 }
 
 // Check implements [secondary.EngineHealth].
-func (a *EngineHealthAdapter) Check(ctx context.Context) (domain.HealthSummary, error) {
+func (a *EngineHealthAdapter) Check(ctx context.Context, fullCheck bool) (domain.HealthSummary, error) {
 	if a == nil || a.live == nil {
 		return domain.HealthSummary{}, fmt.Errorf("hexxlastore: nil database")
 	}
 	var summary domain.HealthSummary
 	err := a.live.WithRead(func(db *hexxladb.DB) error {
-		rep, err := db.HealthCheck(ctx, hexxladb.DefaultHealthCheckConfig())
-		if err != nil {
-			return fmt.Errorf("hexxladb health check: %w", err)
+		if err := ctx.Err(); err != nil {
+			return err
 		}
-		summary = mapHealthReport(&rep)
+		if fullCheck {
+			rep, err := db.HealthCheck(ctx, hexxladb.DefaultHealthCheckConfig())
+			if err != nil {
+				return fmt.Errorf("hexxladb health check: %w", err)
+			}
+			summary = mapHealthReport(&rep)
+			summary.IntegrityChecked = true
+			summary.IntegrityOK = rep.TagIndexErrors == 0 && rep.SourceIndexErrors == 0 && len(rep.OrphanedSeams) == 0
+		}
 		summary.DatabaseLayout = domain.DatabaseLayout{
 			PageSize:           db.PageSize(),
 			MaxValueBytes:      db.MaxValueBytes(),
@@ -42,7 +49,6 @@ func (a *EngineHealthAdapter) Check(ctx context.Context) (domain.HealthSummary, 
 			EmbeddingMetric:    embeddingMetricLabel(db.EmbeddingDimension(), db.EmbeddingMetric()),
 		}
 		summary.Disk = diskFootprintFromPath(a.primaryPath)
-		summary.IntegrityOK = rep.TagIndexErrors == 0 && rep.SourceIndexErrors == 0 && len(rep.OrphanedSeams) == 0
 		return nil
 	})
 	return summary, err

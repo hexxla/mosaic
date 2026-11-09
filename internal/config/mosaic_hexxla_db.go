@@ -28,7 +28,7 @@ type MosaicDatabaseLayout struct {
 	DistanceMetric     hexxladb.DistanceMetric
 }
 
-// DefaultMosaicDatabaseLayout matches historical Mosaic defaults (same as [MosaicNewDatabaseOptions]).
+// DefaultMosaicDatabaseLayout returns the shared database creation defaults.
 func DefaultMosaicDatabaseLayout() MosaicDatabaseLayout {
 	return MosaicDatabaseLayout{
 		PageSize:           MosaicDefaultPageSize,
@@ -38,19 +38,16 @@ func DefaultMosaicDatabaseLayout() MosaicDatabaseLayout {
 	}
 }
 
-// NewMosaicDatabaseOptions builds [hexxladb.Options] for creating a new database file.
-// Invalid combinations are rejected by [hexxladb.Open], not here.
-func NewMosaicDatabaseOptions(layout MosaicDatabaseLayout) *hexxladb.Options {
-	return &hexxladb.Options{
+// BuildMosaicCreateOptions applies the same credential rules as database open.
+func BuildMosaicCreateOptions(layout MosaicDatabaseLayout, credentials HexxlaOpenParams) (*hexxladb.Options, error) {
+	opts := &hexxladb.Options{
 		PageSize: layout.PageSize, MaxValueBytes: layout.MaxValueBytes,
 		EmbeddingDimension: layout.EmbeddingDimension, DistanceMetric: layout.DistanceMetric,
 	}
-}
-
-// MosaicNewDatabaseOptions returns [hexxladb.Options] for creating a new Mosaic-compatible HexxlaDB file
-// using [DefaultMosaicDatabaseLayout]. Use [NewMosaicDatabaseOptions] when overriding layout via CLI flags.
-func MosaicNewDatabaseOptions() *hexxladb.Options {
-	return NewMosaicDatabaseOptions(DefaultMosaicDatabaseLayout())
+	if err := ApplyHexxlaEncryption(opts, credentials); err != nil {
+		return nil, err
+	}
+	return opts, nil
 }
 
 // ParseMosaicDatabaseLayoutFromCLI builds [MosaicDatabaseLayout] from mosaic-create-db / mosaic-seed flags.

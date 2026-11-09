@@ -58,6 +58,27 @@ func TestContextAssemblyService_applies_byte_budget_after_retrieval(t *testing.T
 	}
 }
 
+func TestContextAssemblyService_caps_pack_by_remaining_session_budget(t *testing.T) {
+	t.Parallel()
+	stub := &stubContextLoader{}
+	service := services.NewContextAssemblyService(stub)
+	command := domain.LoadContextPackCommand{
+		Seeds: seed0(), MaxBudgetBytes: 1000, SessionByteLimit: 64,
+	}
+	out, err := service.LoadFromSeeds(t.Context(), &command)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.MaxBudgetBytes != 64 || stub.last.MaxTokens != 64 {
+		t.Fatalf("applied budget = %d, loader budget = %d, want 64", out.MaxBudgetBytes, stub.last.MaxTokens)
+	}
+	command.SessionByteLimit = 1
+	stub.last = nil
+	if _, err := service.LoadFromSeeds(t.Context(), &command); err == nil || stub.last != nil {
+		t.Fatalf("expected rejection before loading, got error %v and request %+v", err, stub.last)
+	}
+}
+
 func TestContextAssemblyService_facet_text_counts_toward_budget(t *testing.T) {
 	t.Parallel()
 	stub := &stubContextLoader{response: domain.ContextPackResponse{

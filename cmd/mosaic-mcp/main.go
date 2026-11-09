@@ -88,12 +88,12 @@ func run(log *slog.Logger) error {
 	}
 
 	var ratchetObserver *mcpsrv.RatchetObserver
-	var ratchetEventStore ratchetsecondary.EventStore
+	var ratchetEvents ratchetsecondary.EventSink
 	if ratchetObservability.Enabled {
 		ratchetObserver = mcpsrv.NewRatchetObserver(ratchetObservability.BearerToken)
-		ratchetEventStore = ratchetObserver
+		ratchetEvents = ratchetObserver
 	}
-	ratchetGate, err := loadRatchetGate(ratchetConfigPath, log, ratchetEventStore)
+	ratchetGate, err := loadRatchetGate(ratchetConfigPath, log, ratchetEvents)
 	if err != nil {
 		return fmt.Errorf("ratchet setup: %w", err)
 	}
@@ -256,7 +256,7 @@ func run(log *slog.Logger) error {
 	return nil
 }
 
-func loadRatchetGate(path string, log *slog.Logger, eventStore ratchetsecondary.EventStore) (*mcpsrv.RatchetGate, error) {
+func loadRatchetGate(path string, log *slog.Logger, eventSink ratchetsecondary.EventSink) (*mcpsrv.RatchetGate, error) {
 	loaded, err := config.LoadRatchetConfig(path)
 	if err != nil {
 		return nil, fmt.Errorf("ratchet config: %w", err)
@@ -271,15 +271,11 @@ func loadRatchetGate(path string, log *slog.Logger, eventStore ratchetsecondary.
 		return nil, fmt.Errorf("open ratchet config: %w", err)
 	}
 
-	sessions := ratchetadapters.NewMemorySessionStore()
 	configLoader := ratchetadapters.NewYAMLConfigLoader()
 	tokenStore := ratchetadapters.NewMemoryTokenStore()
 	randomGenerator := ratchetadapters.NewCryptoRandomGenerator()
 	clock := ratchetadapters.NewRealClock()
-	service := ratchetservices.NewRatchetService(configLoader, tokenStore, sessions, randomGenerator, clock)
-	if eventStore != nil {
-		service = ratchetservices.NewRatchetServiceWithObservability(configLoader, tokenStore, sessions, randomGenerator, clock, eventStore)
-	}
+	service := ratchetservices.NewRatchetServiceWithEventSink(configLoader, tokenStore, randomGenerator, clock, eventSink)
 	rules, loadErr := service.LoadConfiguration(context.Background(), configFile)
 	closeErr := configFile.Close()
 	if loadErr != nil {
@@ -289,7 +285,10 @@ func loadRatchetGate(path string, log *slog.Logger, eventStore ratchetsecondary.
 		return nil, fmt.Errorf("close ratchet config: %w", closeErr)
 	}
 
-	gate := mcpsrv.NewRatchetGate(service, sessions, rules, log)
+	gate := mcpsrv.NewRatchetGate(service, rules)
+	if err := gate.ValidateToolNames(); err != nil {
+		return nil, err
+	}
 	if err := gate.ValidateProtectedTools(mcpsrv.MutationToolNames()); err != nil {
 		return nil, err
 	}

@@ -4,10 +4,10 @@ import (
 	"testing"
 )
 
-func TestLoadOllamaFromEnv_defaults(t *testing.T) {
+func TestResolveOllamaDefaults(t *testing.T) {
 	t.Setenv(EnvOllamaURL, "")
 	t.Setenv(EnvEmbedModel, "")
-	got, err := LoadOllamaFromEnv()
+	got, err := ResolveOllama(OllamaResolveInput{})
 	if err != nil {
 		t.Fatal(err)
 	}

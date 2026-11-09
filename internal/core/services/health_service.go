@@ -28,11 +28,11 @@ func NewHealthService(engine secondary.EngineHealth, version string, mvccRetainC
 }
 
 // Status implements [primary.Health].
-func (s *HealthService) Status(ctx context.Context) (domain.HealthSummary, error) {
+func (s *HealthService) Status(ctx context.Context, fullCheck bool) (domain.HealthSummary, error) {
 	if s.engine == nil {
 		return domain.HealthSummary{}, fmt.Errorf("health: nil engine")
 	}
-	summary, err := s.engine.Check(ctx)
+	summary, err := s.engine.Check(ctx, fullCheck)
 	if err != nil {
 		return domain.HealthSummary{}, fmt.Errorf("health: %w", err)
 	}

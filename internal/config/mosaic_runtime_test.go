@@ -7,7 +7,7 @@ import (
 	"github.com/sploitzberg/mosaic/internal/core/domain"
 )
 
-func TestMosaicRuntimeConfig_AllowsPutCell(t *testing.T) {
+func TestMosaicRuntimeConfigMutationPolicy(t *testing.T) {
 	t.Parallel()
 	pol := config.RetentionPolicy{
 		Version:     1,
@@ -15,10 +15,10 @@ func TestMosaicRuntimeConfig_AllowsPutCell(t *testing.T) {
 		Enforcement: config.PolicyEnforcementReject,
 	}
 	g := config.NewMosaicRuntimeConfig(pol, false)
-	if g.AllowsPutCell(domain.CellPutKindAssistantResponse) {
+	if g.MutationPolicy().PutCellDenied(domain.CellPutKindAssistantResponse) == nil {
 		t.Fatal("expected false for assistant under user_only+reject")
 	}
-	if !g.AllowsPutCell(domain.CellPutKindUserMessage) {
+	if g.MutationPolicy().PutCellDenied(domain.CellPutKindUserMessage) != nil {
 		t.Fatal("expected true for user message")
 	}
 }

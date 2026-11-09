@@ -38,8 +38,7 @@ configured embedding model. A repeat seed on an existing primary skips it.
 
 | Command | Passphrase precedence |
 | --- | --- |
-| **mosaic-mcp** and **mosaic-create-db** | **-db-passphrase**, **MOSAIC_DB_PASSPHRASE**, YAML **database.passphrase** |
-| **mosaic-seed** | **-db-passphrase**, **MOSAIC_DB_PASSPHRASE** |
+| **mosaic-mcp**, **mosaic-create-db**, and **mosaic-seed** | **-db-passphrase**, **MOSAIC_DB_PASSPHRASE**, YAML **database.passphrase** |
 
 All three accept a hexadecimal key in **MOSAIC_DB_ENCRYPTION_KEY_HEX**.
 Use one credential source. Prefer environment injection for secrets so the
@@ -54,7 +53,7 @@ and open. [Configuration reference](./MOSAIC_CONFIG.md)
    original primary and its matching WAL and any changefeed as one recovery set.
 3. Point **MOSAIC_DB_PATH** or **-db** at the candidate and start Mosaic with
    its matching credentials. Verify the path, layout, and integrity with
-   **mosaic_hexxla_health**.
+   **mosaic_hexxla_health** with `{"full_check":true}`.
 4. To roll back, stop Mosaic and restore the original path and credential.
    Preserve any writes made on the candidate separately.
 

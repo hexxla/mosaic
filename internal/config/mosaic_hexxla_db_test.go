@@ -8,19 +8,24 @@ import (
 	"github.com/sploitzberg/mosaic/internal/config"
 )
 
-func TestDefaultMosaicDatabaseLayout_matches_MosaicNewDatabaseOptions(t *testing.T) {
-	t.Parallel()
-	def := config.DefaultMosaicDatabaseLayout()
-	o := config.NewMosaicDatabaseOptions(def)
-	legacy := config.MosaicNewDatabaseOptions()
-	if o.PageSize != legacy.PageSize ||
-		o.MaxValueBytes != legacy.MaxValueBytes ||
-		o.EmbeddingDimension != legacy.EmbeddingDimension ||
-		o.DistanceMetric != legacy.DistanceMetric {
-		t.Fatalf("NewMosaicDatabaseOptions(Default) != MosaicNewDatabaseOptions: %+v vs %+v", o, legacy)
+func TestMosaicDatabaseDefaultOptions(t *testing.T) {
+	t.Setenv(config.EnvDBPassphrase, "")
+	t.Setenv(config.EnvDBEncryptionKeyHex, "")
+	loaded, err := config.ParseMosaicConfigYAML([]byte("version: 1\ndatabase:\n  passphrase: example-fixture\n"))
+	if err != nil {
+		t.Fatal(err)
 	}
-	if def.PageSize != 4096 {
-		t.Fatalf("default PageSize=%d want HexxlaDB validated profile 4096", def.PageSize)
+	o, err := config.BuildMosaicCreateOptions(config.DefaultMosaicDatabaseLayout(), config.HexxlaOpenParams{
+		YAMLPassphrase: loaded.DatabasePassphrase,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if o.Passphrase != "example-fixture" {
+		t.Fatal("creation options did not inherit the YAML passphrase")
+	}
+	if o.PageSize != 4096 || o.EmbeddingDimension != 384 || o.DistanceMetric != hexxladb.DistanceCosine {
+		t.Fatalf("unexpected default layout: page size %d, embedding dimension %d, metric %v", o.PageSize, o.EmbeddingDimension, o.DistanceMetric)
 	}
 }
 

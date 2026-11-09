@@ -69,10 +69,3 @@ func ResolveOllama(in OllamaResolveInput) (Ollama, error) {
 	}
 	return Ollama{Base: u, Model: model}, nil
 }
-
-// LoadOllamaFromEnv reads MOSAIC_OLLAMA_URL and MOSAIC_EMBED_MODEL with defaults (no YAML seed).
-//
-// Equivalent to ResolveOllama(OllamaResolveInput{}).
-func LoadOllamaFromEnv() (Ollama, error) {
-	return ResolveOllama(OllamaResolveInput{})
-}

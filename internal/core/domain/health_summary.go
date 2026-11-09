@@ -1,6 +1,6 @@
 package domain
 
-// HealthSummary is an engine-agnostic snapshot from a database health scan.
+// HealthSummary reports database status and optional integrity results.
 type HealthSummary struct {
 	// MosaicVersion is the mosaic-mcp binary version (from the application layer).
 	MosaicVersion string `json:"mosaic_version" jsonschema:"mosaic MCP server version string"`
@@ -13,6 +13,9 @@ type HealthSummary struct {
 
 	// MVCCRetainCommitsBehindHead is the effective Mosaic policy value forwarded into Hexxla open options (0 if unset).
 	MVCCRetainCommitsBehindHead uint64 `json:"mvcc_retain_commits_behind_head,omitempty" jsonschema:"MVCC retention commits behind head from Mosaic config"`
+
+	// IntegrityChecked distinguishes a full check from header and file status.
+	IntegrityChecked bool `json:"integrity_checked" jsonschema:"true when the full integrity scan ran"`
 
 	// IntegrityOK is true when the health scan reported no tag/source index errors and no orphan seams.
 	IntegrityOK bool `json:"integrity_ok" jsonschema:"true if index and seam reference checks are clean"`

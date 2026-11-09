@@ -3,8 +3,13 @@ package mcpsrv
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/rand"
+	"crypto/sha256"
 	"crypto/subtle"
+	"encoding/hex"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -35,24 +40,25 @@ type RatchetEvent struct {
 }
 
 type ratchetSubscriber struct {
-	sessionID ratchetdomain.SessionID
+	sessionID string
 	events    chan RatchetEvent
 }
 
-// RatchetObserver is a bounded, live-only Ratchet EventStore and authenticated
+// RatchetObserver is a bounded, live-only Ratchet EventSink and authenticated
 // WebSocket handler. It retains no historical events.
 type RatchetObserver struct {
 	mu          sync.RWMutex
 	nextID      uint64
 	subscribers map[uint64]ratchetSubscriber
 	token       []byte
+	labelKey    [32]byte
 	upgrader    websocket.Upgrader
 }
 
 // NewRatchetObserver creates an authenticated live event stream. The caller
 // must provide a validated bearer token of at least 32 bytes.
 func NewRatchetObserver(token []byte) *RatchetObserver {
-	return &RatchetObserver{
+	observer := &RatchetObserver{
 		subscribers: make(map[uint64]ratchetSubscriber),
 		token:       bytes.Clone(token),
 		upgrader: websocket.Upgrader{
@@ -63,9 +69,11 @@ func NewRatchetObserver(token []byte) *RatchetObserver {
 			},
 		},
 	}
+	rand.Read(observer.labelKey[:])
+	return observer
 }
 
-// Store implements Ratchet's EventStore as a live, non-retaining sink.
+// Store implements Ratchet's EventSink as a live, non-retaining sink.
 func (o *RatchetObserver) Store(_ context.Context, event *ratchetdomain.Event) error {
 	if event == nil {
 		return nil
@@ -74,21 +82,10 @@ func (o *RatchetObserver) Store(_ context.Context, event *ratchetdomain.Event) e
 	return nil
 }
 
-// GetEvents returns no events because the observer intentionally retains no history.
-func (*RatchetObserver) GetEvents(context.Context, ratchetdomain.SessionID, *ratchetsecondary.EventFilter) ([]*ratchetdomain.Event, error) {
-	return []*ratchetdomain.Event{}, nil
-}
-
-// GetStats returns zero-valued live-only statistics because no history is retained.
-func (*RatchetObserver) GetStats(context.Context) (*ratchetdomain.EventStats, error) {
-	return &ratchetdomain.EventStats{
-		EventsByType: make(map[ratchetdomain.EventType]int),
-		EventsByTool: make(map[ratchetdomain.ToolName]int),
-	}, nil
-}
+var _ ratchetsecondary.EventSink = (*RatchetObserver)(nil)
 
 // ServeHTTP upgrades an authenticated, non-browser request to a WebSocket. An
-// optional session_id query limits delivery to one MCP session; omitting it
+// optional session_id query filters by an observer correlation ID; omitting it
 // subscribes the authenticated operator to all live sessions.
 func (o *RatchetObserver) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if !o.authorized(r) {
@@ -174,22 +171,28 @@ func (o *RatchetObserver) authorized(r *http.Request) bool {
 	return subtle.ConstantTimeCompare([]byte(header[len(prefix):]), o.token) == 1
 }
 
-func observerSessionID(r *http.Request) (ratchetdomain.SessionID, bool) {
-	values, present := r.URL.Query()["session_id"]
-	if !present {
+func observerSessionID(r *http.Request) (string, bool) {
+	query, err := url.ParseQuery(r.URL.RawQuery)
+	if err != nil {
+		return "", false
+	}
+	if len(query) == 0 {
 		return "", true
 	}
-	if len(values) != 1 || len(values[0]) > 256 {
+	values := query["session_id"]
+	if len(query) != 1 {
 		return "", false
 	}
-	sessionID := ratchetdomain.SessionID(values[0])
-	if err := sessionID.Validate(); err != nil {
+	if len(values) != 1 || len(values[0]) != 32 {
 		return "", false
 	}
-	return sessionID, true
+	if _, err := hex.DecodeString(values[0]); err != nil {
+		return "", false
+	}
+	return strings.ToLower(values[0]), true
 }
 
-func (o *RatchetObserver) subscribe(sessionID ratchetdomain.SessionID) (uint64, ratchetSubscriber, bool) {
+func (o *RatchetObserver) subscribe(sessionID string) (uint64, ratchetSubscriber, bool) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	if len(o.subscribers) >= observerMaxClients {
@@ -210,18 +213,24 @@ func (o *RatchetObserver) unsubscribe(id uint64) {
 	o.mu.Unlock()
 }
 
+func (o *RatchetObserver) sessionLabel(id ratchetdomain.SessionID) string {
+	mac := hmac.New(sha256.New, o.labelKey[:])
+	_, _ = mac.Write([]byte(id))
+	return hex.EncodeToString(mac.Sum(nil)[:16])
+}
+
 func (o *RatchetObserver) broadcast(event *ratchetdomain.Event) {
 	redacted := RatchetEvent{
 		ID:        string(event.ID),
 		Type:      string(event.Type),
-		SessionID: string(event.SessionID),
+		SessionID: o.sessionLabel(event.SessionID),
 		ToolName:  string(event.ToolName),
 		Timestamp: event.Timestamp,
 	}
 	o.mu.RLock()
 	defer o.mu.RUnlock()
 	for _, subscriber := range o.subscribers {
-		if subscriber.sessionID != "" && subscriber.sessionID != event.SessionID {
+		if subscriber.sessionID != "" && subscriber.sessionID != redacted.SessionID {
 			continue
 		}
 		select {

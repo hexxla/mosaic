@@ -27,12 +27,12 @@ an authorization layer and Mosaic's normal runtime write policies still apply.
 The middleware applies only to tools named in the loaded rules. A configured tool call:
 
 1. obtains the actual MCP server-session ID;
-2. creates or loads process-local Ratchet state for that session;
+2. acquires the per-session executor gate;
 3. validates the configured prerequisite;
 4. reserves a one-time prerequisite, when configured, before running the handler;
 5. records the call and issues a token only after the handler succeeds.
 
-Calls without an MCP session fail closed for configured tools. State is isolated between clients, held in memory, and lost when the process restarts. Same-session calls are serialized through bounded lock striping so concurrent requests cannot reuse one one-time token.
+Calls without an MCP session fail closed for configured tools. State is isolated between clients, held in memory, and lost when the process restarts. Same-session calls are serialized so concurrent requests cannot reuse a one-time token. Finished calls release their slot when the session has no live prerequisites. The observer receives live events through Ratchet v0.3.0’s `EventSink`.
 
 If a protected handler fails after its one-time prerequisite was reserved, the client must repeat the prerequisite before retrying. This prevents two concurrent mutations from both passing on one token.
 
@@ -58,7 +58,13 @@ Ratchet is enabled. Multiple rules with the same `tool` are alternatives (OR),
 not cumulative requirements. An empty `prerequisite` makes that rule
 immediately callable and allows it to issue a token after success.
 
-A one-time prerequisite is reserved before the handler runs. With the current pinned Ratchet version, Mosaic rejects policies that combine multiple rules for one tool with any one-time rule. The supplied multi-prerequisite rules use reusable tokens. With a Ratchet build that exposes workflow execution, Mosaic delegates selection and reservation to that operation.
+Ratchet selects the first eligible alternative and reserves its one-time
+prerequisite before the handler runs. A failed handler issues no completion.
+The YAML `expiry` sets the lifetime of completions issued by its `tool`.
+All explicit expiry values for the same tool must agree. The executor admits
+up to 1,024 sessions and reclaims sessions after 30 minutes of inactivity
+on subsequent calls. It retains at most 64 pending completions per tool
+and session.
 
 ## Tool safety inventory
 
@@ -80,7 +86,7 @@ that bypass the classification wrapper.
 
 Ratchet is workflow ordering, not authentication, authorization, or a substitute for Mosaic's write/delete policy. Continue to bind Mosaic to a trusted interface and apply the normal transport/access controls described in the operator documentation.
 
-Mosaic does not expose Ratchet's tokens, session store, historical event store, or HTTP statistics. It also does not log session IDs or token values. An operator may explicitly enable a live-only WebSocket stream; it requires a private bearer-token file, shares Mosaic's loopback-only listener, rejects requests carrying a browser `Origin`, and omits capability tokens and event metadata from every event.
+Mosaic does not expose Ratchet's tokens, session store, historical event store, or HTTP statistics. It also does not log session IDs or token values. An operator may explicitly enable a live-only WebSocket stream; it requires a private bearer-token file, shares Mosaic's loopback-only listener, rejects requests carrying a browser `Origin`, and omits MCP session IDs, capability tokens, and event metadata from every event.
 
 ## Live WebSocket observability
 
@@ -103,8 +109,10 @@ mosaic-observe -token-file ./observer.token
 The default stream URL is `ws://127.0.0.1:8787/observability/stream`.
 Use `-ratchet-observability-path` on the server and `-url` on the observer to
 change it. The observer receives all live sessions by default; use
-`-session-id <mcp-session-id>` to filter one session. Events are NDJSON with
-only `id`, `type`, `session_id`, optional `tool_name`, and `timestamp`.
+`-session-id <observer-correlation-id>` to filter one session. The
+`session_id` field is a process-local observer label. Copy it from a live event
+to filter subsequent events. Events are NDJSON with `id`, `type`,
+`session_id`, optional `tool_name`, and `timestamp`.
 
 The stream is operational telemetry, not a durable audit log: it retains no
 history, accepts at most 16 simultaneous observers, and drops events for a
@@ -120,7 +128,6 @@ server.
 - Rules are loaded only at startup; there is no hot reload.
 - Ratchet observability is live-only and process-local; there is no replay, durable event store, aggregate statistics endpoint, or browser dashboard.
 - Repeated rules implement OR semantics. AND workflows require a separate policy design or upstream Ratchet support.
-- Multi-prerequisite one-time OR enforcement requires a Ratchet build with workflow execution.
 - Tokens attest only that a prerequisite tool succeeded in the same session;
   they do not bind returned coordinates or records to a later mutation's
   arguments. Clients must inspect the relevant cell/context/seam, and Mosaic's

@@ -80,9 +80,9 @@ type rawMosaicConfig struct {
 	// PersistencePolicy is deprecated; use retention.
 	PersistencePolicy *retentionYAMLFields `yaml:"persistence_policy"`
 
-	CaptureMode string                    `yaml:"capture_mode"`
+	CaptureMode *string                   `yaml:"capture_mode"`
 	Enforcement retentionEnforcementField `yaml:"enforcement"`
-	Notes       string                    `yaml:"notes"`
+	Notes       *string                   `yaml:"notes"`
 
 	AllowDeleteCell *bool `yaml:"allow_delete_cell"`
 
@@ -134,37 +134,26 @@ func ParseMosaicConfigYAML(data []byte) (MosaicConfigLoaded, error) {
 		allowDelete = *raw.AllowDeleteCell
 	}
 
-	hasRetKey := raw.Retention != nil
-	hasLegKey := raw.PersistencePolicy != nil
-	hasRetCM := hasRetKey && strings.TrimSpace(raw.Retention.CaptureMode) != ""
-	hasLegCM := hasLegKey && strings.TrimSpace(raw.PersistencePolicy.CaptureMode) != ""
-	hasFlat := strings.TrimSpace(raw.CaptureMode) != ""
-
-	if hasRetCM && hasLegCM {
-		return MosaicConfigLoaded{}, errors.New("mosaic config: use either retention or persistence_policy, not both")
-	}
-	if hasFlat && (hasRetCM || hasLegCM) {
-		return MosaicConfigLoaded{}, errors.New("mosaic config: use either retention/persistence_policy section or flat capture_mode, not both")
+	hasFlat := raw.CaptureMode != nil || raw.Enforcement.present || raw.Notes != nil
+	if raw.Retention != nil && raw.PersistencePolicy != nil ||
+		hasFlat && (raw.Retention != nil || raw.PersistencePolicy != nil) {
+		return MosaicConfigLoaded{}, errors.New("mosaic config: use one retention policy form")
 	}
 
 	var fields retentionYAMLFields
 	switch {
-	case hasRetCM:
+	case raw.Retention != nil:
 		fields = *raw.Retention
-	case hasLegCM:
+	case raw.PersistencePolicy != nil:
 		fields = *raw.PersistencePolicy
 	case hasFlat:
-		fields = retentionYAMLFields{
-			CaptureMode: raw.CaptureMode,
-			Enforcement: raw.Enforcement,
-			Notes:       raw.Notes,
+		fields.Enforcement = raw.Enforcement
+		if raw.CaptureMode != nil {
+			fields.CaptureMode = *raw.CaptureMode
 		}
-	case hasRetKey:
-		fields = *raw.Retention
-	case hasLegKey:
-		fields = *raw.PersistencePolicy
-	default:
-		fields = retentionYAMLFields{}
+		if raw.Notes != nil {
+			fields.Notes = *raw.Notes
+		}
 	}
 
 	rt, err := normalizeRetentionPolicy(fields.CaptureMode, fields.Enforcement, fields.Notes)
@@ -282,32 +271,4 @@ func ResolveMosaicConfigPath(flagValue string) string {
 		return flagValue
 	}
 	return strings.TrimSpace(os.Getenv(EnvPolicyFile))
-}
-
-// ResolvePersistencePolicyPath is an alias for [ResolveMosaicConfigPath].
-func ResolvePersistencePolicyPath(flagValue string) string {
-	return ResolveMosaicConfigPath(flagValue)
-}
-
-// ParsePersistencePolicyYAML parses YAML and returns only retention (backward compat for tests).
-func ParsePersistencePolicyYAML(data []byte) (RetentionPolicy, error) {
-	cfg, err := ParseMosaicConfigYAML(data)
-	if err != nil {
-		return RetentionPolicy{}, err
-	}
-	return cfg.Retention, nil
-}
-
-// LoadPersistencePolicyFromFile loads a config file and returns only retention (backward compat).
-func LoadPersistencePolicyFromFile(path string) (RetentionPolicy, error) {
-	cfg, err := LoadMosaicConfigFromFile(path)
-	if err != nil {
-		return RetentionPolicy{}, err
-	}
-	return cfg.Retention, nil
-}
-
-// DefaultPersistencePolicy returns default retention (backward compat name).
-func DefaultPersistencePolicy() RetentionPolicy {
-	return DefaultRetentionPolicy()
 }

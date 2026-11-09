@@ -13,11 +13,14 @@ Typical causes:
 
 ### **`mosaic_hexxla_health`**: disk footprint and MVCC retention
 
-The JSON response includes **`disk`** (**`primary_path`**, **`primary_bytes`**, **`wal_bytes`**, **`total_bytes`**) from the primary Hexxla file and **`{primary}-wal`**, and **`mvcc_retain_commits_behind_head`** (effective Mosaic policy at open, including injected defaults when post-delete pruning is enabled without an explicit YAML value). Use **`disk.total_bytes`** together with **`mvcc`** (**`commit_seq`**, **`versioned_rows`**, **`logical_cells`**) when debugging extend-only file growth vs WAL size.
+The JSON response includes **`disk`** (**`primary_path`**, **`primary_bytes`**, **`wal_bytes`**, **`total_bytes`**) from the primary Hexxla file and **`{primary}-wal`**, and **`mvcc_retain_commits_behind_head`** (effective Mosaic policy at open, including injected defaults when post-delete pruning is enabled without an explicit YAML value). For growth diagnostics, pass `full_check: true` and compare **`disk.total_bytes`** with **`mvcc`** (**`commit_seq`**, **`versioned_rows`**, **`logical_cells`**) when debugging extend-only file growth vs WAL size.
 
 ---
 
 ## **`mosaic_hexxla_health`**: tag/source index warnings on MVCC files
+
+Pass `full_check: true` to scan for integrity warnings. The scan can hold up
+writes. The default call reports layout and file sizes.
 
 Older HexxlaDB releases reported **tag/source index inconsistencies** (“index entries reference deleted or superseded cells”) after **heavy MVCC churn** — multiple **`PutCell`** updates at the same coordinate, **`DeleteCell`**, or many versioned writes — even when storage was coherent.
 

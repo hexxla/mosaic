@@ -7,7 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Ratchet observer** — Emit separate observer correlation IDs in place of
+  transport session IDs. Use the correlation ID for stream filters.
+- **Ratchet enforcement** — Delegate to the current executor, including
+  one-time alternatives, and reject policies naming unknown Mosaic tools.
+
+### Fixed
+
+- **Configuration** — Reject files that mix retention configuration forms. Use YAML encryption credentials when seeding a database.
+- **Retrieval budgets** — Release counters when MCP sessions close and pass the remaining budget into context assembly.
+
 ### Changed
+
+- **Health tool** — Report layout and disk usage by default. Pass `full_check: true` for the integrity scan and counts.
 
 - **Development workflow** — Build future tagged versions from source. Remove automatic binary publishing and narrow routine lint checks.
 

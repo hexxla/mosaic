@@ -58,6 +58,12 @@ func (s *ContextAssemblyService) LoadFromSeeds(ctx context.Context, cmd *domain.
 		return domain.ContextPackResponse{}, fmt.Errorf("context assembly: resolved UTF-8 byte budget must be between %d and %d",
 			minContextMaxTokens, maxContextMaxTokens)
 	}
+	if normalized.SessionByteLimit > 0 {
+		effectiveBudget = min(effectiveBudget, normalized.SessionByteLimit)
+		if effectiveBudget < minContextMaxTokens {
+			return domain.ContextPackResponse{}, fmt.Errorf("context assembly: remaining session budget is below %d bytes", minContextMaxTokens)
+		}
+	}
 	normalized.MaxTokens = effectiveBudget
 	normalized.OmitBudget = false
 	normalized.BudgetTokensApprox = 0

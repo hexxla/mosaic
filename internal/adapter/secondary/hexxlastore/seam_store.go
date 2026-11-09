@@ -80,79 +80,44 @@ func (a *SeamStoreAdapter) FindSeams(ctx context.Context, q *domain.FindSeamsQue
 
 // MarkConflict implements [secondary.SeamStore].
 func (a *SeamStoreAdapter) MarkConflict(ctx context.Context, cellA, cellB domain.AxialCoord, reason string) error {
-	if a == nil || a.live == nil {
-		return fmt.Errorf("hexxlastore seam store: nil database")
-	}
-	updErr := a.live.WithRead(func(db *hexxladb.DB) error {
-		return db.Update(func(tx *hexxladb.Tx) error {
-			if err := ctx.Err(); err != nil {
-				return fmt.Errorf("context: %w", err)
-			}
-			if err := tx.MarkConflict(
-				hexxladb.Coord{Q: cellA.Q, R: cellA.R},
-				hexxladb.Coord{Q: cellB.Q, R: cellB.R},
-				reason,
-			); err != nil {
-				return fmt.Errorf("tx MarkConflict: %w", err)
-			}
-			return nil
-		})
+	return a.updateSeam(ctx, "mark conflict", "MarkConflict", func(tx *hexxladb.Tx) error {
+		return tx.MarkConflict(hexxladb.Coord(cellA), hexxladb.Coord(cellB), reason)
 	})
-	if updErr != nil {
-		return fmt.Errorf("hexxlastore mark conflict: %w", updErr)
-	}
-	return nil
 }
 
 // MarkSupersedes implements [secondary.SeamStore].
 func (a *SeamStoreAdapter) MarkSupersedes(ctx context.Context, superseder, superseded domain.AxialCoord, reason string) error {
-	if a == nil || a.live == nil {
-		return fmt.Errorf("hexxlastore seam store: nil database")
-	}
-	updErr := a.live.WithRead(func(db *hexxladb.DB) error {
-		return db.Update(func(tx *hexxladb.Tx) error {
-			if err := ctx.Err(); err != nil {
-				return fmt.Errorf("context: %w", err)
-			}
-			if err := tx.MarkSupersedes(
-				hexxladb.Coord{Q: superseder.Q, R: superseder.R},
-				hexxladb.Coord{Q: superseded.Q, R: superseded.R},
-				reason,
-			); err != nil {
-				return fmt.Errorf("tx MarkSupersedes: %w", err)
-			}
-			return nil
-		})
+	return a.updateSeam(ctx, "mark supersedes", "MarkSupersedes", func(tx *hexxladb.Tx) error {
+		return tx.MarkSupersedes(hexxladb.Coord(superseder), hexxladb.Coord(superseded), reason)
 	})
-	if updErr != nil {
-		return fmt.Errorf("hexxlastore mark supersedes: %w", updErr)
-	}
-	return nil
 }
 
 // ResolveSeam implements [secondary.SeamStore].
 func (a *SeamStoreAdapter) ResolveSeam(ctx context.Context, seamID, resolutionStatus, resolutionNote string) error {
+	return a.updateSeam(ctx, "resolve seam", "ResolveSeam", func(tx *hexxladb.Tx) error {
+		return tx.ResolveSeam(seamID, resolutionStatus, resolutionNote)
+	})
+}
+
+func (a *SeamStoreAdapter) updateSeam(ctx context.Context, operation, method string, apply func(*hexxladb.Tx) error) error {
 	if a == nil || a.live == nil {
 		return fmt.Errorf("hexxlastore seam store: nil database")
 	}
-	updErr := a.live.WithRead(func(db *hexxladb.DB) error {
+	err := a.live.WithRead(func(db *hexxladb.DB) error {
 		return db.Update(func(tx *hexxladb.Tx) error {
 			if err := ctx.Err(); err != nil {
 				return fmt.Errorf("context: %w", err)
 			}
-			if err := tx.ResolveSeam(seamID, resolutionStatus, resolutionNote); err != nil {
-				return fmt.Errorf("tx ResolveSeam: %w", err)
+			if err := apply(tx); err != nil {
+				return fmt.Errorf("tx %s: %w", method, err)
 			}
 			return nil
 		})
 	})
-	if updErr != nil {
-		if errors.Is(updErr, hexxladb.ErrSeamNotFound) {
-			return updErr
-		}
-		return fmt.Errorf("hexxlastore resolve seam: %w", updErr)
+	if err != nil && !errors.Is(err, hexxladb.ErrSeamNotFound) {
+		return fmt.Errorf("hexxlastore %s: %w", operation, err)
 	}
-	return nil
+	return err
 }
 
 // Ensure SeamStoreAdapter implements secondary.SeamStore.

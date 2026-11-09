@@ -22,7 +22,7 @@ Architecture rule from hexxladb: outbound code calls **`package hexxladb` only**
 | **Facets & edges** | `PutFacet`, `PutEdge`, `LinkCells`, reads: `GetFacet`, `AscendFacetsForCell`, `GetEdge`, `AscendEdgesFrom` | Writes: `mosaic_hexxla_put_facet`, `mosaic_hexxla_link_cells` ([facet_edge_tools.go](../../internal/adapter/primary/mcpsrv/facet_edge_tools.go)); reads: `mosaic_hexxla_get_facet`, `mosaic_hexxla_list_facets`, `mosaic_hexxla_get_edge`, `mosaic_hexxla_list_edges_from` ([facet_edge_read_tools.go](../../internal/adapter/primary/mcpsrv/facet_edge_read_tools.go)); **`NewFacetDerived`** / **`NewProvenanceWire`** ([templates.go](https://github.com/hexxla/hexxladb/blob/v0.7.0/templates.go)). |
 | **Query / search** | `QueryCells`, `SearchCells`, tag/source/time scans; embeddings + `SearchByEmbedding` when enabled | MCP **`mosaic_hexxla_query_cells`**, **`mosaic_hexxla_search_cells`**, **`mosaic_hexxla_search_embedding`** ([coverage](./HEXXLA_API_SURFACE_COVERAGE.md)). |
 | **Tags (analytics)** | `ListExistingTopics`, `TagCounts` (`View`) | MCP **`mosaic_hexxla_list_tags`**, **`mosaic_hexxla_tag_counts`** ([`tag_tools.go`](../../internal/adapter/primary/mcpsrv/tag_tools.go)). |
-| **Ops / observability** | `HealthCheck`, `StatsMVCC`, changelog readers, prune | `mosaic_hexxla_health` maps the integrity report to Mosaic’s health schema and includes persisted layout settings and file sizes. |
+| **Ops / observability** | `HealthCheck`, `StatsMVCC`, changelog readers, prune | `mosaic_hexxla_health` reports persisted layout and file sizes by default. Pass `full_check: true` for integrity results and counts. |
 | **Raw KV** | `Tx.Get` / `Put` / `AscendRange` | Mosaic exposes typed records. Application-owned raw keys stay outside the MCP surface. |
 
 ---

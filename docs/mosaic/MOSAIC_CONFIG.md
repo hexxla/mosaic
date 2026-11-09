@@ -60,6 +60,10 @@ Cumulative approximate-token metering on structured JSON outputs from HexxlaDB *
 | **`session_approx_token_budget`** | int | **`0`** = no enforcement cap; metering still recorded where applicable |
 | **`bytes_per_approx_token`** | float | **`4`**; must be **2–16** if set |
 
+Mosaic discards usage when the MCP session closes. Idle HTTP sessions close
+after 30 minutes. Context packs use the remaining budget to trim content
+before Mosaic checks the cost of the complete serialized response.
+
 Tools **`mosaic_hexxla_estimate_context_budget_bytes`**, **`mosaic_hexxla_get_persistence_policy`**, and writes are outside this budget.
 
 ---

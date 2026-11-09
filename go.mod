@@ -5,14 +5,13 @@ go 1.27.3
 require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/hexxla/hexxladb v0.7.0
-	github.com/hexxla/mcp-ratchet v0.0.0-20260505003403-f4303c8bf0cb
+	github.com/hexxla/mcp-ratchet v0.3.0
 	github.com/modelcontextprotocol/go-sdk v1.7.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
 	github.com/google/jsonschema-go v0.4.3 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/oklog/ulid/v2 v2.1.0 // indirect
 	github.com/segmentio/asm v1.2.1 // indirect
 	github.com/segmentio/encoding v0.5.4 // indirect

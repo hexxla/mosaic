@@ -24,6 +24,9 @@ type LoadContextPackCommand struct {
 	// MaxBudgetBytes is an explicit UTF-8 byte ceiling (alternative to approximate tokens).
 	MaxBudgetBytes int
 
+	// SessionByteLimit further bounds the pack when MCP session budgeting is enabled.
+	SessionByteLimit int
+
 	FilterSuperseded bool
 	IncludeSeams     bool
 	IncludeFacetText bool

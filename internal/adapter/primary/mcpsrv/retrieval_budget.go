@@ -21,7 +21,7 @@ type RetrievalBudgetTracker struct {
 	mu       sync.Mutex
 	budget   int // 0 = unlimited
 	bytesPer float64
-	used     map[string]int64
+	used     map[*mcp.ServerSession]int64
 }
 
 // NewRetrievalBudgetTracker builds a tracker from loaded Mosaic config. SessionApproxTokenBudget 0 disables enforcement.
@@ -39,7 +39,7 @@ func NewRetrievalBudgetTracker(cfg config.RetrievalBudgetConfig) *RetrievalBudge
 	return &RetrievalBudgetTracker{
 		budget:   cfg.SessionApproxTokenBudget,
 		bytesPer: per,
-		used:     make(map[string]int64),
+		used:     make(map[*mcp.ServerSession]int64),
 	}
 }
 
@@ -48,11 +48,23 @@ func (t *RetrievalBudgetTracker) Enabled() bool {
 	return t != nil && t.budget > 0
 }
 
-func sessionKey(req *mcp.CallToolRequest) string {
-	if req == nil {
-		return ""
+func budgetSession(req *mcp.CallToolRequest) *mcp.ServerSession {
+	if req == nil || req.Session == nil || req.Session.ID() == "" {
+		return nil
 	}
-	return req.GetSession().ID()
+	return req.Session
+}
+
+// RemainingBytes estimates the session's remaining response budget in bytes.
+// Zero means no cap. The final serialized response still goes through metering.
+func (t *RetrievalBudgetTracker) RemainingBytes(req *mcp.CallToolRequest) int {
+	if !t.Enabled() {
+		return 0
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	remaining := int64(t.budget) - t.used[budgetSession(req)]
+	return int(min(float64(math.MaxInt/2), max(1, float64(remaining)*t.bytesPer)))
 }
 
 // BeforeRead returns an error when the session has already reached or exceeded the configured budget.
@@ -60,12 +72,12 @@ func (t *RetrievalBudgetTracker) BeforeRead(req *mcp.CallToolRequest) error {
 	if t == nil || !t.Enabled() {
 		return nil
 	}
-	key := sessionKey(req)
+	session := budgetSession(req)
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	if t.used[key] >= int64(t.budget) {
-		return fmt.Errorf("mosaic retrieval budget exhausted: used %d >= budget %d approximate tokens (session %q)",
-			t.used[key], t.budget, key)
+	if t.used[session] >= int64(t.budget) {
+		return fmt.Errorf("mosaic retrieval budget exhausted: used %d >= budget %d approximate tokens",
+			t.used[session], t.budget)
 	}
 	return nil
 }
@@ -81,16 +93,26 @@ func (t *RetrievalBudgetTracker) RecordStructuredOutput(req *mcp.CallToolRequest
 		return fmt.Errorf("mosaic retrieval budget: marshal structured output: %w", err)
 	}
 	cost := approximateTokensFromJSONBytes(len(b), t.bytesPer)
-	key := sessionKey(req)
+	session := budgetSession(req)
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	next := t.used[key] + cost
+	next := t.used[session] + cost
 	if t.budget > 0 && next > int64(t.budget) {
-		return fmt.Errorf("mosaic retrieval budget would be exceeded: used %d + %d (this response) > budget %d approximate tokens (session %q)",
-			t.used[key], cost, t.budget, key)
+		return fmt.Errorf("mosaic retrieval budget would be exceeded: used %d + %d (this response) > budget %d approximate tokens",
+			t.used[session], cost, t.budget)
 	}
-	t.used[key] = next
+	if _, tracked := t.used[session]; !tracked && session != nil {
+		go t.releaseOnClose(session)
+	}
+	t.used[session] = next
 	return nil
+}
+
+func (t *RetrievalBudgetTracker) releaseOnClose(session *mcp.ServerSession) {
+	_ = session.Wait()
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	delete(t.used, session)
 }
 
 func approximateTokensFromJSONBytes(n int, bytesPer float64) int64 {
@@ -137,9 +159,10 @@ type RetrievalBudgetStatus struct {
 
 // Status snapshots usage for the MCP session attached to req.
 func (t *RetrievalBudgetTracker) Status(req *mcp.CallToolRequest) RetrievalBudgetStatus {
+	session := budgetSession(req)
 	key := ""
-	if req != nil {
-		key = sessionKey(req)
+	if session != nil {
+		key = session.ID()
 	}
 	if t == nil {
 		return RetrievalBudgetStatus{
@@ -150,7 +173,7 @@ func (t *RetrievalBudgetTracker) Status(req *mcp.CallToolRequest) RetrievalBudge
 	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	used := t.used[key]
+	used := t.used[session]
 	return RetrievalBudgetStatus{
 		SessionApproxTokenBudget: t.budget,
 		ApproxTokensUsed:         used,

@@ -179,7 +179,8 @@ version: 1
 capture_mode: user_only
 enforcement: reject
 `
-	p, err := config.ParsePersistencePolicyYAML([]byte(raw))
+	cfg, err := config.ParseMosaicConfigYAML([]byte(raw))
+	p := cfg.Retention
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -199,7 +200,8 @@ enforcement: true
 	if err := os.WriteFile(path, content, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	p, err := config.LoadPersistencePolicyFromFile(path)
+	cfg, err := config.LoadMosaicConfigFromFile(path)
+	p := cfg.Retention
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -220,5 +222,17 @@ func TestRetentionPolicy_EnforcementEnabled(t *testing.T) {
 	on := config.RetentionPolicy{Enforcement: config.PolicyEnforcementReject}
 	if !on.EnforcementEnabled() {
 		t.Fatal("expected true when enforcement on")
+	}
+}
+
+func TestMosaicConfigRejectsMixedRetentionForms(t *testing.T) {
+	for _, mixed := range []string{
+		"retention: {enforcement: true}\npersistence_policy: {capture_mode: none}",
+		"retention: {capture_mode: none}\nenforcement: true",
+		"persistence_policy: {capture_mode: none}\nnotes: ''",
+	} {
+		if _, err := config.ParseMosaicConfigYAML([]byte("version: 1\n" + mixed)); err == nil {
+			t.Errorf("mixed forms were accepted: %s", mixed)
+		}
 	}
 }

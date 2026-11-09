@@ -12,17 +12,19 @@ import (
 
 // RegisterHealthTool registers the mosaic_hexxla_health MCP tool, which delegates to [primary.Health].
 func RegisterHealthTool(server *mcp.Server, health primary.Health, log *slog.Logger, budget *RetrievalBudgetTracker) error {
-	type healthInput struct{} // No parameters.
+	type healthInput struct {
+		FullCheck bool `json:"full_check,omitempty" jsonschema:"run the full integrity scan (can block writes)"`
+	}
 
 	return addTool(server, &mcp.Tool{
 		Name:        "mosaic_hexxla_health",
-		Description: "Run HexxlaDB HealthCheck (cells, seams, tag/source indexes, orphans, MVCC stats, warnings) plus database layout (page size, max value bytes, embedding dimension/metric), disk footprint (primary + WAL bytes, paths), effective mvcc_retain_commits_behind_head from Mosaic policy, and integrity_ok. Use before heavy retrieval when embedding setup or DB integrity is unknown; empty embedding hits may mean dimension mismatch or missing vectors.",
-	}, func(ctx context.Context, req *mcp.CallToolRequest, _ healthInput) (*mcp.CallToolResult, domain.HealthSummary, error) {
+		Description: "Report database layout, embedding configuration, disk footprint, and retention policy. Pass full_check=true to scan cells, seams, and tag/source indexes. Integrity results and scan counts apply only when integrity_checked is true.",
+	}, func(ctx context.Context, req *mcp.CallToolRequest, in healthInput) (*mcp.CallToolResult, domain.HealthSummary, error) {
 		if log != nil {
 			log.DebugContext(ctx, "mosaic_hexxla_health invoked")
 		}
 		out, err := budget.RunBudgetedRead(req, func() (domain.HealthSummary, error) {
-			return health.Status(ctx)
+			return health.Status(ctx, in.FullCheck)
 		})
 		if err != nil {
 			return nil, domain.HealthSummary{}, err

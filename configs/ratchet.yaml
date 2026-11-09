@@ -42,9 +42,7 @@ rules:
     error_message: "Before saving a cell, call mosaic_hexxla_list_tags to review the current tag vocabulary."
     one_time_use: true
 
-  # Embedding and facet writes require a recent successful cell retrieval. OR
-  # dependencies remain reusable because one-time OR consumption is ambiguous
-  # in the pinned mcp-ratchet version.
+  # Embedding and facet writes accept a recent successful retrieval from any of these tools.
   - tool: "mosaic_hexxla_put_embedding"
     prerequisite: "mosaic_hexxla_search_embedding"
     error_message: "Before storing an embedding, retrieve the target cell with mosaic_hexxla_search_embedding, mosaic_hexxla_query_cells, or mosaic_hexxla_search_cells."
@@ -97,8 +95,7 @@ rules:
     one_time_use: true
 
   # Context loading and deletion require one recent successful retrieval. These
-  # OR rules deliberately use reusable tokens: mcp-ratchet consumes only the
-  # first rule's prerequisite for a one-time multi-rule dependency.
+  # These alternatives deliberately permit reuse within the issuing tool's expiry.
   - tool: "mosaic_hexxla_load_context_pack"
     prerequisite: "mosaic_hexxla_search_embedding"
     error_message: "Before loading context, call mosaic_hexxla_search_embedding, mosaic_hexxla_query_cells, or mosaic_hexxla_search_cells."

@@ -24,7 +24,14 @@ func TestEngineHealthAdapter_Check_includes_layout_and_integrity(t *testing.T) {
 	live := NewLiveDB(db)
 	t.Cleanup(func() { _ = live.Close() })
 	ad := NewEngineHealthAdapter(live, path)
-	summary, err := ad.Check(t.Context())
+	status, err := ad.Check(t.Context(), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.IntegrityChecked || status.Disk.PrimaryPath != path {
+		t.Fatalf("unexpected cheap status: %+v", status)
+	}
+	summary, err := ad.Check(t.Context(), true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +56,7 @@ func TestEngineHealthAdapter_Check_includes_layout_and_integrity(t *testing.T) {
 	if summary.DatabaseLayout.EmbeddingMetric != "cosine" {
 		t.Fatalf("EmbeddingMetric: got %q", summary.DatabaseLayout.EmbeddingMetric)
 	}
-	if !summary.IntegrityOK {
+	if !summary.IntegrityChecked || !summary.IntegrityOK {
 		t.Fatal("expected IntegrityOK on empty healthy DB")
 	}
 }

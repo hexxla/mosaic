@@ -75,11 +75,11 @@ func run(log *slog.Logger, dbPath string, force bool, policyFlag, dbPassphraseFl
 		yamlPass = loaded.DatabasePassphrase
 	}
 
-	opts := config.NewMosaicDatabaseOptions(layout)
-	if err := config.ApplyHexxlaEncryption(opts, config.HexxlaOpenParams{
+	opts, err := config.BuildMosaicCreateOptions(layout, config.HexxlaOpenParams{
 		FlagPassphrase: dbPassphraseFlag,
 		YAMLPassphrase: yamlPass,
-	}); err != nil {
+	})
+	if err != nil {
 		return fmt.Errorf("database encryption options: %w", err)
 	}
 

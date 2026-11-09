@@ -56,7 +56,8 @@ func TestObserverURLQueryBoundary(t *testing.T) {
 		wantErr bool
 	}{
 		{name: "empty", raw: "ws://127.0.0.1/stream"},
-		{name: "session", raw: "ws://127.0.0.1/stream?session_id=abc"},
+		{name: "session", raw: "ws://127.0.0.1/stream?session_id=0123456789abcdef0123456789abcdef"},
+		{name: "raw session ID", raw: "ws://127.0.0.1/stream?session_id=transport-session", wantErr: true},
 		{name: "empty session", raw: "ws://127.0.0.1/stream?session_id=", wantErr: true},
 		{name: "duplicate session", raw: "ws://127.0.0.1/stream?session_id=a&session_id=b", wantErr: true},
 		{name: "token query", raw: "ws://127.0.0.1/stream?token=secret", wantErr: true},

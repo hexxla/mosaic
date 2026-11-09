@@ -5,6 +5,7 @@ package mcpsrv
 import (
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -32,7 +33,7 @@ func ServerInstructions(instructions string) *mcp.ServerOptions {
 //
 // Clients send JSON-RPC to the configured listen address and path (see MOSAIC_MCP_ADDR / MOSAIC_MCP_PATH).
 func StreamableHTTPHandler(srv *mcp.Server, log *slog.Logger) http.Handler {
-	opts := &mcp.StreamableHTTPOptions{}
+	opts := &mcp.StreamableHTTPOptions{SessionTimeout: 30 * time.Minute}
 	if log != nil {
 		opts.Logger = log
 	}

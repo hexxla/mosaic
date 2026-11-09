@@ -26,7 +26,7 @@ describes agent workflows.
 | HexxlaDB capability | Mosaic disposition |
 | --- | --- |
 | `OpenExisting`, `Open`, `Options`, `Close`; `PageSize`, `MaxValueBytes`, `EmbeddingDimension`, `EmbeddingMetric` | **Composition**. The layout readers are returned by `mosaic_hexxla_health`. |
-| `HealthCheck` | `mosaic_hexxla_health`; Mosaic also reports primary/WAL file sizes and its effective MVCC retention setting. |
+| `HealthCheck` | `mosaic_hexxla_health` with `full_check: true`; Mosaic also reports primary/WAL file sizes and its effective MVCC retention setting. |
 | `WriteStats`, `WALStats`, `StorageStats` | **Operator only**. The MCP health response does not claim these full reports. |
 | `BackupTo` | **Operator only**; backups need operator-selected destinations and lifecycle control. |
 | `Compact`, `CompactWithOptions`, `CompactTo`, `CompactToWithOptions`, `PreflightCompactTo`, `ReclaimTail` | **Operator only**; I/O-heavy physical maintenance. |

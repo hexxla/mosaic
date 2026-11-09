@@ -97,6 +97,7 @@ func RegisterContextPackTool(server *mcp.Server, svc primary.ContextAssembly, lo
 			Explain:             in.Explain,
 		}
 		out, err := budget.RunBudgetedRead(req, func() (domain.ContextPackResponse, error) {
+			cmd.SessionByteLimit = budget.RemainingBytes(req)
 			return svc.LoadFromSeeds(ctx, cmd)
 		})
 		if err != nil {

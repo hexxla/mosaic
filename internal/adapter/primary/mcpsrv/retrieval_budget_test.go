@@ -1,8 +1,13 @@
 package mcpsrv
 
 import (
+	"context"
 	"errors"
+	"net/http/httptest"
 	"testing"
+	"time"
+
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/sploitzberg/mosaic/internal/config"
 )
@@ -79,5 +84,37 @@ func TestMetering_accumulatesWhenBudgetZero(t *testing.T) {
 	}
 	if rb.Status(nil).ApproxTokensUsed <= 0 {
 		t.Fatal("expected metering without enforcement")
+	}
+}
+
+func TestRetrievalBudgetReleasesClosedSession(t *testing.T) {
+	t.Parallel()
+	tracker := NewRetrievalBudgetTracker(config.RetrievalBudgetConfig{SessionApproxTokenBudget: 100})
+	server := mcp.NewServer(&mcp.Implementation{Name: "budget-test", Version: "test"}, nil)
+	mcp.AddTool(server, &mcp.Tool{Name: "read"}, func(_ context.Context, req *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, ratchetTestOutput, error) {
+		out := ratchetTestOutput{OK: true}
+		return nil, out, tracker.RecordStructuredOutput(req, out)
+	})
+	httpServer := httptest.NewServer(StreamableHTTPHandler(server, nil))
+	t.Cleanup(httpServer.Close)
+	session := connectRatchetTestClient(t, httpServer.URL)
+	assertToolSuccess(t, callRatchetTestTool(t, session, "read"))
+	count := func() int {
+		tracker.mu.Lock()
+		defer tracker.mu.Unlock()
+		return len(tracker.used)
+	}
+	if got := count(); got != 1 {
+		t.Fatalf("tracked sessions = %d, want 1", got)
+	}
+	if err := session.Close(); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for count() != 0 && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
+	}
+	if got := count(); got != 0 {
+		t.Fatalf("tracked sessions after close = %d, want 0", got)
 	}
 }

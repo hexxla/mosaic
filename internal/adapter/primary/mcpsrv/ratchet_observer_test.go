@@ -1,7 +1,6 @@
 package mcpsrv
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -48,10 +47,20 @@ func TestRatchetObserverStreamsRedactedSessionEvents(t *testing.T) {
 
 	token := strings.Repeat("b", 32)
 	observer := NewRatchetObserver([]byte(token))
+	if observer.sessionLabel("session-a") == NewRatchetObserver([]byte(token)).sessionLabel("session-a") {
+		t.Fatal("observer instances reused a session label")
+	}
 	server := httptest.NewServer(observer)
 	defer server.Close()
-	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "?session_id=session-a"
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "?session_id=" + observer.sessionLabel("session-a")
 	header := http.Header{"Authorization": {"Bearer " + token}}
+	rawURL := "ws" + strings.TrimPrefix(server.URL, "http") + "?session_id=session-a"
+	if raw, response, err := websocket.DefaultDialer.Dial(rawURL, header); err == nil {
+		_ = raw.Close()
+		t.Fatal("raw session ID accepted as an observer filter")
+	} else if response == nil || response.StatusCode != http.StatusBadRequest {
+		t.Fatalf("raw session filter response = %v", response)
+	}
 	conn, _, err := websocket.DefaultDialer.Dial(wsURL, header)
 	if err != nil {
 		t.Fatalf("dial observer: %v", err)
@@ -59,7 +68,7 @@ func TestRatchetObserverStreamsRedactedSessionEvents(t *testing.T) {
 	defer func() { _ = conn.Close() }()
 
 	wantTime := time.Date(2026, time.August, 27, 12, 0, 0, 0, time.UTC)
-	if err := observer.Store(context.Background(), &ratchetdomain.Event{
+	if err := observer.Store(t.Context(), &ratchetdomain.Event{
 		ID:        "ignored-session",
 		Type:      ratchetdomain.EventTypeToolCallAttempt,
 		SessionID: "session-b",
@@ -67,7 +76,7 @@ func TestRatchetObserverStreamsRedactedSessionEvents(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("store ignored event: %v", err)
 	}
-	if err := observer.Store(context.Background(), &ratchetdomain.Event{
+	if err := observer.Store(t.Context(), &ratchetdomain.Event{
 		ID:        "event-1",
 		Type:      ratchetdomain.EventTypeTokenCreated,
 		SessionID: "session-a",
@@ -86,22 +95,15 @@ func TestRatchetObserverStreamsRedactedSessionEvents(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read event: %v", err)
 	}
-	if strings.Contains(string(payload), "secret") || strings.Contains(string(payload), "metadata") {
+	if strings.Contains(string(payload), "secret") || strings.Contains(string(payload), "metadata") || strings.Contains(string(payload), "session-a") {
 		t.Fatalf("credential-bearing fields leaked: %s", payload)
 	}
 	var got RatchetEvent
 	if err := json.Unmarshal(payload, &got); err != nil {
 		t.Fatalf("decode event: %v", err)
 	}
-	if got.ID != "event-1" || got.SessionID != "session-a" || got.ToolName != "mosaic_hexxla_query_cells" || !got.Timestamp.Equal(wantTime) {
+	if got.ID != "event-1" || got.SessionID != observer.sessionLabel("session-a") || got.ToolName != "mosaic_hexxla_query_cells" || !got.Timestamp.Equal(wantTime) {
 		t.Fatalf("unexpected event: %+v", got)
 	}
 
-	events, err := observer.GetEvents(context.Background(), "session-a", nil)
-	if err != nil {
-		t.Fatalf("GetEvents: %v", err)
-	}
-	if len(events) != 0 {
-		t.Fatalf("live observer retained %d events", len(events))
-	}
 }
