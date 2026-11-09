@@ -12,8 +12,8 @@ github.com/hexxla/hexxladb v0.7.0 h1:qXfyRkGuUWWADkTu1cZISNfgK34AO/DTxIHj31fO4Is
 github.com/hexxla/hexxladb v0.7.0/go.mod h1:w/CIvwVrHb94hJP4qRm9L2GWYZToboQtMfKMuvmQMm4=
 github.com/hexxla/mcp-ratchet v0.0.0-20260505003403-f4303c8bf0cb h1:2j8AisAwN9lEAQ12iIdcQ5t8bLkLHieYm4tL58zjWtk=
 github.com/hexxla/mcp-ratchet v0.0.0-20260505003403-f4303c8bf0cb/go.mod h1:e+xSjCj6GVyENVkQUf+rsg3KyoJAAMT+KRxEJZHRqUA=
-github.com/modelcontextprotocol/go-sdk v1.7.0 h1:yqjY2dsbKAC0LSuWZVBMrHgiG8ukXv6NRo0JiALay44=
-github.com/modelcontextprotocol/go-sdk v1.7.0/go.mod h1:dL7u98E/zjJTGzEq+j30jQ8K2k1mb6LeAH4inEcSGts=
+github.com/modelcontextprotocol/go-sdk v1.8.0 h1:KIvahhYqwtbeniWVPs3TcXEA7b8jEtwfBpOTAI+Urx4=
+github.com/modelcontextprotocol/go-sdk v1.8.0/go.mod h1:dL7u98E/zjJTGzEq+j30jQ8K2k1mb6LeAH4inEcSGts=
 github.com/oklog/ulid/v2 v2.1.0 h1:+9lhoxAP56we25tyYETBBY1YLA2SaoLvUFgrP2miPJU=
 github.com/oklog/ulid/v2 v2.1.0/go.mod h1:rcEKHmBBKfef9DhnvX7y1HZBYxjXb0cP5ExxNsTT1QQ=
 github.com/pborman/getopt v0.0.0-20170112200414-7148bc3a4c30/go.mod h1:85jBQOZwpVEaDAr341tbn15RS4fCAsIst0qp7i8ex1o=
