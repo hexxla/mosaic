@@ -22,7 +22,6 @@ const (
 // MosaicDatabaseLayout describes persisted-on-create HexxlaDB options shared by mosaic-create-db and mosaic-seed.
 // Encryption is applied separately via [ApplyHexxlaEncryption].
 type MosaicDatabaseLayout struct {
-	EnableMVCC         bool
 	PageSize           uint32
 	MaxValueBytes      uint32
 	EmbeddingDimension uint16
@@ -32,7 +31,6 @@ type MosaicDatabaseLayout struct {
 // DefaultMosaicDatabaseLayout matches historical Mosaic defaults (same as [MosaicNewDatabaseOptions]).
 func DefaultMosaicDatabaseLayout() MosaicDatabaseLayout {
 	return MosaicDatabaseLayout{
-		EnableMVCC:         true,
 		PageSize:           MosaicDefaultPageSize,
 		MaxValueBytes:      MosaicDefaultMaxValueBytes,
 		EmbeddingDimension: MosaicEmbeddingDimensionAllMiniLM,
@@ -43,13 +41,12 @@ func DefaultMosaicDatabaseLayout() MosaicDatabaseLayout {
 // NewMosaicDatabaseOptions builds [hexxladb.Options] for creating a new database file.
 // Invalid combinations are rejected by [hexxladb.Open], not here.
 func NewMosaicDatabaseOptions(layout MosaicDatabaseLayout) *hexxladb.Options {
-	return &hexxladb.Options{
-		EnableMVCC:         layout.EnableMVCC,
-		PageSize:           layout.PageSize,
-		MaxValueBytes:      layout.MaxValueBytes,
-		EmbeddingDimension: layout.EmbeddingDimension,
-		DistanceMetric:     layout.DistanceMetric,
-	}
+	opts := defaultHexxlaOptions()
+	opts.PageSize = layout.PageSize
+	opts.MaxValueBytes = layout.MaxValueBytes
+	opts.EmbeddingDimension = layout.EmbeddingDimension
+	opts.DistanceMetric = layout.DistanceMetric
+	return opts
 }
 
 // MosaicNewDatabaseOptions returns [hexxladb.Options] for creating a new Mosaic-compatible HexxlaDB file
@@ -60,7 +57,7 @@ func MosaicNewDatabaseOptions() *hexxladb.Options {
 
 // ParseMosaicDatabaseLayoutFromCLI builds [MosaicDatabaseLayout] from mosaic-create-db / mosaic-seed flags.
 // page-size, max-value-bytes, embedding-dim use flag defaults matching [DefaultMosaicDatabaseLayout].
-func ParseMosaicDatabaseLayoutFromCLI(mvcc bool, pageSize, maxVal, embedDim uint, metricStr string) (MosaicDatabaseLayout, error) {
+func ParseMosaicDatabaseLayoutFromCLI(pageSize, maxVal, embedDim uint, metricStr string) (MosaicDatabaseLayout, error) {
 	metric, err := ParseDistanceMetricName(metricStr)
 	if err != nil {
 		return MosaicDatabaseLayout{}, err
@@ -72,7 +69,6 @@ func ParseMosaicDatabaseLayoutFromCLI(mvcc bool, pageSize, maxVal, embedDim uint
 		return MosaicDatabaseLayout{}, fmt.Errorf("config: page-size or max-value-bytes too large")
 	}
 	return MosaicDatabaseLayout{
-		EnableMVCC:         mvcc,
 		PageSize:           uint32(pageSize), //nolint:gosec // G115: bounded by check above
 		MaxValueBytes:      uint32(maxVal),   //nolint:gosec // G115: bounded by check above
 		EmbeddingDimension: uint16(embedDim),

@@ -90,17 +90,22 @@ func ApplyHexxlaEncryption(opts *hexxladb.Options, p HexxlaOpenParams) error {
 	return nil
 }
 
-// MergeMVCCRetainIntoOpenOptions returns a copy of base with [hexxladb.Options.MVCCRetention]
-// set when retain is non-zero (enables [DB.SuggestedPruneBeforeSeq] / [DB.MVCCPrunePlan] at open).
+func defaultHexxlaOptions() *hexxladb.Options {
+	// Required for plaintext creation until Mosaic upgrades from HexxlaDB v0.6.0.
+	return &hexxladb.Options{EnableMVCC: true}
+}
+
+// MergeMVCCRetainIntoOpenOptions supplies MVCC creation defaults and enables
+// prune suggestions when retain is non-zero.
 // Encryption fields on base are preserved by shallow struct copy.
 func MergeMVCCRetainIntoOpenOptions(base *hexxladb.Options, retain uint64) *hexxladb.Options {
+	if base == nil {
+		base = defaultHexxlaOptions()
+	}
 	if retain == 0 {
 		return base
 	}
-	var out hexxladb.Options
-	if base != nil {
-		out = *base
-	}
+	out := *base
 	out.MVCCRetention = hexxladb.MVCCRetention{RetainCommitsBehindHead: retain}
 	return &out
 }

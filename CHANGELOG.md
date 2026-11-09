@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **MCP tool safety inventory** — all 23 tools publish explicit read-only, destructive, idempotent, and open-world hints from one fail-closed registration inventory; tests prevent production registrations from bypassing it.
 - **Secure Ratchet live observability** — an opt-in, bearer-authenticated WebSocket stream shares the loopback MCP listener and emits a redacted live event shape without Ratchet capability tokens, metadata, or history. The bounded `mosaic-observe` CLI provides a self-contained operator workflow.
 
+### Changed
+
+- Plaintext creation always enables MVCC, including first startup of `mosaic-mcp`. The creation and seed commands now use a fixed storage policy and have removed the `--mvcc` flag.
+
 ### Fixed
 
 - Reject unsupported one-time Ratchet alternatives with the pinned dependency. Delegate to Ratchet workflow execution when available.

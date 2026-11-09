@@ -53,7 +53,7 @@ func TestParseDistanceMetricName(t *testing.T) {
 func TestParseMosaicDatabaseLayoutFromCLI(t *testing.T) {
 	t.Parallel()
 	def := config.DefaultMosaicDatabaseLayout()
-	got, err := config.ParseMosaicDatabaseLayoutFromCLI(def.EnableMVCC, uint(def.PageSize), uint(def.MaxValueBytes), uint(def.EmbeddingDimension), "cosine")
+	got, err := config.ParseMosaicDatabaseLayoutFromCLI(uint(def.PageSize), uint(def.MaxValueBytes), uint(def.EmbeddingDimension), "cosine")
 	if err != nil {
 		t.Fatal(err)
 	}

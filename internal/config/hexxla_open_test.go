@@ -1,6 +1,7 @@
 package config_test
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/hexxla/hexxladb"
@@ -84,5 +85,21 @@ func TestApplyHexxlaEncryption_merge(t *testing.T) {
 	}
 	if opts.Passphrase != "p" || !opts.EnableMVCC {
 		t.Fatalf("got %#v", opts)
+	}
+}
+
+func TestPlaintextStartupCreatesMVCC(t *testing.T) {
+	t.Parallel()
+	opts := config.MergeMVCCRetainIntoOpenOptions(nil, 0)
+	db, err := hexxladb.Open(filepath.Join(t.TempDir(), "mosaic.db"), opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	if err := db.Update(func(*hexxladb.Tx) error { return nil }); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.ViewAt(1, func(*hexxladb.Tx) error { return nil }); err != nil {
+		t.Fatalf("first commit must be visible at sequence 1: %v", err)
 	}
 }

@@ -33,7 +33,6 @@ func main() {
 	flag.BoolVar(&replaceExisting, "replace", false, "same as -force")
 	dbPassphrase := flag.String("db-passphrase", "", "optional HexxlaDB encryption passphrase (overrides "+config.EnvDBPassphrase+")")
 
-	mvcc := flag.Bool("mvcc", true, "enable MVCC for plaintext creation (format v2; encryption creates authenticated format v3)")
 	pageSize := flag.Uint("page-size", uint(config.MosaicDefaultPageSize), "page size for new file (4096, 8192, 16384, or 65536)")
 	maxVal := flag.Uint("max-value-bytes", uint(config.MosaicDefaultMaxValueBytes), "max encoded value size per cell")
 	embedDim := flag.Uint("embedding-dim", uint(config.MosaicEmbeddingDimensionAllMiniLM), "embedding vector width (must match your embedding model when using MCP)")
@@ -51,7 +50,7 @@ func main() {
 		os.Exit(2)
 	}
 
-	layout, err := config.ParseMosaicDatabaseLayoutFromCLI(*mvcc, *pageSize, *maxVal, *embedDim, *metricStr)
+	layout, err := config.ParseMosaicDatabaseLayoutFromCLI(*pageSize, *maxVal, *embedDim, *metricStr)
 	if err != nil {
 		log.Error(err.Error())
 		os.Exit(2)
@@ -123,7 +122,6 @@ func run(log *slog.Logger, dbPath string, force bool, policyFlag, dbPassphraseFl
 	log.Info("created empty Mosaic HexxlaDB",
 		"path", dbPath,
 		"embedding_dim", db.EmbeddingDimension(),
-		"mvcc", layout.EnableMVCC,
 		"page_size", layout.PageSize,
 	)
 	return nil

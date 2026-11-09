@@ -38,7 +38,6 @@ func main() {
 	embedModel := flag.String("embed-model", "", "embeddings model (overrides policy YAML then "+config.EnvEmbedModel+")")
 	dbPassphrase := flag.String("db-passphrase", "", "optional HexxlaDB encryption passphrase (overrides "+config.EnvDBPassphrase+")")
 
-	mvcc := flag.Bool("mvcc", true, "enable MVCC for plaintext creation (format v2; encryption creates authenticated format v3)")
 	pageSize := flag.Uint("page-size", uint(config.MosaicDefaultPageSize), "page size for new file (4096, 8192, 16384, or 65536)")
 	maxVal := flag.Uint("max-value-bytes", uint(config.MosaicDefaultMaxValueBytes), "max encoded value size per cell")
 	embedDim := flag.Uint("embedding-dim", uint(config.MosaicEmbeddingDimensionAllMiniLM), "embedding vector width (must match the embed model output)")
@@ -75,7 +74,7 @@ func main() {
 		os.Exit(2)
 	}
 
-	layout, err := config.ParseMosaicDatabaseLayoutFromCLI(*mvcc, *pageSize, *maxVal, *embedDim, *metricStr)
+	layout, err := config.ParseMosaicDatabaseLayoutFromCLI(*pageSize, *maxVal, *embedDim, *metricStr)
 	if err != nil {
 		log.Error(err.Error())
 		os.Exit(2)
