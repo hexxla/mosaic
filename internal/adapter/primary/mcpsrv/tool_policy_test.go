@@ -15,7 +15,7 @@ import (
 )
 
 func TestMCPToolPolicyInventory(t *testing.T) {
-	const wantToolCount = 23
+	const wantToolCount = 22
 	if got := len(mcpToolPolicies); got != wantToolCount {
 		t.Fatalf("tool policy count = %d, want %d", got, wantToolCount)
 	}
@@ -30,7 +30,7 @@ func TestMCPToolPolicyInventory(t *testing.T) {
 		"mosaic_hexxla_put_facet",
 		"mosaic_hexxla_resolve_seam",
 	}
-	if got := MutationToolNames(); !slices.Equal(got, wantMutations) {
+	if got := MutationToolNames(true); !slices.Equal(got, wantMutations) {
 		t.Fatalf("mutation tools = %v, want %v", got, wantMutations)
 	}
 }
@@ -106,5 +106,15 @@ func TestProductionRegistrationsUsePolicyWrapper(t *testing.T) {
 			}
 			return true
 		})
+	}
+}
+
+func TestCoreToolProfile(t *testing.T) {
+	want := []string{"mosaic_hexxla_delete_cell", "mosaic_hexxla_get_cell", "mosaic_hexxla_health", "mosaic_hexxla_list_tags", "mosaic_hexxla_load_context_pack", "mosaic_hexxla_put_cell", "mosaic_hexxla_search_cells"}
+	if got := EnabledToolNames(false); !slices.Equal(got, want) {
+		t.Fatalf("core tools=%v, want %v", got, want)
+	}
+	if got := MutationToolNames(false); !slices.Equal(got, []string{"mosaic_hexxla_delete_cell", "mosaic_hexxla_put_cell"}) {
+		t.Fatalf("core mutations=%v", got)
 	}
 }

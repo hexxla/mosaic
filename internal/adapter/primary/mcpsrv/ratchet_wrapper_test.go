@@ -9,9 +9,7 @@ import (
 	"testing"
 	"time"
 
-	ratchetadapters "github.com/hexxla/mcp-ratchet/pkg/ratchet/adapters"
-	ratchetdomain "github.com/hexxla/mcp-ratchet/pkg/ratchet/domain"
-	ratchetservices "github.com/hexxla/mcp-ratchet/pkg/ratchet/services"
+	"github.com/hexxla/mcp-ratchet/pkg/ratchet"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -50,13 +48,13 @@ func TestRatchetGateDoesNotAuthorizeFailedTool(t *testing.T) {
 }
 
 func TestRatchetGateValidatesProtectedToolCoverage(t *testing.T) {
-	rules := []ratchetdomain.Rule{
-		{Tool: "protected", Prerequisite: "discover"},
+	rules := []ratchet.Rule{
+		{Tool: "protected", AfterAny: []string{"discover"}},
 		{Tool: "free-pass"},
-		{Tool: "mixed", Prerequisite: "discover"},
+		{Tool: "mixed", AfterAny: []string{"discover"}},
 		{Tool: "mixed"},
 	}
-	gate := NewRatchetGate(nil, rules)
+	gate := NewRatchetGate(nil, ratchet.Policy{Rules: rules})
 
 	if err := gate.ValidateProtectedTools([]string{"protected"}); err != nil {
 		t.Fatalf("validate protected tool: %v", err)
@@ -73,9 +71,9 @@ func TestRatchetGateValidatesProtectedToolCoverage(t *testing.T) {
 }
 
 func TestRatchetGateRejectsUnknownPrerequisite(t *testing.T) {
-	gate := NewRatchetGate(nil, []ratchetdomain.Rule{
-		{Tool: "mosaic_hexxla_put_cell", Prerequisite: "typo"},
-	})
+	gate := NewRatchetGate(nil, ratchet.Policy{Rules: []ratchet.Rule{
+		{Tool: "mosaic_hexxla_put_cell", AfterAny: []string{"typo"}},
+	}})
 	if err := gate.ValidateToolNames(); err == nil || !strings.Contains(err.Error(), "typo") {
 		t.Fatalf("policy validation error = %v", err)
 	}
@@ -84,29 +82,23 @@ func TestRatchetGateRejectsUnknownPrerequisite(t *testing.T) {
 func newRatchetTestServer(t *testing.T, failDiscovery bool, mutationCalls *atomic.Int32) *httptest.Server {
 	t.Helper()
 
-	rules := []ratchetdomain.Rule{
-		{Tool: "discover", Expiry: time.Minute},
+	rules := []ratchet.Rule{
+		{Tool: "discover", TTL: time.Minute},
 		{
-			Tool:         "mutate",
-			Prerequisite: "discover",
-			ErrorMessage: "discover first",
-			OneTimeUse:   true,
+			Tool:     "mutate",
+			AfterAny: []string{"discover"},
+			Message:  "discover first",
+			Consume:  true,
 		},
 	}
-	service := ratchetservices.NewRatchetService(
-		ratchetadapters.NewYAMLConfigLoader(),
-		ratchetadapters.NewMemoryTokenStore(),
-		ratchetadapters.NewCryptoRandomGenerator(),
-		ratchetadapters.NewRealClock(),
-	)
-	for _, rule := range rules {
-		if err := service.RegisterRule(t.Context(), rule); err != nil {
-			t.Fatalf("register rule: %v", err)
-		}
+	policy := ratchet.Policy{Rules: rules}
+	service, err := ratchet.New(policy, ratchet.Options{})
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	srv := NewServer("ratchet-test", "test", nil)
-	srv.AddReceivingMiddleware(NewRatchetGate(service, rules).Middleware())
+	srv.AddReceivingMiddleware(NewRatchetGate(service, policy).Middleware())
 	mcp.AddTool(srv, &mcp.Tool{Name: "discover"}, func(context.Context, *mcp.CallToolRequest, struct{}) (*mcp.CallToolResult, ratchetTestOutput, error) {
 		if failDiscovery {
 			return nil, ratchetTestOutput{}, errors.New("discovery failed")
@@ -165,37 +157,29 @@ func assertToolError(t *testing.T, result *mcp.CallToolResult) {
 }
 
 func TestRatchetGateDelegatesOneTimeAlternatives(t *testing.T) {
-	rules := []ratchetdomain.Rule{
-		{Tool: "mutate", Prerequisite: "discover_a", OneTimeUse: true},
-		{Tool: "mutate", Prerequisite: "discover_b", OneTimeUse: true},
-	}
-	service := ratchetservices.NewRatchetService(ratchetadapters.NewYAMLConfigLoader(), ratchetadapters.NewMemoryTokenStore(), ratchetadapters.NewCryptoRandomGenerator(), ratchetadapters.NewRealClock())
-	for _, rule := range rules {
-		if err := service.RegisterRule(t.Context(), rule); err != nil {
-			t.Fatal(err)
-		}
-	}
-	gate := NewRatchetGate(service, rules)
-	if err := gate.ValidateProtectedTools([]string{"mutate"}); err != nil {
+	policy := ratchet.Policy{Rules: []ratchet.Rule{{Tool: "mutate", AfterAny: []string{"discover_a", "discover_b"}, Consume: true}}}
+	engine, err := ratchet.New(policy, ratchet.Options{})
+	if err != nil {
 		t.Fatal(err)
 	}
-	var calls int
-	for i, tool := range []ratchetdomain.ToolName{"discover_b", "mutate", "mutate"} {
-		result, err := gate.execute(t.Context(), "test-session", tool, func() (mcp.Result, error) {
-			if tool == "mutate" {
-				calls++
+	srv := NewServer("alternatives", "test", nil)
+	srv.AddReceivingMiddleware(NewRatchetGate(engine, policy).Middleware())
+	var calls atomic.Int32
+	for _, name := range []string{"discover_a", "discover_b", "mutate"} {
+		mcp.AddTool(srv, &mcp.Tool{Name: name}, func(context.Context, *mcp.CallToolRequest, struct{}) (*mcp.CallToolResult, struct{}, error) {
+			if name == "mutate" {
+				calls.Add(1)
 			}
-			return new(mcp.CallToolResult), nil
+			return nil, struct{}{}, nil
 		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		callResult, ok := result.(*mcp.CallToolResult)
-		if !ok || callResult.IsError != (i == 2) {
-			t.Fatalf("call %d returned unexpected result: %v", i, result)
-		}
 	}
-	if calls != 1 {
-		t.Fatalf("one-time prerequisite authorized %d mutations", calls)
+	server := httptest.NewServer(StreamableHTTPHandler(srv, nil))
+	t.Cleanup(server.Close)
+	client := connectRatchetTestClient(t, server.URL)
+	assertToolSuccess(t, callRatchetTestTool(t, client, "discover_b"))
+	assertToolSuccess(t, callRatchetTestTool(t, client, "mutate"))
+	assertToolError(t, callRatchetTestTool(t, client, "mutate"))
+	if calls.Load() != 1 {
+		t.Fatalf("one completion allowed %d mutations", calls.Load())
 	}
 }

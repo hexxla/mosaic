@@ -63,13 +63,10 @@ func TestParseMVCCPruneProfile(t *testing.T) {
 
 func TestParseMosaicConfigYAMLRejectsLiveCompaction(t *testing.T) {
 	t.Parallel()
-	const raw = `version: 1
-database:
-  auto_maintain_after_cell_delete:
-    enabled: true
-    compact: true
-`
-	if _, err := config.ParseMosaicConfigYAML([]byte(raw)); err == nil {
-		t.Fatal("accepted an unsafe live compaction setting")
+	for _, value := range []string{"true", "false"} {
+		raw := "version: 1\ndatabase:\n  auto_maintain_after_cell_delete:\n    enabled: true\n    compact: " + value + "\n"
+		if _, err := config.ParseMosaicConfigYAML([]byte(raw)); err == nil {
+			t.Fatalf("removed compact field accepted: %s", value)
+		}
 	}
 }

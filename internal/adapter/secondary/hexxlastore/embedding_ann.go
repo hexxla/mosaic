@@ -22,7 +22,7 @@ func NewEmbeddingANNAdapter(live *LiveDB) *EmbeddingANNAdapter {
 }
 
 // Search implements [secondary.EmbeddingANN].
-func (a *EmbeddingANNAdapter) Search(ctx context.Context, vector []float32, limit int, minScore float64) ([]domain.EmbeddingMatch, error) {
+func (a *EmbeddingANNAdapter) Search(ctx context.Context, vector []float32, limit int, minScore float64) ([]domain.CellHit, error) {
 	if a == nil || a.live == nil {
 		return nil, fmt.Errorf("hexxlastore embedding: nil database")
 	}
@@ -30,18 +30,27 @@ func (a *EmbeddingANNAdapter) Search(ctx context.Context, vector []float32, limi
 		return nil, err
 	}
 
-	var matches []domain.EmbeddingMatch
+	var matches []domain.CellHit
 	err := a.live.WithRead(func(db *hexxladb.DB) error {
 		return db.View(func(tx *hexxladb.Tx) error {
-			hits, err := tx.SearchByEmbedding(vector, hexxladb.EmbeddingSearchConfig{
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			hits, err := tx.SearchByEmbedding(ctx, vector, hexxladb.EmbeddingSearchConfig{
 				MaxResults: limit,
 				MinScore:   minScore,
 			})
 			if err != nil {
 				return fmt.Errorf("search by embedding: %w", err)
 			}
-			matches = make([]domain.EmbeddingMatch, 0, len(hits))
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			matches = make([]domain.CellHit, 0, len(hits))
 			for _, hit := range hits {
+				if err := ctx.Err(); err != nil {
+					return err
+				}
 				ax, err := hexxladb.Unpack(hit.Coord)
 				if err != nil {
 					return fmt.Errorf("unpack hit coord: %w", err)
@@ -53,7 +62,7 @@ func (a *EmbeddingANNAdapter) Search(ctx context.Context, vector []float32, limi
 				if !ok {
 					continue
 				}
-				matches = append(matches, domain.EmbeddingMatch{
+				matches = append(matches, domain.CellHit{
 					Coord:      domain.AxialCoord{Q: ax.Q, R: ax.R},
 					Score:      hit.Score,
 					RawContent: rec.RawContent,
@@ -66,7 +75,7 @@ func (a *EmbeddingANNAdapter) Search(ctx context.Context, vector []float32, limi
 					ValidTo:    nanoWallPtrToRFC3339(rec.Validity.ValidTo),
 				})
 			}
-			return nil
+			return ctx.Err()
 		})
 	})
 	if err != nil {

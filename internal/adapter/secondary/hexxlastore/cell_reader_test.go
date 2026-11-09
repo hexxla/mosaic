@@ -43,19 +43,19 @@ func TestCellReaderReportsPartialAndCandidateLimits(t *testing.T) {
 	}
 
 	reader := NewCellReaderAdapter(live)
-	partial, err := reader.QueryCells(ctx, &domain.CellQueryCommand{MaxScanRows: 1}, nil)
+	partial, err := reader.SearchCells(ctx, &domain.CellSearchCommand{MaxScanRows: 1}, nil)
 	if err != nil || !partial.ScanLimitReached || len(partial.Hits) != 1 {
 		t.Fatalf("partial query = %+v, %v", partial, err)
 	}
 
-	q := &domain.CellQueryCommand{RequireTags: []string{"rare"}, MaxResults: 1}
-	capped, err := reader.QueryCells(ctx, q, []float32{1, 0})
+	q := &domain.CellSearchCommand{RequireTags: []string{"rare"}, MaxResults: 1}
+	capped, err := reader.SearchCells(ctx, q, []float32{1, 0})
 	if err != nil || !capped.EmbeddingCandidateLimitReached || len(capped.Hits) != 0 {
 		t.Fatalf("candidate-limited query = %+v, %v", capped, err)
 	}
 
 	q.MaxScanRows = 1
-	exact, err := reader.QueryCells(ctx, q, []float32{1, 0})
+	exact, err := reader.SearchCells(ctx, q, []float32{1, 0})
 	if err != nil || exact.ScanLimitReached || exact.EmbeddingCandidateLimitReached || exact.EmbeddingPath != "flat" || len(exact.Hits) != 1 {
 		t.Fatalf("bounded exact query = %+v, %v", exact, err)
 	}

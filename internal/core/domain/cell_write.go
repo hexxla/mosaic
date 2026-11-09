@@ -30,6 +30,9 @@ const (
 // or a live cell without explicitly allowing replacement.
 var ErrCellCoordinateOccupied = errors.New("cell coordinate occupied")
 
+// ErrCellContentChanged means an embedding guard no longer matches its cell.
+var ErrCellContentChanged = errors.New("cell content changed")
+
 // PutCellCommand writes one cell at an axial coordinate (within DB.Update).
 type PutCellCommand struct {
 	Coord      AxialCoord
@@ -45,6 +48,7 @@ type PutCellCommand struct {
 	Placement      CellPlacementMode
 	MaxRadius      int
 	AllowOverwrite bool
+	Embed          bool // compute and commit an embedding with this cell when requested
 }
 
 // PutEmbeddingCommand stores a vector at coord: supply either embed Text (Ollama) or Vector (raw).
@@ -52,6 +56,9 @@ type PutEmbeddingCommand struct {
 	Coord  AxialCoord
 	Text   string // natural language; embedded via Ollama when non-empty
 	Vector []float32
+	// ExpectedContentSHA256 optionally guards the current RawContent in the
+	// same transaction as the embedding write. Empty disables the guard.
+	ExpectedContentSHA256 string
 }
 
 // DeleteCellCommand removes the cell at the given axial coordinate (tombstone on MVCC DBs).
@@ -66,6 +73,7 @@ type MutationOK struct {
 
 // PutCellMutationResult reports the actual coordinate selected for a cell write.
 type PutCellMutationResult struct {
+	Embedded  bool              `json:"embedded"`
 	OK        bool              `json:"ok"`
 	Coord     AxialCoord        `json:"coord"`
 	Placement CellPlacementMode `json:"placement"`

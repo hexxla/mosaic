@@ -49,7 +49,13 @@ New Mosaic databases default to **`PageSize` 4096** ([`internal/config/mosaic_he
 
 ### 2. **Delete does not automatically shrink the primary file**
 
-Plaintext and legacy encrypted v1/v2 files remain **extend-only** and require compaction to reclaim dead pages. Authenticated v3 records reusable pages and consumes them before extending, but reuse alone does not shorten the file; `ReclaimTail` can remove only a contiguous allocator-owned suffix and compaction repacks fragmented/low-fill pages. See HexxlaDB's upstream `docs/hexxladb/OPERATIONS.md` for the format-specific procedure.
+Plaintext v2 remains **extend-only** and requires compaction to reclaim dead
+pages. Authenticated v3 reuses free pages before extending; `ReclaimTail` can
+remove a contiguous allocator-owned suffix, and compaction repacks fragmented
+pages. Engine v1 and AES-XTS files require offline conversion before opening.
+See [upgrade and rollback instructions](./DATABASE_CREATION.md#upgrade-an-existing-database)
+and the matching HexxlaDB operations guide. Live Mosaic maintenance prunes
+history; compaction requires stopping Mosaic.
 
 ### 3. **MVCC deletes still leave a physical row per coordinate**
 

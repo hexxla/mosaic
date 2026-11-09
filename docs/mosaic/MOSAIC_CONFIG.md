@@ -18,6 +18,11 @@ Reference for the Mosaic MCP server configuration file. Policy affects **`mosaic
 
 Restart **`mosaic-mcp`** after editing YAML.
 
+Files must contain exactly one YAML document. Unknown fields are rejected,
+including misspelled retention and encryption settings. Use only the canonical
+retention block with boolean enforcement; legacy aliases and string enforcement
+are rejected.
+
 ---
 
 ## Top-level keys
@@ -25,13 +30,19 @@ Restart **`mosaic-mcp`** after editing YAML.
 | Key | Required | Purpose |
 | --- | -------- | ------- |
 | **`version`** | Yes | Must be **`1`**. |
+| **`ratchet`** | No | Default **`false`**. **`true`** enables the embedded workflow policy; a custom Ratchet path also enables it. |
+| **`advanced_tools`** | No | Default **`false`**. Enables the additional low-level operations and diagnostic tools. |
 | **`retention`** | No | Which chat turn kinds may be stored and whether the server **enforces** capture rules. |
 | **`allow_delete_cell`** | No | Default **`false`**. When **`false`**, **`mosaic_hexxla_delete_cell`** errors. |
 | **`retrieval`** | No | Optional cumulative session read budget (metering / cap). |
 | **`ollama`** | No | Optional **`base_url`** and **`embed_model`** — override **`MOSAIC_OLLAMA_URL`** / **`MOSAIC_EMBED_MODEL`** when set (see precedence below). |
 | **`database`** | No | Optional passphrase hint, MVCC retention, post-delete pruning. |
 
-Legacy/alternate shapes (`persistence_policy`, flat `capture_mode` at root) are accepted by the parser; prefer the **`retention`** block.
+The default seven tools are health, search_cells, get_cell, load_context_pack,
+put_cell, delete_cell and list_tags, with the `mosaic_hexxla_` prefix. Advanced
+tools add raw embedding writes, facets/edges, seams, tag counts, policy
+inspection, retrieval-budget status and byte estimation. See
+[Ratchet integration](./RATCHET_INTEGRATION.md) for activation and mutation coverage.
 
 ---
 
@@ -40,7 +51,7 @@ Legacy/alternate shapes (`persistence_policy`, flat `capture_mode` at root) are 
 | Field | Type | Default / notes |
 | ----- | ---- | --------------- |
 | **`capture_mode`** | string | **`llm_curates`** if omitted. Values: **`llm_curates`**, **`save_all_turns`**, **`user_only`**, **`assistant_only`**, **`none`**. See [PERSISTENCE_POLICY](./PERSISTENCE_POLICY.md). |
-| **`enforcement`** | boolean | **`false`** if omitted. **`true`**: conflicting **`put_cell`** kinds return an error. Legacy **`off`** / **`reject`** strings still parse. |
+| **`enforcement`** | boolean | **`false`** if omitted. **`true`**: conflicting **`put_cell`** kinds return an error. Only YAML booleans are accepted. |
 | **`notes`** | string | Injected into MCP server instructions and **`mosaic_hexxla_get_persistence_policy`**. Operator-facing guidance for agents. |
 
 ---
@@ -58,19 +69,25 @@ Cumulative approximate-token metering on structured JSON outputs from HexxlaDB *
 | Field | Type | Default |
 | ----- | ---- | ------- |
 | **`session_approx_token_budget`** | int | **`0`** = no enforcement cap; metering still recorded where applicable |
-| **`bytes_per_approx_token`** | float | **`4`**; must be **2–16** if set |
+| **`bytes_per_approx_token`** | float | **`4`**; **`0`** selects the default; otherwise finite **2–16** |
 
 Mosaic discards usage when the MCP session closes. Idle HTTP sessions close
 after 30 minutes. Context packs use the remaining budget to trim content
 before Mosaic checks the cost of the complete serialized response.
 
-Tools **`mosaic_hexxla_estimate_context_budget_bytes`**, **`mosaic_hexxla_get_persistence_policy`**, and writes are outside this budget.
+Advanced tools **`mosaic_hexxla_estimate_context_budget_bytes`**, **`mosaic_hexxla_get_persistence_policy`**, and writes are outside this budget.
+
+Context packs accept only `max_budget_bytes`: omitted or zero selects 4096;
+explicit limits must be 64–100000 UTF-8 bytes. Results expose `total_bytes`
+and `max_budget_bytes`. Approximate-token input aliases and legacy token-named
+outputs have been removed. `max_ring` is capped at 32 and `max_cells` at 8192.
+The advanced byte-estimate tool remains available for token-to-byte planning.
 
 ---
 
 ## `ollama` (optional)
 
-HTTP root and embedding model for **Ollama** (hybrid query/search, **`mosaic_hexxla_search_embedding`**, text path on **`mosaic_hexxla_put_embedding`**, **`mosaic-seed`** when it embeds).
+HTTP root and embedding model for **Ollama** (semantic/hybrid search, atomic cell embeddings, advanced embedding writes, and **`mosaic-seed`** when it embeds).
 
 | Field | Type | Default / notes |
 | ----- | ---- | ----------------- |
@@ -80,6 +97,11 @@ HTTP root and embedding model for **Ollama** (hybrid query/search, **`mosaic_hex
 **Precedence** (URL): **`mosaic-seed -ollama`** (flag) → YAML **`ollama.base_url`** → **`MOSAIC_OLLAMA_URL`** → default. Same for model: **`-embed-model`** → **`ollama.embed_model`** → **`MOSAIC_EMBED_MODEL`** → default.
 
 **`mosaic-mcp`** uses YAML → env → default (no Ollama CLI flags). The [Taskfile](../../Taskfile.yml) supplies **`MOSAIC_OLLAMA_*`** defaults to its seed tasks; **`ollama:`** in policy YAML overrides those when the corresponding YAML field is non-empty.
+
+The base must use HTTP or HTTPS with a host. Path prefixes and URL userinfo
+are supported; query strings and fragments are rejected. Diagnostics omit
+userinfo, queries, and fragments. Embedding responses are limited to 4 MiB;
+error-body diagnostics are limited to 4 KiB. Components must fit finite float32.
 
 ---
 
@@ -111,11 +133,15 @@ Runs bounded **`PruneScheduler.Tick`** after a successful cell delete. A prune f
 | ----- | ---- | ----- |
 | **`enabled`** | bool | Master switch |
 | **`prune`** | bool | Default **`true`** when **`enabled`** |
-| **`compact`** | bool | Omit or set **`false`**. Enabling live compaction is rejected at startup. |
 | **`debounce_after_delete_ms`** | int | Milliseconds. **`0`** = run pruning immediately after **each** delete. **Omitted** when **`enabled: true`** defaults to **2000** ms — coalesces rapid deletes into one burst |
 | **`prune_profile`** | string | **`balanced`** (default), **`low-latency`**, **`long-history`** → Hexxla **`MVCCPruneProfile`** batch sizes |
 | **`max_prune_rounds_per_delete`** | int | Cap on prune **`Tick`** iterations per **maintenance burst** (not per delete when debounced); default **64** if omitted or invalid |
 
-Shutdown **`mosaic-mcp`** flushes pending debounced maintenance before closing the DB.
+The removed `compact` field is rejected even when false; compaction remains an
+offline operation. The shipped configuration leaves automatic pruning disabled.
+
+Shutdown **`mosaic-mcp`** drains active SDK calls, including disconnected POSTs, closes sessions, and flushes
+pending debounced maintenance before closing the DB. Prune rounds are bounded
+by count; an individual storage operation is synchronous and has no hard deadline.
 
 See [CHANGELOG](../../CHANGELOG.md) and [HEXXLA_TROUBLESHOOTING](./HEXXLA_TROUBLESHOOTING.md) for disk expectations (extend-only file, MVCC tombstones).

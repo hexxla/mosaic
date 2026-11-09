@@ -1,158 +1,61 @@
-# HexxlaDB API surface ↔ Mosaic MCP coverage
+# HexxlaDB capability coverage
 
-This document maps the public feature families in
-`github.com/hexxla/hexxladb` `v0.7.0` to the
-23 tools registered by `cmd/mosaic-mcp`. Related symbols share a row when they
-have the same Mosaic disposition. Runtime MCP `tools/list` is authoritative
-for schemas. [The tool policy inventory](../../internal/adapter/primary/mcpsrv/tool_policy.go)
-classifies the registered surface.
+Mosaic exposes seven core tools, or 22 tools with `advanced_tools: true`.
+All names below omit `mosaic_hexxla_`. Runtime `tools/list` is authoritative.
+The [policy inventory](../../internal/adapter/primary/mcpsrv/tool_policy.go)
+classifies every tool and defines both startup profiles.
 
-Companions: [HEXXLADB_API_NOTES.md](./HEXXLADB_API_NOTES.md) explains the
-hexagonal adapter boundary; [MCP_AGENT_BLUEPRINT.md](./MCP_AGENT_BLUEPRINT.md)
-describes agent workflows.
+## Core
 
-## Dispositions
-
-| Disposition | Meaning |
+| Tool | Public database/application operation |
 | --- | --- |
-| **MCP tool** | Available to the general local agent surface today |
-| **Composition** | Used internally to construct or operate Mosaic, not callable as a tool |
-| **Candidate** | Read-only capability worth a bounded product experiment; see the roadmap |
-| **Native API** | Deliberately left to trusted Go integrations because the generic MCP abstraction would be weak or unsafe |
-| **Operator only** | Backup, maintenance, retention, migration, encryption, or raw administration; keep outside the general agent surface |
+| `health` | Layout readers and file sizes; opt-in `HealthCheck` for full integrity/counts |
+| `search_cells` | Lexical/hybrid `QueryCellsWithStats`; pure-vector `SearchByEmbedding` in semantic mode |
+| `get_cell` | Exact current `GetCell`; explicit missing/tombstoned result |
+| `load_context_pack` | `LoadContext`, followed by Mosaic byte budgeting |
+| `put_cell` | `FindUnusedCellPlacement` and `PutCell` in one transaction; optional atomic `PutEmbedding` |
+| `delete_cell` | `DeleteCellWithOutcome`, additionally controlled by write policy |
+| `list_tags` | `ListExistingTopics` |
 
-## Engine lifecycle, health, and physical operations
+The previous query and embedding-discovery tools are replaced by search modes.
+There is no implicit 32-ring search scope. Semantic mode retains pure vector
+scores; filtered semantic discovery uses hybrid mode with its native composite
+ranking. [Detailed mapping](HEXXLADB_API_NOTES.md)
 
-| HexxlaDB capability | Mosaic disposition |
+## Advanced
+
+| Tools | Purpose |
 | --- | --- |
-| `OpenExisting`, `Open`, `Options`, `Close`; `PageSize`, `MaxValueBytes`, `EmbeddingDimension`, `EmbeddingMetric` | **Composition**. The layout readers are returned by `mosaic_hexxla_health`. |
-| `HealthCheck` | `mosaic_hexxla_health` with `full_check: true`; Mosaic also reports primary/WAL file sizes and its effective MVCC retention setting. |
-| `WriteStats`, `WALStats`, `StorageStats` | **Operator only**. The MCP health response does not claim these full reports. |
-| `BackupTo` | **Operator only**; backups need operator-selected destinations and lifecycle control. |
-| `Compact`, `CompactWithOptions`, `CompactTo`, `CompactToWithOptions`, `PreflightCompactTo`, `ReclaimTail` | **Operator only**; I/O-heavy physical maintenance. |
-| `BatchPutCells`, `ImportCellsJSON`, `Tx.ExportCellsJSON` | **Operator only** for bulk transfer/ingestion. MCP writes stay individually governed. |
+| `put_embedding` | Independent text/vector maintenance; optional atomic content-hash guard |
+| `tag_counts` | `TagCounts` |
+| `find_seams`, `mark_conflict`, `mark_supersedes`, `resolve_seam` | Bounded seam discovery and validated lifecycle operations |
+| `put_facet`, `get_facet`, `list_facets` | Derived facet writes/reads; native guarded `UpdateFacet` remains outside MCP |
+| `link_cells`, `get_edge`, `list_edges_from` | Typed graph records with bounded read results |
+| `get_persistence_policy` | Application capture/deletion policy |
+| `retrieval_budget_status` | Current session's JSON-egress meter |
+| `estimate_context_budget_bytes` | Optional approximate-token conversion; context itself accepts bytes only |
 
-## Transactions and generic KV
+## Native and operator boundaries
 
-| HexxlaDB capability | Mosaic disposition |
+| Capability | Disposition |
 | --- | --- |
-| `View`, `Update`, `Batch` | **Composition** inside secondary adapters; transaction handles never cross a Mosaic port. |
-| `Tx.Get`, `Tx.Put`, `Tx.AscendRange`, `Tx.Writable` | **Native API**. Mosaic exposes product-shaped cells, seams, facets, edges, and embeddings—not arbitrary byte keys. |
-| `AfterPutCellHook`, `AfterPutSeamHook`, `CellValidator` options | **Native API** configuration seams; not runtime MCP tools. |
+| `Open`, `OpenExisting`, `Close`, `Options` | Command composition; existing-primary server startup |
+| `View`, `Update` | Adapter-owned transaction boundaries |
+| Raw KV and physical index walks | Native API, never arbitrary MCP byte keys |
+| `BackupTo`, compaction, `ReclaimTail`, pruning, key rotation/recovery | Operator procedures with explicit destinations and recovery plans |
+| Bulk cell transfer and batch ingestion | Operator/native API; generic MCP writes remain individually governed |
+| FOV, Voronoi, super-hex summaries and rendering | Native specialized spatial/visualization APIs |
+| `FindEdgePath`, edge walks, density and taxonomy analytics | Native; bounded agent experiments require a demonstrated use case |
+| MVCC snapshots, diffs and changelog consumers | Native/operator; retention and consumer mutation are not general-agent actions |
+| Hooks, record constructors, guarded facet update | Native integration options |
 
-## Cells, placement, and structured retrieval
-
-| HexxlaDB capability | Mosaic disposition |
-| --- | --- |
-| `PutCell`, `FindUnusedCellPlacement` | `mosaic_hexxla_put_cell`: safe exact placement or bounded `near_anchor`, with the actual coordinate returned. Mosaic does not infer the semantic anchor. |
-| `DeleteCell`, `DeleteCellWithOutcome` | `mosaic_hexxla_delete_cell`, additionally controlled by `allow_delete_cell`. |
-| `GetCell` | No coordinate-only tool. Cell records are returned through bounded query/search/context tools. |
-| Cell templates (`NewFactCell`, `NewUserMessageCell`, `NewAssistantResponseCell`) | `mosaic_hexxla_put_cell` selects the corresponding product template through `kind`. `NewSystemPromptCell` remains **Native API**. |
-| `QueryCells`, `SearchCells` | `mosaic_hexxla_query_cells`, `mosaic_hexxla_search_cells`; vector queries report the execution path and candidate-limit status. A supported filter plus a scan budget enables exact vector scoring. |
-| `AscendCellsByTag`, `AscendCellsBySource`, `AscendCellsInTimeBucket`, `AscendDistinctTags` | Covered by higher-level query filters or tag tools where useful; raw index iteration remains **Native API**. |
-
-## Context, spatial views, and lattice geometry
-
-| HexxlaDB capability | Mosaic disposition |
-| --- | --- |
-| `LoadContext`, `AssembleCellView` | `mosaic_hexxla_load_context_pack`; HexxlaDB bounds candidates and Mosaic applies provider-neutral UTF-8 byte budgeting. |
-| `WalkRing`, `WalkRingAt`, `WalkRingFacets`, `ScanContextRaw`, `ScanContextAtRaw` | **Native API**. The context-pack tool is the safer bounded agent abstraction. |
-| `LoadContextFOV`, `LoadContextVoronoi` | **Native API** for specialized spatial applications; no demonstrated general-agent need yet. |
-| `Coord`, `PackedCoord`, `Pack`, `Unpack`, `Ring`, `WalkRings` | **Native API** geometry primitives. MCP schemas use axial `q,r` fields. |
-| `RingDensityMap`, `TotalDensity` | **Candidate** for bounded placement/coverage diagnostics; no current MCP tool. |
-| `RenderHexGrid`, `RenderHexGridFromDB`, `SuperHexSummaryIndex` | **Native API** visualization/derived-index facilities. |
-
-## Tags and graph traversal
-
-| HexxlaDB capability | Mosaic disposition |
-| --- | --- |
-| `ListExistingTopics`, `TagCounts` | `mosaic_hexxla_list_tags`, `mosaic_hexxla_tag_counts`. |
-| `TagCooccurrences`, `UntaggedCells` | **Candidate** for bounded taxonomy-quality tools; no current MCP tool. |
-| `FindEdgePath`, `WalkEdges`, `WalkEdgeCoords` | **Candidate** for bounded relationship traversal with strict hop/node/result caps; no current MCP tool. |
-
-## Embeddings
-
-| HexxlaDB capability | Mosaic disposition |
-| --- | --- |
-| `PutEmbedding`, `PutEmbeddingWithOptions` | `mosaic_hexxla_put_embedding` accepts either a raw vector or text embedded through configured Ollama. Advanced write options remain **Native API**. |
-| `GetEmbedding`, `DeleteEmbedding` | Not exposed independently. Search returns matches rather than raw stored vectors; cell deletion performs HexxlaDB's cell-associated cleanup when policy allows. |
-| `SearchByEmbedding` | `mosaic_hexxla_search_embedding`; query text is embedded through configured Ollama. |
-| `SearchByEmbeddingWithStats` | Search behavior is exposed, but detailed execution-path statistics remain **Native API**. |
-| `ReindexEmbeddings`, `RebuildEmbeddingIndex` | **Operator only**; potentially expensive derived-index maintenance. |
-
-## Seams
-
-| HexxlaDB capability | Mosaic disposition |
-| --- | --- |
-| `FindSeams` | `mosaic_hexxla_find_seams`. |
-| `MarkConflict`, `MarkSupersedes`, `ResolveSeam` | `mosaic_hexxla_mark_conflict`, `mosaic_hexxla_mark_supersedes`, `mosaic_hexxla_resolve_seam`. |
-| `PutSeam` | **Native API**. Mosaic exposes validated lifecycle operations instead of arbitrary seam records. |
-| `FindSeamsAt`, `AscendSeamsBySource`, `AscendSeamsInTimeBucket` | **Native API**; no separate temporal/index-walk tool. |
-
-## Facets and edges
-
-| HexxlaDB capability | Mosaic disposition |
-| --- | --- |
-| `PutFacet`, `NewFacetDerived` | `mosaic_hexxla_put_facet`. It does not expose `UpdateFacet`'s derivation-hash guard. |
-| `UpdateFacet` | **Native API** when guarded derived-content replacement is required. |
-| `GetFacet`, `AscendFacetsForCell` | `mosaic_hexxla_get_facet`, `mosaic_hexxla_list_facets`. |
-| `LinkCells`, `PutEdge`, `NewProvenanceWire` | `mosaic_hexxla_link_cells`; Mosaic constructs provenance and does not accept arbitrary edge records. |
-| `GetEdge`, `AscendEdgesFrom` | `mosaic_hexxla_get_edge`, `mosaic_hexxla_list_edges_from` (`max_edges` default 50, cap 200, explicit `truncated`). |
-
-## MVCC, snapshots, and time travel
-
-| HexxlaDB capability | Mosaic disposition |
-| --- | --- |
-| `ViewAt`, `ViewAtTime`, `ViewAtTag`; `TagSnapshot`, `ListSnapshotTags`, `DeleteSnapshotTag` | Read-only portions are a **Candidate** only after authorization, retention, and response bounds are specified. Snapshot creation/deletion stays **Operator only**. |
-| `SnapshotDiff` | **Candidate** for a bounded read-only comparison tool; no current MCP tool. |
-| `StatsMVCC`, `SuggestedPruneBeforeSeq`, `MVCCPrunePlan` | **Operator only** diagnostics/planning. |
-| `PruneCellVersions`, `PruneCellVersionsByProfile`, `PruneScheduler` | **Operator only**; can remove retained history. Mosaic may run configured post-delete maintenance internally, but exposes no direct tool. |
-
-## Changelog and consumers
-
-| HexxlaDB capability | Mosaic disposition |
-| --- | --- |
-| `ReadChangelogSince`, `ReadChangelogFiltered` | A strictly bounded read-only peek is a **Candidate** for audit workflows; the full changefeed remains **Operator only**. |
-| `GetChangelogConsumerCursor`, `ListChangelogConsumers`, `ChangelogRetentionFloor` | **Operator only** observability and retention coordination. |
-| `AdvanceChangelogConsumer`, `DeleteChangelogConsumer` | **Operator only** state mutation; never a general-agent tool. |
-
-## Encryption, migration, and recovery
-
-| HexxlaDB capability | Mosaic disposition |
-| --- | --- |
-| Passphrase/key options, `DeriveKeyFromPassphrase` | **Composition** from protected operator configuration; never exposed through MCP payloads. |
-| `RotateEncryption`, `RotateEncryptionWithOptions`, `RecoverInterruptedRotation` | **Operator only** key-management/recovery workflow. |
-| Retired engine v1 and AES-XTS conversion | **Operator only** through the [pinned offline converter](./DATABASE_CREATION.md#upgrade-an-existing-database). |
-
-## Mosaic policy and budget tools
-
-| Tool | Use |
-| --- | --- |
-| `mosaic_hexxla_get_persistence_policy` | Inspect the configured capture and mutation policy. |
-| `mosaic_hexxla_estimate_context_budget_bytes` | Convert an approximate token allowance to a context-pack byte budget. |
-| `mosaic_hexxla_retrieval_budget_status` | Report retrieval metering and enforcement for the current MCP session. |
-
-These three tools report Mosaic application state and calculations.
-
-## Default-surface boundary
-
-The general MCP surface intentionally excludes arbitrary KV access, raw record
-construction, bulk import/export, physical maintenance, retention mutation,
-changefeed cursor mutation, migration, and encryption operations. Those actions
-need explicit operator authority, destinations, credentials, maintenance
-windows, or recovery plans that an ordinary local agent call cannot safely
-represent.
-
-Read-only candidates are not assumed to be safe merely because they do not
-write. Each needs hard request/response bounds, data-exposure review, and a
-demonstrated agent workflow before implementation. Their current evaluation and
-priority are recorded in [the roadmap](../ROADMAP.md).
+Mosaic intentionally does not mirror every database method. The general agent
+surface excludes physical maintenance, retention mutation, migrations,
+encryption, raw KV and changefeed cursor mutation.
 
 ## Maintenance
 
-When Mosaic changes HexxlaDB versions or registers a tool:
-
-1. compare the pinned package's public `DB`, `Tx`, and package-level exports;
-2. update this feature-family map and the runtime agent guidance;
-3. add the tool to the explicit safety-policy inventory; and
-4. classify every mutation in the enabled Ratchet policy before startup.
+When changing a dependency or tool, verify the pinned public APIs, update this
+map and runtime instructions, classify the tool in the inventory, and validate
+Ratchet coverage for every enabled mutation. Core and advanced profiles must
+both pass real MCP session tests. [Roadmap](../ROADMAP.md)

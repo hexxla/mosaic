@@ -2,189 +2,162 @@ package services_test
 
 import (
 	"context"
-	"strings"
+	"errors"
 	"testing"
 
 	"github.com/sploitzberg/mosaic/internal/core/domain"
 	"github.com/sploitzberg/mosaic/internal/core/services"
 )
 
-func TestCellRetrievalValidatesHybridScanBeforeEmbedding(t *testing.T) {
-	t.Parallel()
-	stub := &stubCellReader{}
-	svc := services.NewCellRetrievalService(stub, nil, 2)
-	_, err := svc.QueryCells(t.Context(), &domain.CellQueryCommand{
-		EmbedQueryText: "semantic", MaxScanRows: 10, AnyTags: []string{"any"},
-	})
-	if err == nil || !strings.Contains(err.Error(), "requires require_tags, source_id, or a positive radius") || stub.lastQuery != nil {
-		t.Fatalf("invalid hybrid scan reached embedding or storage: %v", err)
-	}
-}
-
 type stubCellReader struct {
-	lastQuery     *domain.CellQueryCommand
-	lastSearch    *domain.CellSearchCommand
-	lastEmbedding []float32
-	queryErr      error
-	searchErr     error
+	last   *domain.CellSearchCommand
+	vector []float32
+	err    error
+	lookup domain.CellLookupResponse
 }
 
-func (s *stubCellReader) captureEmb(emb []float32) {
-	if len(emb) == 0 {
-		s.lastEmbedding = nil
-		return
-	}
-	s.lastEmbedding = append([]float32(nil), emb...)
+func (s *stubCellReader) SearchCells(_ context.Context, q *domain.CellSearchCommand, v []float32) (domain.CellHitsResponse, error) {
+	copy := *q
+	s.last = &copy
+	s.vector = v
+	return domain.CellHitsResponse{Hits: []domain.CellHit{}}, s.err
+}
+func (s *stubCellReader) GetCell(context.Context, domain.AxialCoord) (domain.CellLookupResponse, error) {
+	return s.lookup, s.err
 }
 
-func (s *stubCellReader) QueryCells(_ context.Context, q *domain.CellQueryCommand, emb []float32) (domain.CellHitsResponse, error) {
-	if q != nil {
-		c := *q
-		s.lastQuery = &c
-	}
-	s.captureEmb(emb)
-	if s.queryErr != nil {
-		return domain.CellHitsResponse{}, s.queryErr
-	}
-	return domain.CellHitsResponse{}, nil
+type queryEmbedder struct {
+	calls int
+	text  string
+	err   error
 }
 
-func (s *stubCellReader) SearchCells(_ context.Context, q *domain.CellSearchCommand, emb []float32) (domain.CellHitsResponse, error) {
-	if q != nil {
-		c := *q
-		s.lastSearch = &c
-	}
-	s.captureEmb(emb)
-	if s.searchErr != nil {
-		return domain.CellHitsResponse{}, s.searchErr
-	}
-	return domain.CellHitsResponse{}, nil
+func (e *queryEmbedder) Embed(_ context.Context, text string, dim int) ([]float32, error) {
+	e.calls++
+	e.text = text
+	return make([]float32, dim), e.err
 }
 
-type stubEmbedder struct{}
-
-func (stubEmbedder) Embed(_ context.Context, text string, dim int) ([]float32, error) {
-	out := make([]float32, dim)
-	if dim > 0 {
-		out[0] = 1
-	}
-	return out, nil
+type queryANN struct {
+	calls int
+	score float64
+	err   error
 }
 
-func TestCellRetrievalService_QueryCells_invalidSort(t *testing.T) {
-	t.Parallel()
-	svc := services.NewCellRetrievalService(&stubCellReader{}, nil, 0)
-	_, err := svc.QueryCells(t.Context(), &domain.CellQueryCommand{
-		SortBy: domain.CellQuerySort("invalid"),
-	})
-	if err == nil {
-		t.Fatal("expected error for invalid sort")
+func (a *queryANN) Search(context.Context, []float32, int, float64) ([]domain.CellHit, error) {
+	a.calls++
+	return []domain.CellHit{{Score: a.score}}, a.err
+}
+
+func TestUnifiedRetrievalPaths(t *testing.T) {
+	for _, mode := range []domain.SearchMode{domain.SearchLexical, domain.SearchSemantic, domain.SearchHybrid} {
+		t.Run(string(mode), func(t *testing.T) {
+			r := &stubCellReader{}
+			e := &queryEmbedder{}
+			a := &queryANN{score: 0.87}
+			s := services.NewCellRetrievalService(r, a, e, 2)
+			cmd := &domain.CellSearchCommand{Query: "concept", Mode: mode}
+			if mode == domain.SearchHybrid {
+				cmd.LexicalQuery = "literal"
+				cmd.RequireTags = []string{"tag"}
+			}
+			out, err := s.SearchCells(t.Context(), cmd)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if out.Mode != mode {
+				t.Fatalf("mode=%q", out.Mode)
+			}
+			if mode == domain.SearchSemantic {
+				if a.calls != 1 || r.last != nil || out.Hits[0].Score != 0.87 {
+					t.Fatal("semantic path changed pure vector scoring")
+				}
+			} else if r.last == nil || a.calls != 0 {
+				t.Fatal("structured path bypassed reader")
+			}
+			if mode == domain.SearchLexical {
+				if e.calls != 0 || r.last.Radius != 0 || r.last.MaxScanRows != 20_000 {
+					t.Fatal("lexical discovery must be global, bounded, and model independent")
+				}
+			} else if e.calls != 1 || e.text != "concept" {
+				t.Fatal("wrong embedding cue")
+			}
+			if cmd.MaxResults != 0 || cmd.MaxScanRows != 0 {
+				t.Fatal("normalization mutated caller")
+			}
+		})
 	}
 }
 
-func TestCellRetrievalService_QueryCells_capsMaxResults(t *testing.T) {
-	t.Parallel()
-	stub := &stubCellReader{}
-	svc := services.NewCellRetrievalService(stub, nil, 0)
-	_, err := svc.QueryCells(t.Context(), &domain.CellQueryCommand{
-		SortBy:     domain.CellQuerySortScore,
-		MaxResults: 500,
-	})
-	if err != nil {
+func TestSearchBoundsAndValidationBeforeEmbedding(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		cmd  domain.CellSearchCommand
+		rows int
+		bad  bool
+	}{
+		{name: "lexical requested", cmd: domain.CellSearchCommand{MaxScanRows: 1}, rows: 1},
+		{name: "lexical capped", cmd: domain.CellSearchCommand{MaxScanRows: 30_000}, rows: 20_000},
+		{name: "negative", cmd: domain.CellSearchCommand{MaxScanRows: -1}, bad: true},
+		{name: "hybrid adaptive", cmd: domain.CellSearchCommand{Mode: domain.SearchHybrid, Query: "cue"}},
+		{name: "hybrid exact", cmd: domain.CellSearchCommand{Mode: domain.SearchHybrid, Query: "cue", SourceID: "source", MaxScanRows: 1}, rows: 1},
+		{name: "hybrid unbounded exact", cmd: domain.CellSearchCommand{Mode: domain.SearchHybrid, Query: "cue", MaxScanRows: 1}, bad: true},
+		{name: "semantic filters", cmd: domain.CellSearchCommand{Mode: domain.SearchSemantic, Query: "cue", RequireTags: []string{"tag"}}, bad: true},
+		{name: "bad mode", cmd: domain.CellSearchCommand{Mode: "unknown"}, bad: true},
+		{name: "bad sort", cmd: domain.CellSearchCommand{SortBy: "unknown"}, bad: true},
+		{name: "missing cue", cmd: domain.CellSearchCommand{Mode: domain.SearchSemantic}, bad: true},
+		{name: "literal in lexical", cmd: domain.CellSearchCommand{LexicalQuery: "invalid"}, bad: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := &stubCellReader{}
+			e := &queryEmbedder{}
+			s := services.NewCellRetrievalService(r, &queryANN{}, e, 2)
+			_, err := s.SearchCells(t.Context(), &tc.cmd)
+			if tc.bad {
+				if err == nil || e.calls != 0 || r.last != nil {
+					t.Fatalf("invalid request reached I/O: %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if r.last.MaxScanRows != tc.rows || r.last.MaxResults != 20 {
+				t.Fatalf("normalized: %+v", r.last)
+			}
+		})
+	}
+}
+
+func TestRetrievalDependencyErrorsAndCancellation(t *testing.T) {
+	cause := errors.New("source failed")
+	r := &stubCellReader{err: cause}
+	s := services.NewCellRetrievalService(r, nil, nil, 0)
+	if _, err := s.SearchCells(t.Context(), &domain.CellSearchCommand{}); !errors.Is(err, cause) {
+		t.Fatalf("reader cause: %v", err)
+	}
+	if _, err := s.GetCell(t.Context(), domain.AxialCoord{}); !errors.Is(err, cause) {
+		t.Fatalf("lookup cause: %v", err)
+	}
+	if _, err := s.SearchCells(t.Context(), &domain.CellSearchCommand{Mode: domain.SearchSemantic, Query: "cue"}); err == nil {
+		t.Fatal("embedding dependencies missing")
+	}
+	if _, err := s.SearchCells(t.Context(), nil); err == nil {
+		t.Fatal("nil command accepted")
+	}
+	var absent *services.CellRetrievalService
+	if _, err := absent.GetCell(t.Context(), domain.AxialCoord{}); err == nil {
+		t.Fatal("nil service accepted")
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	if _, err := s.SearchCells(ctx, &domain.CellSearchCommand{}); !errors.Is(err, context.Canceled) {
 		t.Fatal(err)
 	}
-	const capMax = 100
-	if stub.lastQuery.MaxResults != capMax {
-		t.Fatalf("max results: got %d want %d", stub.lastQuery.MaxResults, capMax)
-	}
-}
-
-func TestCellRetrievalService_SearchCells_capsMaxResults(t *testing.T) {
-	t.Parallel()
-	stub := &stubCellReader{}
-	svc := services.NewCellRetrievalService(stub, nil, 0)
-	_, err := svc.SearchCells(t.Context(), &domain.CellSearchCommand{
-		MaxResults: 999,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	const capMax = 100
-	if stub.lastSearch.MaxResults != capMax {
-		t.Fatalf("max results: got %d want %d", stub.lastSearch.MaxResults, capMax)
-	}
-}
-
-func TestCellRetrievalService_nilDeps(t *testing.T) {
-	t.Parallel()
-	svc := services.NewCellRetrievalService(nil, nil, 0)
-	_, err := svc.QueryCells(t.Context(), &domain.CellQueryCommand{SortBy: domain.CellQuerySortScore})
-	if err == nil {
-		t.Fatal("expected error")
-	}
-	_, err = svc.SearchCells(t.Context(), &domain.CellSearchCommand{})
-	if err == nil {
-		t.Fatal("expected error")
-	}
-}
-
-func TestCellRetrievalService_embedQueryText_requiresDim(t *testing.T) {
-	t.Parallel()
-	stub := &stubCellReader{}
-	svc := services.NewCellRetrievalService(stub, stubEmbedder{}, 0)
-	_, err := svc.QueryCells(t.Context(), &domain.CellQueryCommand{
-		SortBy:         domain.CellQuerySortScore,
-		EmbedQueryText: "hello",
-	})
-	if err == nil {
-		t.Fatal("expected error when embedding dimension is 0")
-	}
-}
-
-func TestCellRetrievalService_embedQueryText_requiresEmbedder(t *testing.T) {
-	t.Parallel()
-	stub := &stubCellReader{}
-	svc := services.NewCellRetrievalService(stub, nil, 384)
-	_, err := svc.QueryCells(t.Context(), &domain.CellQueryCommand{
-		SortBy:         domain.CellQuerySortScore,
-		EmbedQueryText: "hello",
-	})
-	if err == nil {
-		t.Fatal("expected error when embedder is nil")
-	}
-}
-
-func TestCellRetrievalService_embedQueryText_passesVectorToReader(t *testing.T) {
-	t.Parallel()
-	stub := &stubCellReader{}
-	svc := services.NewCellRetrievalService(stub, stubEmbedder{}, 4)
-	_, err := svc.QueryCells(t.Context(), &domain.CellQueryCommand{
-		SortBy:         domain.CellQuerySortScore,
-		EmbedQueryText: "hybrid test",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if stub.lastEmbedding == nil || len(stub.lastEmbedding) != 4 {
-		t.Fatalf("embedding: got %#v want len 4", stub.lastEmbedding)
-	}
-	if stub.lastEmbedding[0] != 1 {
-		t.Fatalf("embedding marker")
-	}
-}
-
-func TestCellRetrievalService_search_embedQueryText_passesVectorToReader(t *testing.T) {
-	t.Parallel()
-	stub := &stubCellReader{}
-	svc := services.NewCellRetrievalService(stub, stubEmbedder{}, 2)
-	_, err := svc.SearchCells(t.Context(), &domain.CellSearchCommand{
-		Query:          "lit",
-		EmbedQueryText: "semantic cue",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(stub.lastEmbedding) != 2 {
-		t.Fatalf("embedding len: got %d want 2", len(stub.lastEmbedding))
+	r.err = nil
+	r.lookup = domain.CellLookupResponse{Found: true, Cell: &domain.CellHit{RawContent: "exact"}}
+	out, err := s.GetCell(t.Context(), domain.AxialCoord{Q: 100})
+	if err != nil || !out.Found || out.Cell.RawContent != "exact" {
+		t.Fatalf("lookup=%+v %v", out, err)
 	}
 }

@@ -8,9 +8,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
 )
 
@@ -19,6 +19,9 @@ const (
 	DefaultPingTimeout = 5 * time.Second
 	// DefaultEmbedTimeout bounds each embeddings POST (large prompts / cold model load).
 	DefaultEmbedTimeout = 120 * time.Second
+
+	maxEmbeddingResponseBytes = 4 << 20
+	maxEmbeddingErrorBytes    = 4 << 10
 )
 
 // embeddingsRequest matches Ollama POST /api/embeddings.
@@ -62,15 +65,15 @@ func (c *Client) Ping(ctx context.Context) error {
 	defer cancel()
 	req, err := http.NewRequestWithContext(pingCtx, http.MethodGet, c.Base.String(), http.NoBody)
 	if err != nil {
-		return fmt.Errorf("ollama ping request: %w", err)
+		return fmt.Errorf("ollama ping request %q: %w", DiagnosticURL(c.Base), diagnosticRequestError{err})
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("ollama not reachable at %q: %w", c.Base.String(), err)
+		return fmt.Errorf("ollama not reachable at %q: %w", DiagnosticURL(c.Base), diagnosticRequestError{err})
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("ollama ping %q: status %s", c.Base.String(), resp.Status)
+		return fmt.Errorf("ollama ping %q: status %s", DiagnosticURL(c.Base), resp.Status)
 	}
 	return nil
 }
@@ -88,29 +91,40 @@ func (c *Client) Embed(ctx context.Context, prompt string, expectedDim int) ([]f
 	if client == nil {
 		client = http.DefaultClient
 	}
-	embedURL := strings.TrimSuffix(c.Base.String(), "/") + "/api/embeddings"
+	embedURL := c.Base.JoinPath("api", "embeddings")
+	embedURL.Fragment, embedURL.RawFragment = "", ""
 	body, err := json.Marshal(embeddingsRequest{Model: c.Model, Prompt: prompt})
 	if err != nil {
 		return nil, fmt.Errorf("marshal request: %w", err)
 	}
 	embedCtx, cancel := context.WithTimeout(ctx, DefaultEmbedTimeout)
 	defer cancel()
-	req, err := http.NewRequestWithContext(embedCtx, http.MethodPost, embedURL, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(embedCtx, http.MethodPost, embedURL.String(), bytes.NewReader(body))
 	if err != nil {
-		return nil, fmt.Errorf("ollama embed request: %w", err)
+		return nil, fmt.Errorf("ollama embed request %q: %w", DiagnosticURL(embedURL), diagnosticRequestError{err})
 	}
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("ollama embed http: %w", err)
+		return nil, fmt.Errorf("ollama embed http %q: %w", DiagnosticURL(embedURL), diagnosticRequestError{err})
 	}
 	defer func() { _ = resp.Body.Close() }()
-	raw, err := io.ReadAll(resp.Body)
+	limit := maxEmbeddingResponseBytes
+	if resp.StatusCode != http.StatusOK {
+		limit = maxEmbeddingErrorBytes
+	}
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, int64(limit)+1))
 	if err != nil {
 		return nil, fmt.Errorf("read ollama embed body: %w", err)
 	}
 	if resp.StatusCode != http.StatusOK {
+		if len(raw) > limit {
+			return nil, fmt.Errorf("ollama embed status %s: %s [truncated]", resp.Status, bytes.TrimSpace(raw[:limit]))
+		}
 		return nil, fmt.Errorf("ollama embed status %s: %s", resp.Status, bytes.TrimSpace(raw))
+	}
+	if len(raw) > limit {
+		return nil, fmt.Errorf("ollama embed response exceeds %d bytes", limit)
 	}
 	var result embeddingsResponse
 	if err := json.Unmarshal(raw, &result); err != nil {
@@ -124,6 +138,9 @@ func (c *Client) Embed(ctx context.Context, prompt string, expectedDim int) ([]f
 	}
 	out := make([]float32, len(result.Embedding))
 	for i := range result.Embedding {
+		if value := result.Embedding[i]; math.IsNaN(value) || math.IsInf(value, 0) || math.Abs(value) > math.MaxFloat32 {
+			return nil, fmt.Errorf("ollama embedding component %d is outside the finite float32 range", i)
+		}
 		out[i] = float32(result.Embedding[i])
 	}
 	return out, nil

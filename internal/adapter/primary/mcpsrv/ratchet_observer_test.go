@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	ratchetdomain "github.com/hexxla/mcp-ratchet/pkg/ratchet/domain"
+	"github.com/hexxla/mcp-ratchet/pkg/ratchet"
 )
 
 func TestRatchetObserverRequiresAuthenticationAndRejectsOrigins(t *testing.T) {
@@ -68,25 +68,21 @@ func TestRatchetObserverStreamsRedactedSessionEvents(t *testing.T) {
 	defer func() { _ = conn.Close() }()
 
 	wantTime := time.Date(2026, time.August, 27, 12, 0, 0, 0, time.UTC)
-	if err := observer.Store(t.Context(), &ratchetdomain.Event{
+	observer.Observe(ratchet.Event{
 		ID:        "ignored-session",
-		Type:      ratchetdomain.EventTypeToolCallAttempt,
+		Type:      ratchet.EventTypeToolCallAttempt,
 		SessionID: "session-b",
 		Timestamp: wantTime,
-	}); err != nil {
-		t.Fatalf("store ignored event: %v", err)
-	}
-	if err := observer.Store(t.Context(), &ratchetdomain.Event{
-		ID:        "event-1",
-		Type:      ratchetdomain.EventTypeTokenCreated,
-		SessionID: "session-a",
-		ToolName:  "mosaic_hexxla_query_cells",
-		Token:     ratchetdomain.TokenValue(strings.Repeat("secret", 8)),
-		Timestamp: wantTime,
-		Metadata:  map[string]any{"private": "metadata"},
-	}); err != nil {
-		t.Fatalf("store event: %v", err)
-	}
+	})
+	observer.Observe(ratchet.Event{
+		ID:         "event-1",
+		Type:       ratchet.EventTypeCompletionRecorded,
+		SessionID:  "session-a",
+		ToolName:   "mosaic_hexxla_search_cells",
+		Timestamp:  wantTime,
+		Error:      "secret metadata",
+		ConsumedBy: "secret",
+	})
 
 	if err := conn.SetReadDeadline(time.Now().Add(2 * time.Second)); err != nil {
 		t.Fatalf("set deadline: %v", err)
@@ -102,7 +98,7 @@ func TestRatchetObserverStreamsRedactedSessionEvents(t *testing.T) {
 	if err := json.Unmarshal(payload, &got); err != nil {
 		t.Fatalf("decode event: %v", err)
 	}
-	if got.ID != "event-1" || got.SessionID != observer.sessionLabel("session-a") || got.ToolName != "mosaic_hexxla_query_cells" || !got.Timestamp.Equal(wantTime) {
+	if got.ID != "event-1" || got.SessionID != observer.sessionLabel("session-a") || got.ToolName != "mosaic_hexxla_search_cells" || !got.Timestamp.Equal(wantTime) {
 		t.Fatalf("unexpected event: %+v", got)
 	}
 

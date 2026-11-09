@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestResolveRatchetConfigPath(t *testing.T) {
@@ -21,25 +22,47 @@ func TestResolveRatchetConfigPath(t *testing.T) {
 	}
 }
 
-func TestLoadRatchetConfig(t *testing.T) {
+func TestLoadRatchetPolicy(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "ratchet.yaml")
 	if err := os.WriteFile(path, []byte("rules: []\n"), 0o600); err != nil {
 		t.Fatalf("write config: %v", err)
 	}
 
-	loaded, err := LoadRatchetConfig(path)
+	loaded, err := LoadRatchetPolicy(path)
 	if err != nil {
 		t.Fatalf("load regular config: %v", err)
 	}
-	if loaded.Path != path {
-		t.Fatalf("loaded path = %q, want %q", loaded.Path, path)
+	if len(loaded.Rules) != 0 {
+		t.Fatalf("unexpected custom rules: %+v", loaded)
 	}
 
-	if _, err := LoadRatchetConfig(filepath.Join(dir, "missing.yaml")); err == nil {
+	if _, err := LoadRatchetPolicy(filepath.Join(dir, "missing.yaml")); err == nil {
 		t.Fatal("missing config unexpectedly succeeded")
 	}
-	if _, err := LoadRatchetConfig(dir); err == nil {
+	if _, err := LoadRatchetPolicy(dir); err == nil {
 		t.Fatal("directory config unexpectedly succeeded")
+	}
+}
+
+func TestBundledRatchetPolicy(t *testing.T) {
+	policy, err := LoadRatchetPolicy("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if policy.CompletionTTL != 10*time.Minute {
+		t.Fatalf("completion TTL=%v", policy.CompletionTTL)
+	}
+	foundContext := false
+	for _, rule := range policy.Rules {
+		if rule.Tool == "mosaic_hexxla_load_context_pack" {
+			foundContext = rule.TTL == 5*time.Minute
+		}
+	}
+	if !foundContext {
+		t.Fatal("context completion TTL must be five minutes")
+	}
+	if len(policy.Rules) != 9 {
+		t.Fatalf("bundled rules=%d", len(policy.Rules))
 	}
 }

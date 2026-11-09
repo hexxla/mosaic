@@ -1,8 +1,10 @@
 package config
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,6 +20,8 @@ const EnvPolicyFile = "MOSAIC_POLICY_FILE"
 type MosaicConfigLoaded struct {
 	Retention       RetentionPolicy
 	AllowDeleteCell bool
+	Ratchet         bool
+	AdvancedTools   bool
 	// DatabasePassphrase is optional at-rest encryption passphrase from YAML (prefer MOSAIC_DB_PASSPHRASE or -db-passphrase).
 	DatabasePassphrase string
 	Retrieval          RetrievalBudgetConfig
@@ -47,11 +51,10 @@ type databaseYAMLFields struct {
 	AutoMaintainAfterCellDelete *autoMaintainYAML `yaml:"auto_maintain_after_cell_delete,omitempty"`
 }
 
-// autoMaintainYAML enables post-delete MVCC prune and/or compaction (documented under database.* in Mosaic ops docs).
+// autoMaintainYAML configures bounded post-delete MVCC pruning.
 type autoMaintainYAML struct {
 	Enabled                 bool   `yaml:"enabled"`
 	Prune                   *bool  `yaml:"prune,omitempty"`
-	Compact                 *bool  `yaml:"compact,omitempty"`
 	PruneProfile            string `yaml:"prune_profile,omitempty"`
 	MaxPruneRoundsPerDelete *int   `yaml:"max_prune_rounds_per_delete,omitempty"`
 	// DebounceAfterDeleteMS — nil = use [DefaultDebounceAfterDelete] when enabled; 0 = no debounce (maintain after each delete).
@@ -76,13 +79,9 @@ type rawMosaicConfig struct {
 
 	Database *databaseYAMLFields `yaml:"database"`
 
-	Retention *retentionYAMLFields `yaml:"retention"`
-	// PersistencePolicy is deprecated; use retention.
-	PersistencePolicy *retentionYAMLFields `yaml:"persistence_policy"`
-
-	CaptureMode *string                   `yaml:"capture_mode"`
-	Enforcement retentionEnforcementField `yaml:"enforcement"`
-	Notes       *string                   `yaml:"notes"`
+	Retention     *retentionYAMLFields `yaml:"retention"`
+	Ratchet       bool                 `yaml:"ratchet"`
+	AdvancedTools bool                 `yaml:"advanced_tools"`
 
 	AllowDeleteCell *bool `yaml:"allow_delete_cell"`
 
@@ -118,11 +117,20 @@ func LoadMosaicConfigFromFile(path string) (MosaicConfigLoaded, error) {
 }
 
 // ParseMosaicConfigYAML decodes YAML into [MosaicConfigLoaded].
-// Supports retention (preferred), persistence_policy (deprecated), or flat legacy keys at root.
+// Only the canonical retention block is accepted; unknown fields fail startup.
 func ParseMosaicConfigYAML(data []byte) (MosaicConfigLoaded, error) {
 	var raw rawMosaicConfig
-	if err := yaml.Unmarshal(data, &raw); err != nil {
+	decoder := yaml.NewDecoder(bytes.NewReader(data))
+	decoder.KnownFields(true)
+	if err := decoder.Decode(&raw); err != nil {
 		return MosaicConfigLoaded{}, fmt.Errorf("mosaic config: yaml: %w", err)
+	}
+	var extra any
+	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
+		if err != nil {
+			return MosaicConfigLoaded{}, fmt.Errorf("mosaic config: trailing yaml: %w", err)
+		}
+		return MosaicConfigLoaded{}, errors.New("mosaic config: exactly one YAML document is required")
 	}
 
 	if raw.Version != MosaicConfigVersion {
@@ -134,26 +142,9 @@ func ParseMosaicConfigYAML(data []byte) (MosaicConfigLoaded, error) {
 		allowDelete = *raw.AllowDeleteCell
 	}
 
-	hasFlat := raw.CaptureMode != nil || raw.Enforcement.present || raw.Notes != nil
-	if raw.Retention != nil && raw.PersistencePolicy != nil ||
-		hasFlat && (raw.Retention != nil || raw.PersistencePolicy != nil) {
-		return MosaicConfigLoaded{}, errors.New("mosaic config: use one retention policy form")
-	}
-
 	var fields retentionYAMLFields
-	switch {
-	case raw.Retention != nil:
+	if raw.Retention != nil {
 		fields = *raw.Retention
-	case raw.PersistencePolicy != nil:
-		fields = *raw.PersistencePolicy
-	case hasFlat:
-		fields.Enforcement = raw.Enforcement
-		if raw.CaptureMode != nil {
-			fields.CaptureMode = *raw.CaptureMode
-		}
-		if raw.Notes != nil {
-			fields.Notes = *raw.Notes
-		}
 	}
 
 	rt, err := normalizeRetentionPolicy(fields.CaptureMode, fields.Enforcement, fields.Notes)
@@ -176,9 +167,6 @@ func ParseMosaicConfigYAML(data []byte) (MosaicConfigLoaded, error) {
 				delMaintain.Prune = true
 				if am.Prune != nil {
 					delMaintain.Prune = *am.Prune
-				}
-				if am.Compact != nil && *am.Compact {
-					return MosaicConfigLoaded{}, errors.New("mosaic config: automatic live compaction is unavailable; use offline HexxlaDB maintenance")
 				}
 				if am.MaxPruneRoundsPerDelete != nil && *am.MaxPruneRoundsPerDelete > 0 {
 					delMaintain.MaxPruneRoundsPerDel = *am.MaxPruneRoundsPerDelete
@@ -224,6 +212,8 @@ func ParseMosaicConfigYAML(data []byte) (MosaicConfigLoaded, error) {
 	loaded := MosaicConfigLoaded{
 		Retention:                   rt,
 		AllowDeleteCell:             allowDelete,
+		Ratchet:                     raw.Ratchet,
+		AdvancedTools:               raw.AdvancedTools,
 		DatabasePassphrase:          dbPass,
 		Retrieval:                   retrieval,
 		MVCCRetainCommitsBehindHead: mvccRetain,

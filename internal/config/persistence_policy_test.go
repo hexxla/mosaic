@@ -70,23 +70,6 @@ retention:
 	}
 }
 
-func TestParseMosaicConfigYAML_persistence_policy_deprecated(t *testing.T) {
-	t.Parallel()
-	raw := `
-version: 1
-persistence_policy:
-  capture_mode: assistant_only
-  enforcement: true
-`
-	cfg, err := config.ParseMosaicConfigYAML([]byte(raw))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if cfg.Retention.CaptureMode != config.CaptureModeAssistantOnly {
-		t.Fatalf("got %+v", cfg.Retention)
-	}
-}
-
 func TestParseMosaicConfigYAML_flat_and_retention_conflict(t *testing.T) {
 	t.Parallel()
 	raw := `
@@ -172,30 +155,14 @@ retention:
 	}
 }
 
-func TestParsePersistencePolicyYAML_backwardCompat(t *testing.T) {
-	t.Parallel()
-	raw := `
-version: 1
-capture_mode: user_only
-enforcement: reject
-`
-	cfg, err := config.ParseMosaicConfigYAML([]byte(raw))
-	p := cfg.Retention
-	if err != nil {
-		t.Fatal(err)
-	}
-	if p.CaptureMode != config.CaptureModeUserOnly {
-		t.Fatal(p)
-	}
-}
-
 func TestLoadPersistencePolicyFromFile_roundTrip(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "policy.yaml")
 	content := []byte(`version: 1
-capture_mode: none
-enforcement: true
+retention:
+  capture_mode: none
+  enforcement: true
 `)
 	if err := os.WriteFile(path, content, 0o600); err != nil {
 		t.Fatal(err)

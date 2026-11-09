@@ -76,8 +76,8 @@ func TestContextPackAdapter_loads_exact_large_radius_and_facet_text(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	if budgeted.TotalBytes > 64 || budgeted.TotalTokens != budgeted.TotalBytes {
-		t.Fatalf("budgeted totals: bytes=%d legacy_tokens=%d", budgeted.TotalBytes, budgeted.TotalTokens)
+	if budgeted.TotalBytes > 64 {
+		t.Fatalf("budgeted bytes=%d", budgeted.TotalBytes)
 	}
 	if len(budgeted.Cells) >= len(out.Cells) || budgeted.Stats.CellsEvicted == 0 {
 		t.Fatalf("budget was not applied after retrieval: cells=%d stats=%+v", len(budgeted.Cells), budgeted.Stats)

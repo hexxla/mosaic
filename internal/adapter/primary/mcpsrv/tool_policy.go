@@ -2,6 +2,7 @@ package mcpsrv
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -18,10 +19,9 @@ type mcpToolPolicy struct {
 // addTool rejects unclassified tools at startup, and MutationToolNames derives
 // Ratchet's required mutation coverage from this same inventory.
 var mcpToolPolicies = map[string]mcpToolPolicy{
+	"mosaic_hexxla_get_cell":                      {readOnly: true},
 	"mosaic_hexxla_health":                        {readOnly: true},
-	"mosaic_hexxla_query_cells":                   {readOnly: true, openWorld: true},
 	"mosaic_hexxla_search_cells":                  {readOnly: true, openWorld: true},
-	"mosaic_hexxla_search_embedding":              {readOnly: true, openWorld: true},
 	"mosaic_hexxla_load_context_pack":             {readOnly: true},
 	"mosaic_hexxla_estimate_context_budget_bytes": {readOnly: true},
 	"mosaic_hexxla_retrieval_budget_status":       {readOnly: true},
@@ -53,11 +53,10 @@ func addTool[In, Out any](server *mcp.Server, tool *mcp.Tool, handler mcp.ToolHa
 		return fmt.Errorf("MCP tool %q sets annotations outside the safety policy inventory", tool.Name)
 	}
 
-	openWorld := policy.openWorld
 	tool.Annotations = &mcp.ToolAnnotations{
-		DestructiveHint: &policy.destructive,
+		DestructiveHint: new(policy.destructive),
 		IdempotentHint:  policy.idempotent,
-		OpenWorldHint:   &openWorld,
+		OpenWorldHint:   new(policy.openWorld),
 		ReadOnlyHint:    policy.readOnly,
 	}
 	mcp.AddTool(server, tool, handler)
@@ -74,13 +73,24 @@ func registerTools(registrations ...func() error) error {
 }
 
 // MutationToolNames returns the sorted tool names that can modify state.
-func MutationToolNames() []string {
+func MutationToolNames(advanced bool) []string {
 	names := make([]string, 0, len(mcpToolPolicies))
-	for name, policy := range mcpToolPolicies {
-		if !policy.readOnly {
+	for _, name := range EnabledToolNames(advanced) {
+		if !mcpToolPolicies[name].readOnly {
 			names = append(names, name)
 		}
 	}
 	slices.Sort(names)
 	return names
+}
+
+// EnabledToolNames is the startup inventory for the core or advanced profile.
+func EnabledToolNames(advanced bool) []string {
+	if advanced {
+		return slices.Sorted(maps.Keys(mcpToolPolicies))
+	}
+	return []string{
+		"mosaic_hexxla_delete_cell", "mosaic_hexxla_get_cell", "mosaic_hexxla_health",
+		"mosaic_hexxla_list_tags", "mosaic_hexxla_load_context_pack", "mosaic_hexxla_put_cell", "mosaic_hexxla_search_cells",
+	}
 }

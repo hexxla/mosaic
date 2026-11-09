@@ -1,0 +1,26 @@
+completion_ttl: 10m
+rules:
+  - tool: mosaic_hexxla_put_cell
+    after_any: [mosaic_hexxla_list_tags]
+    consume: true
+  - tool: mosaic_hexxla_put_embedding
+    after_any: [mosaic_hexxla_get_cell, mosaic_hexxla_search_cells]
+  - tool: mosaic_hexxla_put_facet
+    after_any: [mosaic_hexxla_get_cell, mosaic_hexxla_search_cells]
+  - tool: mosaic_hexxla_delete_cell
+    after_any: [mosaic_hexxla_get_cell, mosaic_hexxla_search_cells]
+  - tool: mosaic_hexxla_load_context_pack
+    after_any: [mosaic_hexxla_get_cell, mosaic_hexxla_search_cells]
+    ttl: 5m
+  - tool: mosaic_hexxla_link_cells
+    after_any: [mosaic_hexxla_load_context_pack]
+    consume: true
+  - tool: mosaic_hexxla_mark_conflict
+    after_any: [mosaic_hexxla_find_seams]
+    consume: true
+  - tool: mosaic_hexxla_mark_supersedes
+    after_any: [mosaic_hexxla_find_seams]
+    consume: true
+  - tool: mosaic_hexxla_resolve_seam
+    after_any: [mosaic_hexxla_find_seams]
+    consume: true

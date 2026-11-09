@@ -15,6 +15,9 @@ func TestDefaultMosaicConfig_llm_curates_and_gates(t *testing.T) {
 	if cfg.Retention.Enforcement != config.PolicyEnforcementOff {
 		t.Fatalf("DefaultMosaicConfig retention enforcement: got %q want off", cfg.Retention.Enforcement)
 	}
+	if cfg.Ratchet || cfg.AdvancedTools {
+		t.Fatal("in-process defaults must leave Ratchet and advanced tools disabled")
+	}
 	if cfg.AllowDeleteCell {
 		t.Fatal("DefaultMosaicConfig AllowDeleteCell: got true want false")
 	}
@@ -34,5 +37,15 @@ func TestDefaultRetentionPolicy_llm_curates(t *testing.T) {
 	}
 	if p.Enforcement != config.PolicyEnforcementOff {
 		t.Fatalf("got %q want off", p.Enforcement)
+	}
+}
+
+func TestShippedMosaicConfigIsSelective(t *testing.T) {
+	cfg, err := config.LoadMosaicConfigFromFile("../../configs/config.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Retention.CaptureMode != config.CaptureModeLLMCurates || cfg.AllowDeleteCell || cfg.DeleteAutoMaintain.Enabled || cfg.AdvancedTools || !cfg.Ratchet {
+		t.Fatalf("unexpected shipped defaults: %+v", cfg)
 	}
 }

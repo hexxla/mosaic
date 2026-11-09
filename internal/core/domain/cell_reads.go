@@ -5,7 +5,7 @@ import "time"
 // CellQuerySort selects ordering for QueryCells (maps to engine sort modes).
 type CellQuerySort string
 
-// Sort modes for [CellQueryCommand.SortBy].
+// Sort modes for [CellSearchCommand.SortBy].
 const (
 	CellQuerySortScore       CellQuerySort = "score"
 	CellQuerySortConfidence  CellQuerySort = "confidence"
@@ -14,59 +14,50 @@ const (
 	CellQuerySortUnspecified CellQuerySort = ""
 )
 
-// CellQueryCommand is a structured predicate for indexed cell reads (Hexxla Tx.QueryCells).
-type CellQueryCommand struct {
-	Query string
+// SearchMode selects the retrieval score and execution path.
+type SearchMode string
 
-	RequireTags []string
-	AnyTags     []string
-	ExcludeTags []string
+// Supported search modes preserve their native scoring semantics.
+const (
+	SearchLexical  SearchMode = "lexical"
+	SearchSemantic SearchMode = "semantic"
+	SearchHybrid   SearchMode = "hybrid"
+)
 
-	SourceID string
-
-	MinConfidence float64
-	MaxConfidence float64
-
-	After  *time.Time
-	Before *time.Time
-
-	Center *AxialCoord
-	Radius int
-
-	MaxResults  int
-	MaxScanRows int
-
-	SortBy  CellQuerySort
-	Explain bool
-
-	// EmbedQueryText enables hybrid retrieval: embed this natural-language string via Ollama
-	// then pass the vector into Hexxla QueryCells (ANN-accelerated seed selection + predicates).
-	// Empty disables hybrid mode. Requires a database opened with non-zero embedding dimension.
-	EmbedQueryText string `json:"embed_query_text,omitempty"`
+// AxialCoord is a lattice axial coordinate; cube s = -q-r.
+type AxialCoord struct {
+	Q int `json:"q" jsonschema:"axial q"`
+	R int `json:"r" jsonschema:"axial r"`
 }
 
-// CellSearchCommand is lexical relevance search over cells (Hexxla Tx.SearchCells).
+// CellSearchCommand provides one bounded retrieval contract. Hybrid Query is
+// embedded and LexicalQuery optionally applies an independent literal filter.
+// Semantic mode retains pure vector scoring; structured filters use hybrid mode.
 type CellSearchCommand struct {
-	Query string
-
-	RequireTags []string
-	AnyTags     []string
-
+	Query         string
+	Mode          SearchMode
+	LexicalQuery  string
+	RequireTags   []string
+	AnyTags       []string
+	ExcludeTags   []string
+	SourceID      string
 	MinConfidence float64
 	MaxConfidence float64
-
-	SourceID string
-
-	Center *AxialCoord
-	Radius int
-
+	After         *time.Time
+	Before        *time.Time
+	Center        *AxialCoord
+	Radius        int
 	MaxResults    int
-	MaxScanRadius int
 	MaxScanRows   int
+	SortBy        CellQuerySort
+	Explain       bool
+	MinScore      float64
+}
 
-	// EmbedQueryText enables hybrid retrieval: embed then SearchCells with ANN-accelerated
-	// candidate selection combined with lexical score. Empty disables hybrid mode.
-	EmbedQueryText string `json:"embed_query_text,omitempty"`
+// CellLookupResponse distinguishes missing cells from empty cell content.
+type CellLookupResponse struct {
+	Found bool     `json:"found"`
+	Cell  *CellHit `json:"cell,omitempty"`
 }
 
 // CellHit is one ranked cell from QueryCells or SearchCells (MCP-safe projection).
@@ -88,10 +79,11 @@ type CellHit struct {
 
 // CellHitsResponse is the MCP JSON body for query/search cell tools.
 type CellHitsResponse struct {
-	Hits                           []CellHit `json:"hits" jsonschema:"ranked cell rows"`
-	RetrievalHint                  string    `json:"retrieval_hint,omitempty" jsonschema:"when to chain mosaic_hexxla_load_context_pack"`
-	ScanLimitReached               bool      `json:"scan_limit_reached,omitempty" jsonschema:"results are partial because the scan row budget was exhausted"`
-	EmbeddingPath                  string    `json:"embedding_path,omitempty" jsonschema:"vector execution path: hnsw, flat, or none"`
-	EmbeddingCandidates            int       `json:"embedding_candidates,omitempty" jsonschema:"distinct vector candidates examined"`
-	EmbeddingCandidateLimitReached bool      `json:"embedding_candidate_limit_reached,omitempty" jsonschema:"vector widening stopped at the candidate budget before filling the requested result count"`
+	Mode                           SearchMode `json:"mode" jsonschema:"score semantics: lexical, pure-vector semantic, or confidence-aware hybrid"`
+	Hits                           []CellHit  `json:"hits" jsonschema:"ranked cell rows"`
+	RetrievalHint                  string     `json:"retrieval_hint,omitempty" jsonschema:"when to chain mosaic_hexxla_load_context_pack"`
+	ScanLimitReached               bool       `json:"scan_limit_reached,omitempty" jsonschema:"results are partial because the scan row budget was exhausted"`
+	EmbeddingPath                  string     `json:"embedding_path,omitempty" jsonschema:"vector execution path: hnsw, flat, or none"`
+	EmbeddingCandidates            int        `json:"embedding_candidates,omitempty" jsonschema:"distinct vector candidates examined"`
+	EmbeddingCandidateLimitReached bool       `json:"embedding_candidate_limit_reached,omitempty" jsonschema:"vector widening stopped at the candidate budget before filling the requested result count"`
 }

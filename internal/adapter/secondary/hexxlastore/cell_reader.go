@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/hexxla/hexxladb"
 
@@ -21,8 +22,8 @@ func NewCellReaderAdapter(live *LiveDB) *CellReaderAdapter {
 	return &CellReaderAdapter{live: live}
 }
 
-// QueryCells implements [secondary.CellReader].
-func (a *CellReaderAdapter) QueryCells(ctx context.Context, q *domain.CellQueryCommand, embedding []float32) (domain.CellHitsResponse, error) {
+// SearchCells implements [secondary.CellReader].
+func (a *CellReaderAdapter) SearchCells(ctx context.Context, q *domain.CellSearchCommand, embedding []float32) (domain.CellHitsResponse, error) {
 	if a == nil || a.live == nil {
 		return domain.CellHitsResponse{}, fmt.Errorf("hexxlastore cell reader: nil database")
 	}
@@ -56,34 +57,53 @@ func (a *CellReaderAdapter) QueryCells(ctx context.Context, q *domain.CellQueryC
 	return out, nil
 }
 
-// SearchCells preserves the search tool's implicit 32-ring scope.
-func (a *CellReaderAdapter) SearchCells(ctx context.Context, q *domain.CellSearchCommand, embedding []float32) (domain.CellHitsResponse, error) {
-	if q == nil {
-		return domain.CellHitsResponse{}, fmt.Errorf("hexxlastore cell reader: nil search command")
+// GetCell reads the visible cell at one exact coordinate, including tombstone absence.
+func (a *CellReaderAdapter) GetCell(ctx context.Context, coord domain.AxialCoord) (domain.CellLookupResponse, error) {
+	if a == nil || a.live == nil {
+		return domain.CellLookupResponse{}, fmt.Errorf("hexxlastore cell reader: nil database")
 	}
-	radius := q.Radius
-	if radius <= 0 {
-		radius = q.MaxScanRadius
-		if radius <= 0 {
-			radius = 32
-		}
+	key, err := hexxladb.Pack(hexxladb.Coord{Q: coord.Q, R: coord.R})
+	if err != nil {
+		return domain.CellLookupResponse{}, fmt.Errorf("pack coordinate: %w", err)
 	}
-	return a.QueryCells(ctx, &domain.CellQueryCommand{
-		Query: q.Query, RequireTags: q.RequireTags, AnyTags: q.AnyTags,
-		MinConfidence: q.MinConfidence, MaxConfidence: q.MaxConfidence, SourceID: q.SourceID,
-		Center: q.Center, Radius: radius, MaxResults: q.MaxResults, MaxScanRows: q.MaxScanRows,
-	}, embedding)
+	var out domain.CellLookupResponse
+	err = a.live.WithRead(func(db *hexxladb.DB) error {
+		return db.View(func(tx *hexxladb.Tx) error {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			rec, found, err := tx.GetCell(key)
+			if err != nil {
+				return err
+			}
+			if !found {
+				return nil
+			}
+			view := hexxladb.CellView{Coord: hexxladb.Coord{Q: coord.Q, R: coord.R}, RawContent: rec.RawContent, Tags: rec.Tags, Provenance: rec.Provenance, Validity: rec.Validity}
+			hit := viewToCellHit(&view, 0, "")
+			out = domain.CellLookupResponse{Found: true, Cell: &hit}
+			return ctx.Err()
+		})
+	})
+	if err != nil {
+		return domain.CellLookupResponse{}, fmt.Errorf("hexxlastore get cell: %w", err)
+	}
+	return out, nil
 }
 
-func toCellQuery(q *domain.CellQueryCommand) (hexxladb.CellQuery, error) {
+func toCellQuery(q *domain.CellSearchCommand) (hexxladb.CellQuery, error) {
 	if q == nil {
 		return hexxladb.CellQuery{}, errors.New("hexxlastore: nil query command")
 	}
+	text := q.Query
+	if q.Mode == domain.SearchHybrid {
+		text = q.LexicalQuery
+	}
 	hq := hexxladb.CellQuery{
-		Query:         q.Query,
-		RequireTags:   append([]string(nil), q.RequireTags...),
-		AnyTags:       append([]string(nil), q.AnyTags...),
-		ExcludeTags:   append([]string(nil), q.ExcludeTags...),
+		Query:         text,
+		RequireTags:   slices.Clone(q.RequireTags),
+		AnyTags:       slices.Clone(q.AnyTags),
+		ExcludeTags:   slices.Clone(q.ExcludeTags),
 		SourceID:      q.SourceID,
 		MinConfidence: q.MinConfidence,
 		MaxConfidence: q.MaxConfidence,

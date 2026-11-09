@@ -15,3 +15,20 @@ Mosaic is a local MCP application. HexxlaDB owns the database format and transac
 A put request travels through the MCP adapter and mutation service to the storage adapter. The mutation service applies the operator's write policy. Ratchet independently controls prerequisites before the handler runs. Database replacement is a separate offline operator procedure.
 
 Run `task ci` for import boundaries and tests. Exercise MCP schemas, cross-session enforcement, atomic cell placement and policy rejections when their owners change.
+
+## Current API boundary
+
+Mosaic publishes one global-by-default discovery operation with lexical,
+pure-vector semantic, and filtered/composite hybrid modes. Exact coordinate
+lookup is separate. Model effects precede atomic cell-and-vector transactions;
+placement, overwrite checks and both writes share the adapter's `DB.Update`.
+
+The default MCP inventory contains seven everyday tools. Specialist tools are
+registered only when `advanced_tools` is enabled. The enabled inventory drives
+Ratchet mutation coverage. Mosaic selects configured calls and delegates their
+execution/result serialization to shared Ratchet middleware. A bundled grouped
+policy is enabled with `ratchet: true`; custom YAML remains an optional adapter.
+
+Context assembly owns one canonical UTF-8 byte budget. Approximate-token
+conversion is an advanced convenience; legacy token-named byte aliases and
+parallel query APIs are removed.

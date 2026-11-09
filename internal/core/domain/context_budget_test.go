@@ -1,10 +1,29 @@
 package domain_test
 
 import (
+	"math"
 	"testing"
 
 	"github.com/sploitzberg/mosaic/internal/core/domain"
 )
+
+func TestApproximateByteBudgetLargeInputsRemainCapped(t *testing.T) {
+	t.Parallel()
+	previous := 0
+	for _, tokens := range []int{1, 100, 25000, math.MaxInt / 4, math.MaxInt / 2, math.MaxInt} {
+		got, err := domain.ApproximateByteBudgetFromTokens(tokens, 4, 64, 100000)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got < previous || got < 64 || got > 100000 {
+			t.Fatalf("tokens=%d budget=%d previous=%d", tokens, got, previous)
+		}
+		if tokens >= 25000 && got != 100000 {
+			t.Fatalf("tokens=%d budget=%d, want maximum", tokens, got)
+		}
+		previous = got
+	}
+}
 
 func TestApproximateByteBudgetFromTokens(t *testing.T) {
 	t.Parallel()

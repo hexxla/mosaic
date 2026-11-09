@@ -16,7 +16,7 @@ const (
 	defaultEmbedML = "all-minilm"
 )
 
-// Ollama holds HTTP embedding endpoints for MCP tools (never stores secrets).
+// Ollama holds HTTP embedding endpoints for MCP tools. Base may include credentials; do not log it directly.
 type Ollama struct {
 	// Base is the parsed Ollama root URL (e.g. http://127.0.0.1:11434).
 	Base *url.URL
@@ -51,10 +51,13 @@ func ResolveOllama(in OllamaResolveInput) (Ollama, error) {
 	}
 	u, err := url.Parse(raw)
 	if err != nil {
-		return Ollama{}, fmt.Errorf("ollama URL %q: %w", raw, err)
+		return Ollama{}, &invalidOllamaURLError{cause: err}
 	}
-	if u.Scheme == "" || u.Host == "" {
-		return Ollama{}, fmt.Errorf("ollama URL %q must have scheme and host (e.g. http://127.0.0.1:11434)", raw)
+	if (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" || u.Opaque != "" {
+		return Ollama{}, fmt.Errorf("ollama URL must be an absolute HTTP(S) URL with a host")
+	}
+	if u.RawQuery != "" || u.ForceQuery || strings.Contains(raw, "#") {
+		return Ollama{}, fmt.Errorf("ollama URL must not contain a query or fragment")
 	}
 
 	model := strings.TrimSpace(in.FlagEmbedModel)
@@ -69,3 +72,11 @@ func ResolveOllama(in OllamaResolveInput) (Ollama, error) {
 	}
 	return Ollama{Base: u, Model: model}, nil
 }
+
+// Keep parsing causes inspectable without printing potentially secret URL components.
+type invalidOllamaURLError struct {
+	cause error
+}
+
+func (*invalidOllamaURLError) Error() string   { return "ollama URL is invalid" }
+func (e *invalidOllamaURLError) Unwrap() error { return e.cause }

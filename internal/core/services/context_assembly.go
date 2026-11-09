@@ -10,13 +10,13 @@ import (
 )
 
 const (
-	defaultContextMaxTokens     = 4096
-	defaultContextMaxRing       = 3
-	minContextMaxTokens         = domain.ContextBudgetMinBytes
-	maxContextMaxTokens         = domain.ContextBudgetMaxBytes
-	maxContextMaxRing           = 32
-	maxContextSeedCoords        = 32
-	maxContextCandidateCellsCap = 8192
+	defaultContextMaxBudgetBytes = 4096
+	defaultContextMaxRing        = 3
+	minContextBudgetBytes        = domain.ContextBudgetMinBytes
+	maxContextBudgetBytes        = domain.ContextBudgetMaxBytes
+	maxContextMaxRing            = 32
+	maxContextSeedCoords         = 32
+	maxContextCandidateCellsCap  = 8192
 )
 
 // ContextAssemblyService implements [primary.ContextAssembly].
@@ -50,25 +50,21 @@ func (s *ContextAssemblyService) LoadFromSeeds(ctx context.Context, cmd *domain.
 	if normalized.MaxRing > maxContextMaxRing {
 		normalized.MaxRing = maxContextMaxRing
 	}
-	effectiveBudget, err := resolveContextByteBudget(&normalized)
-	if err != nil {
-		return domain.ContextPackResponse{}, err
+	effectiveBudget := normalized.MaxBudgetBytes
+	if effectiveBudget == 0 {
+		effectiveBudget = defaultContextMaxBudgetBytes
 	}
-	if effectiveBudget < minContextMaxTokens || effectiveBudget > maxContextMaxTokens {
+	if effectiveBudget < minContextBudgetBytes || effectiveBudget > maxContextBudgetBytes {
 		return domain.ContextPackResponse{}, fmt.Errorf("context assembly: resolved UTF-8 byte budget must be between %d and %d",
-			minContextMaxTokens, maxContextMaxTokens)
+			minContextBudgetBytes, maxContextBudgetBytes)
 	}
 	if normalized.SessionByteLimit > 0 {
 		effectiveBudget = min(effectiveBudget, normalized.SessionByteLimit)
-		if effectiveBudget < minContextMaxTokens {
-			return domain.ContextPackResponse{}, fmt.Errorf("context assembly: remaining session budget is below %d bytes", minContextMaxTokens)
+		if effectiveBudget < minContextBudgetBytes {
+			return domain.ContextPackResponse{}, fmt.Errorf("context assembly: remaining session budget is below %d bytes", minContextBudgetBytes)
 		}
 	}
-	normalized.MaxTokens = effectiveBudget
-	normalized.OmitBudget = false
-	normalized.BudgetTokensApprox = 0
-	normalized.BytesPerApproxToken = 0
-	normalized.MaxBudgetBytes = 0
+	normalized.MaxBudgetBytes = effectiveBudget
 	if normalized.MaxCells > maxContextCandidateCellsCap {
 		normalized.MaxCells = maxContextCandidateCellsCap
 	}
@@ -80,7 +76,6 @@ func (s *ContextAssemblyService) LoadFromSeeds(ctx context.Context, cmd *domain.
 	out.SeedCount = len(normalized.Seeds)
 	out.MaxRingApplied = normalized.MaxRing
 	out.MaxBudgetBytes = effectiveBudget
-	out.MaxTokensBudget = effectiveBudget
 	out.RetrievalHint = domain.RetrievalHintAfterContextPack
 	return out, nil
 }

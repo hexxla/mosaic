@@ -1,8 +1,11 @@
 package hexxlastore
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/hexxla/hexxladb"
@@ -10,6 +13,41 @@ import (
 	"github.com/sploitzberg/mosaic/internal/config"
 	"github.com/sploitzberg/mosaic/internal/core/domain"
 )
+
+func TestPutEmbeddingChecksExpectedCellContentAtomically(t *testing.T) {
+	t.Parallel()
+	db, live := openLifecycleDB(t)
+	ctx := t.Context()
+	writer := NewCellWriterAdapter(live, config.DeleteAutoMaintainConfig{})
+	cmd := domain.PutCellCommand{RawContent: "current content", SourceID: "test"}
+	if _, err := writer.PutCell(ctx, &cmd, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.PutEmbedding(ctx, cmd.Coord, []float32{1, 0}, ""); err != nil {
+		t.Fatal(err)
+	}
+	stale := sha256.Sum256([]byte("previous content"))
+	if err := writer.PutEmbedding(ctx, cmd.Coord, []float32{0, 1}, hex.EncodeToString(stale[:])); !errors.Is(err, domain.ErrCellContentChanged) {
+		t.Fatalf("stale embedding error = %v", err)
+	}
+	key, err := hexxladb.Pack(hexxladb.Coord{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.View(func(tx *hexxladb.Tx) error {
+		vec, found, err := tx.GetEmbedding(key)
+		if err == nil && (!found || !slices.Equal(vec, []float32{1, 0})) {
+			t.Errorf("stale write changed embedding: %v, found=%t", vec, found)
+		}
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	current := sha256.Sum256([]byte(cmd.RawContent))
+	if err := writer.PutEmbedding(ctx, cmd.Coord, []float32{0, 1}, hex.EncodeToString(current[:])); err != nil {
+		t.Fatalf("matching content rejected: %v", err)
+	}
+}
 
 func TestCellWriterAdapter_exact_and_near_anchor_placement(t *testing.T) {
 	t.Parallel()
@@ -32,7 +70,7 @@ func TestCellWriterAdapter_exact_and_near_anchor_placement(t *testing.T) {
 		Kind:       domain.CellPutKindFact,
 		Placement:  domain.CellPlacementExact,
 	}
-	placed, err := writer.PutCell(t.Context(), &base)
+	placed, err := writer.PutCell(t.Context(), &base, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,7 +80,7 @@ func TestCellWriterAdapter_exact_and_near_anchor_placement(t *testing.T) {
 
 	conflict := base
 	conflict.RawContent = "must not replace"
-	if _, err := writer.PutCell(t.Context(), &conflict); !errors.Is(err, domain.ErrCellCoordinateOccupied) {
+	if _, err := writer.PutCell(t.Context(), &conflict, nil); !errors.Is(err, domain.ErrCellCoordinateOccupied) {
 		t.Fatalf("occupied exact error=%v", err)
 	}
 	assertCellContent(t, db, base.Coord, "first")
@@ -50,7 +88,7 @@ func TestCellWriterAdapter_exact_and_near_anchor_placement(t *testing.T) {
 	overwrite := base
 	overwrite.RawContent = "replacement"
 	overwrite.AllowOverwrite = true
-	replaced, err := writer.PutCell(t.Context(), &overwrite)
+	replaced, err := writer.PutCell(t.Context(), &overwrite, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,7 +101,7 @@ func TestCellWriterAdapter_exact_and_near_anchor_placement(t *testing.T) {
 	near.RawContent = "neighbor"
 	near.Placement = domain.CellPlacementNearAnchor
 	near.MaxRadius = 1
-	neighbor, err := writer.PutCell(t.Context(), &near)
+	neighbor, err := writer.PutCell(t.Context(), &near, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +156,7 @@ func TestCellWriterReportsCommittedDeleteWhenPruningFails(t *testing.T) {
 		t.Fatalf("test configuration did not produce a pruning error: %v", err)
 	}
 	writer := NewCellWriterAdapter(live, maintenance)
-	if _, err := writer.PutCell(t.Context(), &domain.PutCellCommand{RawContent: "test", SourceID: "test"}); err != nil {
+	if _, err := writer.PutCell(t.Context(), &domain.PutCellCommand{RawContent: "test", SourceID: "test"}, nil); err != nil {
 		t.Fatal(err)
 	}
 	removed, err := writer.DeleteCell(t.Context(), &domain.DeleteCellCommand{})
@@ -142,7 +180,7 @@ func TestCellWriterProtectsVectorAndSeamIdentity(t *testing.T) {
 	t.Cleanup(func() { _ = live.Close() })
 	writer := NewCellWriterAdapter(live, config.DeleteAutoMaintainConfig{})
 	a, b := domain.AxialCoord{Q: 1}, domain.AxialCoord{Q: 4}
-	if err := writer.PutEmbedding(ctx, a, []float32{1, 0}); !errors.Is(err, hexxladb.ErrCellNotFound) {
+	if err := writer.PutEmbedding(ctx, a, []float32{1, 0}, ""); !errors.Is(err, hexxladb.ErrCellNotFound) {
 		t.Fatalf("embedding at vacant coordinate = %v", err)
 	}
 	key, err := hexxladb.Pack(hexxladb.Coord{Q: a.Q, R: a.R})
@@ -155,7 +193,7 @@ func TestCellWriterProtectsVectorAndSeamIdentity(t *testing.T) {
 		t.Fatal(err)
 	}
 	cmd := domain.PutCellCommand{Coord: a, RawContent: "original", SourceID: "test"}
-	if _, err := writer.PutCell(ctx, &cmd); err != nil {
+	if _, err := writer.PutCell(ctx, &cmd, nil); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.View(func(tx *hexxladb.Tx) error {
@@ -167,12 +205,12 @@ func TestCellWriterProtectsVectorAndSeamIdentity(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := writer.PutEmbedding(ctx, a, []float32{1, 0}); err != nil {
+	if err := writer.PutEmbedding(ctx, a, []float32{1, 0}, ""); err != nil {
 		t.Fatal(err)
 	}
 	cmd.RawContent = "replacement"
 	cmd.AllowOverwrite = true
-	if _, err := writer.PutCell(ctx, &cmd); err != nil {
+	if _, err := writer.PutCell(ctx, &cmd, nil); err != nil {
 		t.Fatal(err)
 	}
 	matches, err := NewEmbeddingANNAdapter(live).Search(ctx, []float32{1, 0}, 1, 0)
@@ -180,7 +218,7 @@ func TestCellWriterProtectsVectorAndSeamIdentity(t *testing.T) {
 		t.Fatalf("old vector still ranks replacement: %v, %v", matches, err)
 	}
 
-	if _, err := writer.PutCell(ctx, &domain.PutCellCommand{Coord: b, RawContent: "peer", SourceID: "test"}); err != nil {
+	if _, err := writer.PutCell(ctx, &domain.PutCellCommand{Coord: b, RawContent: "peer", SourceID: "test"}, nil); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Update(func(tx *hexxladb.Tx) error {
@@ -191,13 +229,13 @@ func TestCellWriterProtectsVectorAndSeamIdentity(t *testing.T) {
 	if removed, err := writer.DeleteCell(ctx, &domain.DeleteCellCommand{Coord: a}); err != nil || !removed {
 		t.Fatalf("delete = %t, %v", removed, err)
 	}
-	if _, err := writer.PutCell(ctx, &cmd); !errors.Is(err, domain.ErrCellCoordinateOccupied) {
+	if _, err := writer.PutCell(ctx, &cmd, nil); !errors.Is(err, domain.ErrCellCoordinateOccupied) {
 		t.Fatalf("exact reuse of tombstone = %v", err)
 	}
 	cmd.AllowOverwrite = false
 	cmd.Placement = domain.CellPlacementNearAnchor
 	cmd.MaxRadius = 1
-	placed, err := writer.PutCell(ctx, &cmd)
+	placed, err := writer.PutCell(ctx, &cmd, nil)
 	if err != nil || placed.Coord == a {
 		t.Fatalf("near-anchor placement = %+v, %v", placed, err)
 	}

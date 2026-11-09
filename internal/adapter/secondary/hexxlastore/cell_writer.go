@@ -2,6 +2,8 @@ package hexxlastore
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"slices"
@@ -35,7 +37,7 @@ func NewCellWriterAdapter(live *LiveDB, maintain config.DeleteAutoMaintainConfig
 }
 
 // PutCell implements [secondary.CellWriter].
-func (a *CellWriterAdapter) PutCell(ctx context.Context, cmd *domain.PutCellCommand) (domain.PutCellMutationResult, error) {
+func (a *CellWriterAdapter) PutCell(ctx context.Context, cmd *domain.PutCellCommand, embedding []float32) (domain.PutCellMutationResult, error) {
 	if a == nil || a.live == nil {
 		return domain.PutCellMutationResult{}, fmt.Errorf("hexxlastore cell writer: nil database")
 	}
@@ -111,6 +113,12 @@ func (a *CellWriterAdapter) PutCell(ctx context.Context, cmd *domain.PutCellComm
 			if err := tx.PutCell(ctx, rec); err != nil {
 				return fmt.Errorf("tx PutCell: %w", err)
 			}
+			if len(embedding) > 0 {
+				if err := tx.PutEmbedding(key, embedding); err != nil {
+					return fmt.Errorf("tx PutEmbedding with cell: %w", err)
+				}
+			}
+			result.Embedded = len(embedding) > 0
 			result.OK = true
 			result.Coord = domain.AxialCoord{Q: selected.Q, R: selected.R}
 			return nil
@@ -143,7 +151,7 @@ func newCellRecord(key hexxladb.PackedCoord, cmd *domain.PutCellCommand, kind do
 }
 
 // PutEmbedding implements [secondary.CellWriter].
-func (a *CellWriterAdapter) PutEmbedding(ctx context.Context, coord domain.AxialCoord, vec []float32) error {
+func (a *CellWriterAdapter) PutEmbedding(ctx context.Context, coord domain.AxialCoord, vec []float32, expectedContentSHA256 string) error {
 	if a == nil || a.live == nil {
 		return fmt.Errorf("hexxlastore cell writer: nil database")
 	}
@@ -163,10 +171,18 @@ func (a *CellWriterAdapter) PutEmbedding(ctx context.Context, coord domain.Axial
 			if err := ctx.Err(); err != nil {
 				return fmt.Errorf("context: %w", err)
 			}
-			if _, found, err := tx.GetCell(pk); err != nil {
+			rec, found, err := tx.GetCell(pk)
+			if err != nil {
 				return fmt.Errorf("check embedding cell: %w", err)
-			} else if !found {
+			}
+			if !found {
 				return fmt.Errorf("embedding needs a live cell at (%d,%d): %w", coord.Q, coord.R, hexxladb.ErrCellNotFound)
+			}
+			if expectedContentSHA256 != "" {
+				hash := sha256.Sum256([]byte(rec.RawContent))
+				if hex.EncodeToString(hash[:]) != expectedContentSHA256 {
+					return fmt.Errorf("embedding cell at (%d,%d): %w", coord.Q, coord.R, domain.ErrCellContentChanged)
+				}
 			}
 			if err := tx.PutEmbedding(pk, vec); err != nil {
 				return fmt.Errorf("tx PutEmbedding: %w", err)

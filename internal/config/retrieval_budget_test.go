@@ -42,3 +42,25 @@ retrieval:
 		t.Fatal("expected error for bytes_per_approx_token out of range")
 	}
 }
+
+func TestParseMosaicConfigYAML_retrievalRejectsNonFiniteAndNegativeRatios(t *testing.T) {
+	t.Parallel()
+	for _, value := range []string{".nan", ".inf", "-.inf", "-1"} {
+		t.Run(value, func(t *testing.T) {
+			t.Parallel()
+			_, err := config.ParseMosaicConfigYAML([]byte("version: 1\nretrieval:\n  bytes_per_approx_token: " + value + "\n"))
+			if err == nil {
+				t.Fatalf("invalid ratio %s was accepted", value)
+			}
+		})
+	}
+}
+
+func TestParseMosaicConfigYAML_retrievalPreservesDefaultAndBoundaryRatios(t *testing.T) {
+	t.Parallel()
+	for _, value := range []string{"0", "2", "4", "16"} {
+		if _, err := config.ParseMosaicConfigYAML([]byte("version: 1\nretrieval:\n  bytes_per_approx_token: " + value + "\n")); err != nil {
+			t.Fatalf("valid ratio %s: %v", value, err)
+		}
+	}
+}

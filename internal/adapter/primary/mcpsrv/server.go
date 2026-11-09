@@ -21,15 +21,19 @@ func NewServer(name, version string, opts *mcp.ServerOptions) *mcp.Server {
 	}, opts)
 }
 
-// ServerInstructions sets only MCP server instructions (sent to clients at initialize), e.g. active persistence policy.
+// ServerInstructions combines operator instructions with mutation recovery
+// guidance sent to clients at initialize.
 func ServerInstructions(instructions string) *mcp.ServerOptions {
-	if instructions == "" {
-		return nil
+	const mutationRecovery = "If a mutation reports a durable-commit or uncertain finalization error, reconcile the database before retrying. A failed response does not prove that nothing was saved. In particular, do not blindly retry near-anchor placement: search by source_id and content to locate a possible committed cell first."
+	if instructions != "" {
+		instructions += "\n\n"
 	}
-	return &mcp.ServerOptions{Instructions: instructions}
+	return &mcp.ServerOptions{Instructions: instructions + mutationRecovery}
 }
 
-// StreamableHTTPHandler exposes the MCP server over MCP Streamable HTTP (JSON-RPC over HTTP POST/SSE GET).
+// StreamableHTTPHandler exposes the MCP server over MCP Streamable HTTP.
+// Responses to POST may use SSE. Standalone GET streams are unnecessary for
+// this fixed tool inventory and would keep HTTP shutdown waiting indefinitely.
 //
 // Clients send JSON-RPC to the configured listen address and path (see MOSAIC_MCP_ADDR / MOSAIC_MCP_PATH).
 func StreamableHTTPHandler(srv *mcp.Server, log *slog.Logger) http.Handler {
@@ -37,5 +41,14 @@ func StreamableHTTPHandler(srv *mcp.Server, log *slog.Logger) http.Handler {
 	if log != nil {
 		opts.Logger = log
 	}
-	return mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return srv }, opts)
+	handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return srv }, opts)
+	protected := http.NewCrossOriginProtection().Handler(handler)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost && r.Method != http.MethodDelete {
+			w.Header().Set("Allow", "POST, DELETE")
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		protected.ServeHTTP(w, r)
+	})
 }

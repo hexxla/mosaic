@@ -6,29 +6,30 @@ import (
 	"slices"
 	"strings"
 
-	ratchetdomain "github.com/hexxla/mcp-ratchet/pkg/ratchet/domain"
-	ratchetprimary "github.com/hexxla/mcp-ratchet/pkg/ratchet/ports/primary"
+	"github.com/hexxla/mcp-ratchet/pkg/ratchet"
+	ratchetmcp "github.com/hexxla/mcp-ratchet/pkg/ratchet/mcp"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-// RatchetGate enforces configured tool prerequisites for each MCP session.
+// RatchetGate selects Mosaic policy tools; shared Ratchet middleware owns
+// execution, prerequisite consumption, and final response serialization.
 type RatchetGate struct {
-	executor   ratchetprimary.WorkflowExecutor
-	configured map[ratchetdomain.ToolName]bool
+	executor   ratchetmcp.Executor
+	configured map[string]bool
 }
 
-// NewRatchetGate wires Ratchet's executor into the MCP tool boundary.
-func NewRatchetGate(executor ratchetprimary.WorkflowExecutor, rules []ratchetdomain.Rule) *RatchetGate {
-	configured := make(map[ratchetdomain.ToolName]bool, len(rules))
-	unrestricted := make(map[ratchetdomain.ToolName]struct{})
-	for _, rule := range rules {
-		configured[rule.Tool] = rule.Prerequisite != ""
-		if rule.Prerequisite == "" {
-			unrestricted[rule.Tool] = struct{}{}
+// NewRatchetGate selects the tools governed by the supplied policy.
+func NewRatchetGate(executor ratchetmcp.Executor, policy ratchet.Policy) *RatchetGate {
+	configured := make(map[string]bool)
+	unrestricted := make(map[string]bool)
+	for _, rule := range policy.Rules {
+		configured[rule.Tool] = len(rule.AfterAny) > 0
+		if len(rule.AfterAny) == 0 {
+			unrestricted[rule.Tool] = true
 		}
-		if rule.Prerequisite != "" {
-			if _, ok := configured[rule.Prerequisite]; !ok {
-				configured[rule.Prerequisite] = false
+		for _, prerequisite := range rule.AfterAny {
+			if _, ok := configured[prerequisite]; !ok {
+				configured[prerequisite] = false
 			}
 		}
 	}
@@ -38,12 +39,12 @@ func NewRatchetGate(executor ratchetprimary.WorkflowExecutor, rules []ratchetdom
 	return &RatchetGate{executor: executor, configured: configured}
 }
 
-// ValidateToolNames rejects policy entries outside Mosaic's tool inventory.
+// ValidateToolNames rejects policy references outside Mosaic's inventory.
 func (g *RatchetGate) ValidateToolNames() error {
 	var unknown []string
 	for tool := range g.configured {
-		if _, ok := mcpToolPolicies[string(tool)]; !ok {
-			unknown = append(unknown, string(tool))
+		if _, ok := mcpToolPolicies[tool]; !ok {
+			unknown = append(unknown, tool)
 		}
 	}
 	if len(unknown) == 0 {
@@ -53,13 +54,12 @@ func (g *RatchetGate) ValidateToolNames() error {
 	return fmt.Errorf("ratchet policy names unknown Mosaic tools: %s", strings.Join(unknown, ", "))
 }
 
-// ValidateProtectedTools fails when any required tool is absent from the
-// Ratchet rules or has a free-pass rule that makes its prerequisites optional.
+// ValidateProtectedTools requires a guarded rule for every enabled mutation.
 func (g *RatchetGate) ValidateProtectedTools(required []string) error {
-	missing := make([]string, 0)
-	for _, name := range required {
-		if !g.configured[ratchetdomain.ToolName(name)] {
-			missing = append(missing, name)
+	var missing []string
+	for _, tool := range required {
+		if !g.configured[tool] {
+			missing = append(missing, tool)
 		}
 	}
 	if len(missing) == 0 {
@@ -69,63 +69,49 @@ func (g *RatchetGate) ValidateProtectedTools(required []string) error {
 	return fmt.Errorf("ratchet policy leaves mutation tools unprotected: %s", strings.Join(missing, ", "))
 }
 
-// Middleware returns MCP receiving middleware that gates configured tool calls.
+// PolicyForTools removes inactive guards and alternatives from an already
+// name-validated policy. Enabled guards must retain an enabled prerequisite.
+func PolicyForTools(policy ratchet.Policy, advanced bool) (ratchet.Policy, error) {
+	enabled := make(map[string]bool)
+	for _, tool := range EnabledToolNames(advanced) {
+		enabled[tool] = true
+	}
+	filtered := ratchet.Policy{CompletionTTL: policy.CompletionTTL}
+	for _, rule := range policy.Rules {
+		if !enabled[rule.Tool] {
+			continue
+		}
+		copy := rule
+		copy.AfterAny = nil
+		for _, prerequisite := range rule.AfterAny {
+			if enabled[prerequisite] {
+				copy.AfterAny = append(copy.AfterAny, prerequisite)
+			}
+		}
+		if len(rule.AfterAny) > 0 && len(copy.AfterAny) == 0 {
+			return ratchet.Policy{}, fmt.Errorf("ratchet policy tool %q has no enabled prerequisite", rule.Tool)
+		}
+		filtered.Rules = append(filtered.Rules, copy)
+	}
+	return filtered, nil
+}
+
+// Middleware delegates governed calls to the shared final-response middleware.
 func (g *RatchetGate) Middleware() mcp.Middleware {
 	return func(next mcp.MethodHandler) mcp.MethodHandler {
+		governed := ratchetmcp.NewMiddleware(g.executor)(next)
 		return func(ctx context.Context, method string, req mcp.Request) (mcp.Result, error) {
 			if method != "tools/call" {
 				return next(ctx, method, req)
 			}
-
-			params, ok := req.GetParams().(*mcp.CallToolParamsRaw)
-			if !ok {
-				return ratchetToolError(fmt.Errorf("ratchet: unexpected tools/call parameters %T", req.GetParams()))
+			call, ok := req.(*mcp.CallToolRequest)
+			if !ok || call == nil || call.Params == nil {
+				return governed(ctx, method, req)
 			}
-			tool := ratchetdomain.ToolName(params.Name)
-			if _, governed := g.configured[tool]; !governed {
+			if _, ok := g.configured[call.Params.Name]; !ok {
 				return next(ctx, method, req)
 			}
-
-			session := req.GetSession()
-			if session == nil || session.ID() == "" {
-				return ratchetToolError(fmt.Errorf("ratchet: tool %q requires an MCP session", tool))
-			}
-
-			return g.execute(ctx, ratchetdomain.SessionID(session.ID()), tool, func() (mcp.Result, error) {
-				return next(ctx, method, req)
-			})
+			return governed(ctx, method, req)
 		}
 	}
-}
-
-func (g *RatchetGate) execute(
-	ctx context.Context,
-	sessionID ratchetdomain.SessionID,
-	tool ratchetdomain.ToolName,
-	next func() (mcp.Result, error),
-) (mcp.Result, error) {
-	var result mcp.Result
-	var handlerErr error
-	err := g.executor.ExecuteToolCall(ctx, sessionID, tool, func() (bool, error) {
-		result, handlerErr = next()
-		return handlerErr == nil && !toolResultFailed(result), handlerErr
-	})
-	if handlerErr != nil {
-		return result, handlerErr
-	}
-	if err != nil {
-		return ratchetToolError(err)
-	}
-	return result, nil
-}
-
-func toolResultFailed(result mcp.Result) bool {
-	toolResult, ok := result.(*mcp.CallToolResult)
-	return ok && toolResult.IsError
-}
-
-func ratchetToolError(err error) (mcp.Result, error) {
-	result := new(mcp.CallToolResult)
-	result.SetError(err)
-	return result, nil
 }

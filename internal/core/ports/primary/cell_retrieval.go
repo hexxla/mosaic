@@ -6,8 +6,8 @@ import (
 	"github.com/sploitzberg/mosaic/internal/core/domain"
 )
 
-// CellRetrieval exposes structured cell reads for MCP tools (QueryCells / SearchCells).
+// CellRetrieval provides bounded discovery and exact coordinate lookup.
 type CellRetrieval interface {
-	QueryCells(ctx context.Context, q *domain.CellQueryCommand) (domain.CellHitsResponse, error)
 	SearchCells(ctx context.Context, q *domain.CellSearchCommand) (domain.CellHitsResponse, error)
+	GetCell(ctx context.Context, coord domain.AxialCoord) (domain.CellLookupResponse, error)
 }

@@ -32,4 +32,4 @@ This project follows security best practices including:
 - Secret scanning in CI/CD pipeline
 - Regular dependency updates
 
-For repository security expectations, see [`AGENTS.md`](AGENTS.md). The `task ci` pipeline runs vulnerability, static-security, and secret checks.
+For repository security expectations, see [`AGENTS.md`](AGENTS.md). `task ci` runs vulnerability and static checks. GitHub Actions runs secret scanning in a separate job; the optional local hook scans staged changes.

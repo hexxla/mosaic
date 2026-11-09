@@ -44,11 +44,11 @@ func TestContextAssemblyService_applies_byte_budget_after_retrieval(t *testing.T
 	if len(out.Cells) != 2 || out.Cells[0].RawContent != "center" || out.Cells[1].RawContent != "strong" {
 		t.Fatalf("cells after eviction: %+v", out.Cells)
 	}
-	if out.TotalBytes != 55 || out.TotalTokens != 55 {
-		t.Fatalf("totals: bytes=%d legacy_tokens=%d", out.TotalBytes, out.TotalTokens)
+	if out.TotalBytes != 55 {
+		t.Fatalf("total bytes=%d", out.TotalBytes)
 	}
-	if out.MaxBudgetBytes != 64 || out.MaxTokensBudget != 64 {
-		t.Fatalf("budgets: bytes=%d legacy_tokens=%d", out.MaxBudgetBytes, out.MaxTokensBudget)
+	if out.MaxBudgetBytes != 64 {
+		t.Fatalf("budget bytes=%d", out.MaxBudgetBytes)
 	}
 	if out.Stats.CandidatesScanned != 3 || out.Stats.CellsEvicted != 1 || out.Stats.MaxRingUsed != 1 {
 		t.Fatalf("stats: %+v", out.Stats)
@@ -69,8 +69,8 @@ func TestContextAssemblyService_caps_pack_by_remaining_session_budget(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
-	if out.MaxBudgetBytes != 64 || stub.last.MaxTokens != 64 {
-		t.Fatalf("applied budget = %d, loader budget = %d, want 64", out.MaxBudgetBytes, stub.last.MaxTokens)
+	if out.MaxBudgetBytes != 64 || stub.last.MaxBudgetBytes != 64 {
+		t.Fatalf("applied budget = %d, loader budget = %d, want 64", out.MaxBudgetBytes, stub.last.MaxBudgetBytes)
 	}
 	command.SessionByteLimit = 1
 	stub.last = nil
@@ -118,8 +118,8 @@ func TestContextAssemblyService_defaults_and_hint(t *testing.T) {
 	}
 	const wantRing = 3
 	const wantTok = 4096
-	if stub.last.MaxRing != wantRing || stub.last.MaxTokens != wantTok {
-		t.Fatalf("defaults: ring=%d tokens=%d", stub.last.MaxRing, stub.last.MaxTokens)
+	if stub.last.MaxRing != wantRing || stub.last.MaxBudgetBytes != wantTok {
+		t.Fatalf("defaults: ring=%d tokens=%d", stub.last.MaxRing, stub.last.MaxBudgetBytes)
 	}
 }
 
@@ -155,55 +155,13 @@ func TestContextAssemblyService_budget_resolve(t *testing.T) {
 		wantTok  int
 		wantFail bool
 	}{
-		{
-			name: "omit_budget",
-			cmd: domain.LoadContextPackCommand{
-				Seeds: seed0(), OmitBudget: true,
-			},
-			wantTok: 100000,
-		},
-		{
-			name: "explicit_legacy_max_tokens",
-			cmd: domain.LoadContextPackCommand{
-				Seeds: seed0(), MaxTokens: 8192,
-			},
-			wantTok: 8192,
-		},
-		{
-			name: "explicit_max_budget_bytes",
-			cmd: domain.LoadContextPackCommand{
-				Seeds: seed0(), MaxBudgetBytes: 16384,
-			},
-			wantTok: 16384,
-		},
-		{
-			name: "approx_tokens",
-			cmd: domain.LoadContextPackCommand{
-				Seeds: seed0(), BudgetTokensApprox: 1000, BytesPerApproxToken: 4,
-			},
-			wantTok: 4000,
-		},
-		{
-			name: "omit_and_token_conflict",
-			cmd: domain.LoadContextPackCommand{
-				Seeds: seed0(), OmitBudget: true, BudgetTokensApprox: 10,
-			},
-			wantFail: true,
-		},
-		{
-			name: "token_and_explicit_conflict",
-			cmd: domain.LoadContextPackCommand{
-				Seeds: seed0(), BudgetTokensApprox: 100, MaxTokens: 5000,
-			},
-			wantFail: true,
-		},
-		{
-			name: "explicit_too_small",
-			cmd: domain.LoadContextPackCommand{
-				Seeds: seed0(), MaxTokens: 10,
-			},
-			wantFail: true,
-		},
+		{name: "default", cmd: domain.LoadContextPackCommand{Seeds: seed0()}, wantTok: 4096},
+		{name: "minimum", cmd: domain.LoadContextPackCommand{Seeds: seed0(), MaxBudgetBytes: 64}, wantTok: 64},
+		{name: "explicit", cmd: domain.LoadContextPackCommand{Seeds: seed0(), MaxBudgetBytes: 16384}, wantTok: 16384},
+		{name: "maximum", cmd: domain.LoadContextPackCommand{Seeds: seed0(), MaxBudgetBytes: 100000}, wantTok: 100000},
+		{name: "negative", cmd: domain.LoadContextPackCommand{Seeds: seed0(), MaxBudgetBytes: -1}, wantFail: true},
+		{name: "too_small", cmd: domain.LoadContextPackCommand{Seeds: seed0(), MaxBudgetBytes: 63}, wantFail: true},
+		{name: "too_large", cmd: domain.LoadContextPackCommand{Seeds: seed0(), MaxBudgetBytes: 100001}, wantFail: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -221,8 +179,8 @@ func TestContextAssemblyService_budget_resolve(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if stub.last.MaxTokens != tt.wantTok {
-				t.Fatalf("MaxTokens=%d want %d", stub.last.MaxTokens, tt.wantTok)
+			if stub.last.MaxBudgetBytes != tt.wantTok {
+				t.Fatalf("MaxBudgetBytes=%d want %d", stub.last.MaxBudgetBytes, tt.wantTok)
 			}
 			_ = out
 		})

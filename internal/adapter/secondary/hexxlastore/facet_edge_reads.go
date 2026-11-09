@@ -143,13 +143,15 @@ func (a *FacetEdgeStoreAdapter) ListEdgesFrom(ctx context.Context, from domain.A
 			if err := ctx.Err(); err != nil {
 				return fmt.Errorf("context: %w", err)
 			}
-			return tx.AscendEdgesFrom(fromPK, func(rec hexxladb.EdgeWalkRecord) bool {
+			var unpackErr error
+			err := tx.AscendEdgesFrom(fromPK, func(rec hexxladb.EdgeWalkRecord) bool {
 				if len(edges) >= maxEdges {
 					truncated = true
 					return false
 				}
 				toCoord, ierr := hexxladb.Unpack(rec.To)
 				if ierr != nil {
+					unpackErr = fmt.Errorf("unpack edge destination: %w", ierr)
 					return false
 				}
 				edges = append(edges, domain.EdgeBullet{
@@ -164,6 +166,10 @@ func (a *FacetEdgeStoreAdapter) ListEdgesFrom(ctx context.Context, from domain.A
 				})
 				return true
 			})
+			if err != nil {
+				return err
+			}
+			return unpackErr
 		})
 	})
 	if viewErr != nil {
@@ -182,14 +188,7 @@ func (a *FacetEdgeStoreAdapter) ListEdgesFrom(ctx context.Context, from domain.A
 }
 
 func hexDerivation(h [32]byte) string {
-	allZero := true
-	for _, b := range h {
-		if b != 0 {
-			allZero = false
-			break
-		}
-	}
-	if allZero {
+	if h == [32]byte{} {
 		return ""
 	}
 	return hex.EncodeToString(h[:])

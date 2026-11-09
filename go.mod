@@ -4,8 +4,8 @@ go 1.27.3
 
 require (
 	github.com/gorilla/websocket v1.5.3
-	github.com/hexxla/hexxladb v0.7.0
-	github.com/hexxla/mcp-ratchet v0.3.0
+	github.com/hexxla/hexxladb v0.7.1-0.20261109183456-2e5ed270ec49
+	github.com/hexxla/mcp-ratchet v0.3.1-0.20261109183504-6b1683627372
 	github.com/modelcontextprotocol/go-sdk v1.7.0
 	gopkg.in/yaml.v3 v3.0.1
 )

@@ -3,7 +3,6 @@ package config
 import (
 	"fmt"
 	"os"
-	"path"
 	"runtime"
 	"strings"
 )
@@ -35,8 +34,8 @@ func LoadRatchetObservability(tokenFile, streamPath string) (RatchetObservabilit
 	if streamPath == "" {
 		streamPath = DefaultRatchetObservabilityPath
 	}
-	if !strings.HasPrefix(streamPath, "/") || path.Clean(streamPath) != streamPath || strings.ContainsAny(streamPath, "{}?#") {
-		return RatchetObservability{}, fmt.Errorf("invalid Ratchet observability path %q", streamPath)
+	if err := validateLiteralHTTPPath(streamPath); err != nil {
+		return RatchetObservability{}, fmt.Errorf("invalid Ratchet observability path: %w", err)
 	}
 
 	token, err := loadPrivateTokenFile(tokenFile)

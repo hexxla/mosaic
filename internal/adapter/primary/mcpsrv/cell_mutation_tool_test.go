@@ -1,9 +1,15 @@
 package mcpsrv
 
 import (
+	"context"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+
 	"github.com/sploitzberg/mosaic/internal/core/domain"
+	"github.com/sploitzberg/mosaic/internal/core/ports/primary"
 )
 
 func TestPutCellCommand_maps_placement_inputs(t *testing.T) {
@@ -29,5 +35,41 @@ func TestPutCellCommand_maps_placement_inputs(t *testing.T) {
 	in.Tags[0] = "mutated"
 	if cmd.Tags[0] != "fact" {
 		t.Fatal("command tags alias MCP input")
+	}
+}
+
+type embeddingCommandCapture struct {
+	primary.CellMutation
+	commands chan *domain.PutEmbeddingCommand
+}
+
+func (c embeddingCommandCapture) PutEmbedding(_ context.Context, cmd *domain.PutEmbeddingCommand) error {
+	c.commands <- cmd
+	return nil
+}
+
+func TestPutEmbeddingAcceptsOptionalContentGuard(t *testing.T) {
+	t.Parallel()
+	capture := embeddingCommandCapture{commands: make(chan *domain.PutEmbeddingCommand, 1)}
+	srv := NewServer("embedding-test", "test", nil)
+	if err := RegisterPutEmbeddingTool(srv, capture, nil); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(StreamableHTTPHandler(srv, nil))
+	t.Cleanup(server.Close)
+	client := connectRatchetTestClient(t, server.URL)
+	for _, digest := range []string{"", strings.Repeat("a", 64)} {
+		args := map[string]any{"q": 1, "r": 2, "vector": []float32{1, 2}}
+		if digest != "" {
+			args["expected_content_sha256"] = digest
+		}
+		result, err := client.CallTool(t.Context(), &mcp.CallToolParams{Name: "mosaic_hexxla_put_embedding", Arguments: args})
+		if err != nil {
+			t.Fatal(err)
+		}
+		assertToolSuccess(t, result)
+		if cmd := <-capture.commands; cmd.ExpectedContentSHA256 != digest {
+			t.Fatalf("content guard = %q, want %q", cmd.ExpectedContentSHA256, digest)
+		}
 	}
 }

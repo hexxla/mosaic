@@ -18,8 +18,8 @@ The file is read **once at process start**. Restart the server after edits.
 version: 1
 
 retention:
-  capture_mode: llm_curates   # required when specifying retention explicitly in section form
-  enforcement: false          # optional boolean: false = advisory; true = server rejects conflicting put_cell kinds (legacy: off | reject)
+  capture_mode: llm_curates   # default when omitted
+  enforcement: false          # optional boolean: false = advisory; true = server rejects conflicting put_cell kinds
   notes: "optional operator note"
 
 allow_delete_cell: false       # optional; default false — disables mosaic_hexxla_delete_cell when false
@@ -45,11 +45,10 @@ Owns **capture_mode**, **enforcement**, and **notes** for turn-related writes (`
 | `false` (or omitted) | Advisory only; server does not block puts by capture mode. |
 | `true` | Server returns an error on disallowed `put_cell` kinds for turn-related kinds. |
 
-Strings **`off`** / **`reject`** are still accepted for backward compatibility.
-
-If the **`retention`** key is **omitted** entirely, defaults match [`DefaultRetentionPolicy`](../../internal/config/retention.go) (`llm_curates`, enforcement **false** / `"off"` in JSON). You may also use a **flat** legacy file with `version`, `capture_mode`, `enforcement`, `notes` at the top level (no `retention` key).
-
-**Deprecated:** `persistence_policy:` — same shape as `retention:`. Choose exactly one form when configuring retention. Mosaic rejects a file that combines `retention:`, `persistence_policy:`, or top-level `capture_mode`, `enforcement`, and `notes` fields.
+Only YAML boolean enforcement is accepted. The canonical `retention` block is
+required for explicit retention settings; flat root keys and
+`persistence_policy` aliases are rejected. Omitting retention uses
+`llm_curates` with enforcement false.
 
 ### `allow_delete_cell`
 
@@ -83,13 +82,13 @@ HexxlaDB **`Open`** creates the file when it does not exist. Mosaic wraps that i
 
 ## Runtime gates (code)
 
-[`config.MosaicRuntimeConfig`](../../internal/config/mosaic_runtime.go): **`AllowsPutCell`**, **`PutCellDenied`**, **`AllowsDeleteCell`**, **`DeleteCellDenied`**.
+[`config.MosaicRuntimeConfig`](../../internal/config/mosaic_runtime.go) maps startup settings into the application mutation policy.
 
 [`cell_mutation_tool.go`](../../internal/adapter/primary/mcpsrv/cell_mutation_tool.go) and [`CellMutationService`](../../internal/core/services/cell_mutation.go) use the same config.
 
 ## MCP
 
-- **`mosaic_hexxla_get_persistence_policy`** — Returns JSON: **`retention`** (`capture_mode`, **`enforcement`** as boolean — `true` when the server blocks conflicting turn-related puts), **`allow_delete_cell`**, **`config_file`**, **`is_default`**.
+- With `advanced_tools: true`, **`mosaic_hexxla_get_persistence_policy`** — Returns JSON: **`retention`** (`capture_mode`, **`enforcement`** as boolean — `true` when the server blocks conflicting turn-related puts), **`allow_delete_cell`**, **`config_file`**, **`is_default`**.
 
 ## Example file
 
@@ -98,8 +97,6 @@ HexxlaDB **`Open`** creates the file when it does not exist. Mosaic wraps that i
 | [`docs/mosaic/MOSAIC_CONFIG.md`](./MOSAIC_CONFIG.md) | Full **`version: 1`** policy YAML reference (all keys) |
 | [`configs/config.yaml`](../../configs/config.yaml) | Minimal committed example (copy or adapt) |
 
-A **flat** layout ( `version` plus `capture_mode` / `enforcement` / `notes` at the top level, no `retention` key) is still valid; no separate example file is shipped.
-
 ## Agent and IDE instructions
 
-Keep one canonical YAML; point project instructions at “call `mosaic_hexxla_get_persistence_policy`” or the repository file path to avoid drift.
+Keep one canonical YAML. The server supplies active retention and deletion settings in initialize instructions; advanced profiles also expose the policy-inspection tool. The shipped configuration selects `llm_curates`, disables deletion and automatic pruning, and enables bundled Ratchet prerequisites.

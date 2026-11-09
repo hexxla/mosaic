@@ -6,6 +6,10 @@ Both commands build a private database and run HexxlaDB integrity checks before
 copying the recovery set to the destination. The destination must be unused.
 The server opens an existing primary and reports an error for a missing path.
 
+Current HexxlaDB opens retain a `{primary}.lock` coordination sidecar, even
+after close. Leave it in place; it is not the WAL or a recoverable data file.
+Do not unlink it while any process may use that database path.
+
 ## Naming the database file
 
 | Precedence | Path |
@@ -69,15 +73,24 @@ task run-mosaic-mcp MOSAIC_DB_PATH="$PWD/.tmp/demo-next.hexxla"
 
 ## Upgrade an existing database
 
-Current plaintext v2 and authenticated v3 files use the same supported
-storage profiles. Close the old writer cleanly and take a verified backup
-before opening with the upgraded server. If the old writer left pending
-plaintext v2 redo, recover it with the old binary first.
+Mosaic pins HexxlaDB commit `2e5ed270ec49`
+(`v0.7.1-0.20261109183456-2e5ed270ec49`) for current storage recovery fixes;
+there is no release tag for that commit yet. Plaintext v2 and authenticated v3
+remain the supported profiles. Close the old writer cleanly and back up the
+primary, matching WAL, and any changelog before upgrading. Recover pending redo
+with the matching old binary first.
+
+Current writes persist complete WAL framing and a plaintext-header checksum
+that `v0.7.0` writers cannot maintain. Encrypted changelogs upgrade to v3 through
+validated replacement; allow temporary space for the full sidecar. Derived
+HNSW state may fall back to exact scoring until an offline rebuild with the
+matching HexxlaDB build. After new writes, use the pre-upgrade recovery set
+to return to an older binary. Do not open upgraded files with an older writer.
 For engine v1 or legacy AES-XTS files,
 use the pinned v0.6.0 offline converter on a copy before upgrading. Keep the
 original recovery set for rollback and verify the converted candidate before
 switching Mosaic to it.
-[HexxlaDB offline conversion](https://github.com/hexxla/hexxladb/blob/v0.7.0/docs/hexxladb/OPERATIONS.md#offline-conversion-of-retired-files)
+[HexxlaDB offline conversion](https://github.com/hexxla/hexxladb/blob/2e5ed270ec49/docs/hexxladb/OPERATIONS.md#offline-conversion-of-retired-files)
 
 Previously stored vectors may already be stale after an earlier cell
 overwrite. If affected, regenerate embeddings from the current cell content.

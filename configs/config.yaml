@@ -1,22 +1,9 @@
 version: 1
-
-# Optional Ollama overrides (otherwise MOSAIC_OLLAMA_URL / MOSAIC_EMBED_MODEL or built-in defaults).
-# ollama:
-#   base_url: http://127.0.0.1:11434
-#   embed_model: all-minilm
+ratchet: true
+advanced_tools: false
 
 retention:
-  capture_mode: save_all_turns
+  capture_mode: llm_curates
   enforcement: true
-  notes: "[save_all_turns] Persist every user_message and assistant_response—full transcript intent, including low-signal and chit-chat. Do not filter turns for importance; this is not LLM curation (use llm_curates for selective persistence). Issue puts for all turns the application sends; fact cells as usual where applicable."
 
-allow_delete_cell: true
-
-database:
-  mvcc_retain_commits_behind_head: 8
-  auto_maintain_after_cell_delete:
-    enabled: true
-    prune: true
-    debounce_after_delete_ms: 2000
-    prune_profile: balanced
-    max_prune_rounds_per_delete: 256
+allow_delete_cell: false

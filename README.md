@@ -1,212 +1,94 @@
-<div align="center">
-
-<img src="assets/images/mosaic_logo_shadow.svg" alt="Mosaic" width="240">
-
 # Mosaic
 
-**Local MCP server for structured agent memory — hex lattice, hybrid retrieval, governed writes, and budgeted context — backed by [HexxlaDB](https://github.com/hexxla/hexxladb).**
+Mosaic is a local MCP server for persistent agent memory backed by HexxlaDB.
+It stores cells on a hex lattice, discovers matching memories, and assembles
+bounded neighbourhood context. You operate the database and optional Ollama
+embedding service.
 
-[![CI](https://github.com/hexxla/mosaic/actions/workflows/ci.yml/badge.svg)](https://github.com/hexxla/mosaic/actions/workflows/ci.yml)
-[![Integration](https://github.com/hexxla/mosaic/actions/workflows/integration.yml/badge.svg)](https://github.com/hexxla/mosaic/actions/workflows/integration.yml)
-[![Go Reference](https://pkg.go.dev/badge/github.com/sploitzberg/mosaic.svg)](https://pkg.go.dev/github.com/sploitzberg/mosaic)
-[![Go Report Card](https://goreportcard.com/badge/github.com/sploitzberg/mosaic)](https://goreportcard.com/report/github.com/sploitzberg/mosaic)
-[![Go 1.27.3](https://img.shields.io/badge/go-1.27.3-00ADD8?logo=go)](https://go.dev/doc/devel/release#go1.27.3)
-[![Version](https://img.shields.io/github/v/tag/hexxla/mosaic?label=version&color=7c3aed)](https://github.com/hexxla/mosaic/tags)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+## Start
 
-</div>
+Use Go 1.27.3 or newer and run from the repository root:
 
----
-
-## Why Mosaic
-
-Mosaic keeps agent memory **on infrastructure you operate**: [MCP](https://modelcontextprotocol.io/) on **localhost**, optional **encryption at rest**, and code you can **inspect and extend**. Retention guidance and delete permission follow **policy you define**, so context is not outsourced by default.
-
-Agents fail in production when recalled facts drift or sessions read as unrelated reruns. Mosaic gives memory that **accumulates cleanly across sessions**, so the assistant can anchor on durable state instead of re-deriving intent from prompts alone.
-
-It is backed by **[HexxlaDB](https://github.com/hexxla/hexxladb)**: a **hex lattice** lays out related cells for **spatial, bounded expansion** from a seed; **hybrid retrieval** combines similarity with structured constraints; callers can record conflicting updates as explicit **seams** rather than losing the disagreement in embedding space. Operators describe behaviour in **YAML**; callers receive **budgeted context** within explicit limits you can trace and revise.
-
----
-
-## Get started
-
-**What Mosaic needs**
-
-- **[Ollama](https://ollama.com)** only for operations that turn text into vectors, including semantic search, text embedding writes, and `mosaic-seed`. Database creation, health, lexical/structured reads, raw-vector writes, and the other non-embedding tools do not require it. The sample **[configs/config.yaml](configs/config.yaml)** expects Ollama on **`http://127.0.0.1:11434`** with the **`all-minilm`** model; adjust it or see **[MOSAIC_CONFIG.md](docs/mosaic/MOSAIC_CONFIG.md)**.
-
----
-
-**Step 1 — Clone the repo**
-
-```bash
-git clone https://github.com/hexxla/mosaic.git
-cd mosaic
+```sh
+export MOSAIC_DB_PATH="$PWD/.tmp/mosaic.hexxla"
+go run ./cmd/mosaic-create-db -db "$MOSAIC_DB_PATH"
+go run ./cmd/mosaic-mcp -db "$MOSAIC_DB_PATH"
 ```
 
----
+Connect your MCP client to `http://127.0.0.1:8787/mcp`. The server opens an
+existing primary; creation and replacement are explicit operator actions.
+For a demo corpus, run `ollama pull all-minilm`, then use `task seed` on an
+unused database path. [Creation, seeding and upgrades](docs/mosaic/DATABASE_CREATION.md)
 
-**Step 2 — Build**
+Ollama is needed only for semantic/hybrid discovery or `embed: true` writes.
+Its defaults are `http://127.0.0.1:11434` and model `all-minilm`. Lexical reads,
+exact lookup, context loading, and ordinary writes work without it.
+[Configuration](docs/mosaic/MOSAIC_CONFIG.md)
 
-You need **[Go 1.27.3 or newer](https://go.dev/dl/)** and **[Task 3](https://taskfile.dev/installation/)**. From the repo root:
+For encryption, inject `MOSAIC_DB_PASSPHRASE` when creating and opening the
+file. [Credentials and recovery](docs/mosaic/DATABASE_CREATION.md#encrypted-database-passphrase-or-raw-key)
 
-```bash
-go mod download
-task build-mosaic-mcp build-mosaic-create-db build-mosaic-observe
+## Everyday tools
+
+The default surface has seven tools. Names below omit the shared
+`mosaic_hexxla_` prefix:
+
+| Tool | Purpose |
+| --- | --- |
+| `search_cells` | Global-by-default lexical, semantic, or hybrid discovery |
+| `get_cell` | Exact coordinate read, with explicit `found` status |
+| `load_context_pack` | Expand known coordinates under a UTF-8 byte budget |
+| `put_cell` | Exact or near-anchor placement; optional atomic embedding |
+| `delete_cell` | Delete when operator policy permits |
+| `list_tags` | Reuse the existing vocabulary |
+| `health` | Inspect database layout; request a full check explicitly |
+
+`search_cells` uses `mode: lexical` by default. Pure-vector `semantic` mode
+accepts a query and result/score bounds. Use `hybrid` for filtered semantic
+retrieval; its optional `lexical_query` adds an independent text predicate.
+Scores are mode-specific. A positive `radius` opts into spatial scope; omission
+searches globally. Inspect scan/candidate-limit flags before assuming completeness.
+
+Use returned coordinates as context seeds, or call `get_cell` for an identity
+you already know. Context accepts one `max_budget_bytes` value (default 4096,
+maximum 100000); it counts raw cell and requested facet text in UTF-8 bytes.
+The host remains responsible for the final model request's tokenizer accounting.
+
+`put_cell` with `embed: true` computes a vector before opening the write
+transaction and commits cell and vector together. Model failure saves nothing.
+The returned coordinate is authoritative. Changing raw content without a new
+embedding invalidates the old vector.
+
+## Policy and specialist tools
+
+The [sample policy](configs/config.yaml) uses selective capture and leaves
+deletion and automatic maintenance disabled. Pass it with:
+
+```sh
+go run ./cmd/mosaic-mcp -policy configs/config.yaml -db "$MOSAIC_DB_PATH"
 ```
 
-After the build tasks run, your programs are under **`bin/<platform>/`** (the command prints the paths). Later steps assume **`bin/linux-amd64/`** — use the folder Task created on your machine (add **`.exe`** on Windows).
+Mosaic does not automatically capture transcripts. The host must explicitly
+submit the turns it is authorized to persist. Capture policy constrains those
+writes; it is separate from database history retention.
+[Persistence contract](docs/mosaic/PERSISTENCE_POLICY.md)
 
-**Developers:** **`task seed`**; **`task build-mosaic-seed`** builds a **`mosaic-seed`** binary.
+Set `ratchet: true` in the policy file to enable the bundled prerequisites.
+Custom grouped workflows are optional. Ratchet enforces successful call order;
+it does not prove that a query inspected the target or that a write chose
+appropriate tags. [Workflow contract](docs/mosaic/RATCHET_INTEGRATION.md)
 
----
-
-**Step 3 — Create a database**
-
-Pick a path for the DB file (**`-db`**). Use the **same** **`-db`** value (or **`MOSAIC_DB_PATH`**) again when you start **`mosaic-mcp`** (Step 5).
-
-```bash
-./bin/linux-amd64/mosaic-create-db -db ./data/mosaic.db
-```
-
-**Encrypted databases:** If you pass **`-db-passphrase`** or **`MOSAIC_DB_PASSPHRASE`** to **`mosaic-create-db`**, the new database is **encrypted on disk**. Omit both for an unencrypted file. Full behavior: **[DATABASE_CREATION.md](docs/mosaic/DATABASE_CREATION.md#encrypted-database-passphrase-or-raw-key)** (**`MOSAIC_DB_PASSPHRASE`** is usually safer than **`-db-passphrase`** where **`ps`** lists process arguments).
-
-```bash
-./bin/linux-amd64/mosaic-create-db -db ./data/mosaic.db -db-passphrase 'use-a-strong-secret'
-```
-
----
-
-**Step 4 — Policy file (YAML)**
-
-An example **`version: 1`** policy ships at **[configs/config.yaml](configs/config.yaml)** — copy or edit from there for **`mosaic-mcp`** ( **`-policy`** or **`MOSAIC_POLICY_FILE`**). All keys → **[MOSAIC_CONFIG.md](docs/mosaic/MOSAIC_CONFIG.md)**.
-
----
-
-**Step 5 — Run the MCP server**
-
-```bash
-./bin/linux-amd64/mosaic-mcp -policy configs/config.yaml -db ./data/mosaic.db
-```
-
----
-
-**Step 6 — Point your MCP client at the URL**
-
-By default Mosaic serves Streamable HTTP at **`http://127.0.0.1:8787/mcp`**. Tune **`MOSAIC_MCP_ADDR`** / **`MOSAIC_MCP_PATH`** if needed ([Taskfile](Taskfile.yml)).
-
-Configure your MCP client through its UI or configuration file. A typical `mcpServers` entry is:
-
-```json
-{
-  "mcpServers": {
-    "mosaic": {
-      "url": "http://127.0.0.1:8787/mcp"
-    }
-  }
-}
-```
-
-For Codex, see the [local MCP setup](docs/mosaic/DEVELOPMENT_TOOLING.md#codex-mcp-setup). Other clients use their own configuration locations and schemas.
-
----
-
-## How Mosaic works
-
-Mosaic fronts **[HexxlaDB](https://github.com/hexxla/hexxladb)** — a single embedded engine with B+tree pages for structure, optional **HNSW** for embeddings, **MVCC** for truthful versions, and sensible handling of large payloads. You do not assemble that yourself; you expose it through one **MCP** surface your agent can learn once.
-
-### Lattice memory, not a flat pile
-
-Memories sit on **hex coordinates**; **related** items can be **near** in the same way they are near on disk. Expansion from a seed is **spatial and bounded** — you pull context in **rings** with intent, not by hoping the top similarity hits cohere. The benefit: **reproducible, explainable** neighbourhoods instead of a black-box vector grab bag.
-
-Cell writes make placement explicit. Exact placement requires
-`allow_overwrite` to update a live cell and refuses to reuse a deleted
-coordinate. With `placement: near_anchor`, Mosaic finds the first unused
-coordinate within a bounded radius of the caller's anchor. The response
-returns the actual coordinate.
-
-### Retrieval that stacks
-
-Semantic similarity, structured filters, and lexical search **coexist**. You find candidates with the signal that fits the question, then **assemble** a context pack under a UTF-8 **byte budget** (optionally estimated from a token target) so the model sees a **curated slice** of the lattice. Mosaic stays provider-neutral; exact tokenizer accounting belongs with the client that renders the final model request.
-
-### Contradictions you can keep
-
-When two memories disagree, callers can record a **conflict seam** with `mosaic_hexxla_mark_conflict`; an intentional replacement uses `mosaic_hexxla_mark_supersedes`. Neither Mosaic nor HexxlaDB infers semantic disagreement automatically. These visible relationships let the model reason about conflict instead of silently letting a newer embedding win.
-
-### Policy your operators can sign
-
-**YAML** describes capture guidance, whether deletes are permitted, embedding settings, housekeeping after deletes, and encryption hints—not scattered conventions in prose prompts. Delete permission and configured maintenance are enforced by the server; capture modes and notes guide clients but do not auto-save turns.
-
-### Telemetry without theatre
-
-Insight into footprint, versioning, integrity — grounded in MVCC-aware checks — sits alongside optional **automatic prune and compact** after deletes so conscientious workloads do not choke on dormant history unless you intend that trade-off.
-
-For command names, YAML keys, and troubleshooting, begin with **[`docs/mosaic/`](docs/mosaic/)** and the local **[`docs/architecture/`](docs/architecture/)**. HexxlaDB’s storage/API docs live in the **[upstream `docs/hexxladb` tree](https://github.com/hexxla/hexxladb/tree/main/docs/hexxladb)**. **[AGENTS.md](AGENTS.md)** and **[CHANGELOG.md](CHANGELOG.md)** cover contribution layout and shipped changes.
-
----
-
-## Ratchet: Tool flow governance
-
-Mosaic can optionally use **[mcp-ratchet](https://github.com/hexxla/mcp-ratchet)** to enforce configured tool prerequisites within each real MCP session. Ratchet is disabled when no configuration path is supplied:
-
-```bash
-mosaic-mcp -db ./data/mosaic.hexxla -ratchet-config configs/ratchet.yaml
-# or: MOSAIC_RATCHET_CONFIG_FILE=configs/ratchet.yaml mosaic-mcp -db ./data/mosaic.hexxla
-```
-
-The supplied policy governs all eight mutation tools: taxonomy discovery before
-cell writes; cell retrieval before embedding/facet writes or deletion; context
-assembly before linking; and seam inspection before conflict, supersession, or
-resolution. When Ratchet is enabled, Mosaic refuses to start if any mutation is
-missing a real prerequisite or has a free-pass rule. Unlisted read-only tools
-remain unrestricted; repeated rules for a tool are alternatives (OR). State is
-process-local and resets on restart. Ratchet tokens, historical events, and
-statistics are not exposed. Operators can opt into an authenticated,
-redacted, live-only WebSocket stream with
-`-ratchet-observability-token-file`; it remains on the loopback listener and
-is consumed with the bundled `mosaic-observe` command.
-
-All 23 tools also publish explicit MCP safety hints from one fail-closed
-classification inventory. Those hints support client presentation and
-approval; the Ratchet gate controls call ordering, not client authentication or
-authorization. See **[`configs/ratchet.yaml`](configs/ratchet.yaml)** and
-**[`docs/mosaic/RATCHET_INTEGRATION.md`](docs/mosaic/RATCHET_INTEGRATION.md)**
-for the exact contract and limitations.
-
----
-
-## Reliable tool use from agents
-
-MCP **does not force** models to call tools. Reinforce behavior with [`AGENTS.md`](AGENTS.md), **`retention.notes`** in your policy YAML (they are injected into server instructions), and **[docs/mosaic/DEVELOPMENT_TOOLING.md](docs/mosaic/DEVELOPMENT_TOOLING.md)**. The steady pattern is **discover** candidates, **assemble** a budgeted context pack, and **persist** only where policy permits. Runtime `tools/list` schemas are the authoritative payload contract.
-
----
+Set `advanced_tools: true` to expose all 22 tools, including facets, edges,
+seams, independent embedding maintenance, policy/budget diagnostics, and the
+optional approximate-token-to-byte estimator. Physical maintenance, raw KV,
+encryption, and bulk transfer remain operator/native API operations.
+[Complete API mapping](docs/mosaic/HEXXLA_API_SURFACE_COVERAGE.md)
 
 ## Development
 
-```bash
-task ci          # full pipeline (same as CI)
-task test        # tests with the race detector
-```
-
----
-
-## Roadmap
-
-Exploration and limits → **[TODOS.md](TODOS.md)** · themes → **[docs/ROADMAP.md](docs/ROADMAP.md)**
-
----
-
-## Sponsorship
-
-Mosaic is open source and under active development. If it's useful to your work — or you want to accelerate the roadmap (distributed replication, materialized views, richer seam semantics) — sponsorship is the most direct way to help.
-
-- **GitHub Sponsors:** [github.com/sponsors/hexxla](https://github.com/sponsors/hexxla)
-- **Monero (XMR):** `46shAhAihZ3dmVHGU4V6H2ZZt21ex8xydB7Awkxaheq4U1VZFoK53K92tsqhnL8roV2bV8pQWCryR3yNRJJd5gAeBsZUXPF`
-- **Open Collective:** _coming soon_
-
-Sponsors get early access to roadmap discussions, priority issue triage, and attribution in release notes.
-
----
-
-## License
-
-MIT — see [LICENSE](LICENSE).
+`task ci` runs the shared lint, race tests, command builds, and vulnerability
+checks. The server supports POST and DELETE, including POST SSE responses;
+standalone GET streams return 405. It binds to loopback and checks foreign
+Origins. [Architecture](docs/architecture/architecture.md) ·
+[Agent workflow](docs/mosaic/MCP_AGENT_BLUEPRINT.md) ·
+[Development tooling](docs/mosaic/DEVELOPMENT_TOOLING.md)

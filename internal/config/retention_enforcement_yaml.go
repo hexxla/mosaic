@@ -2,15 +2,11 @@ package config
 
 import (
 	"fmt"
-	"strings"
 
 	"gopkg.in/yaml.v3"
 )
 
-// retentionEnforcementField decodes retention.enforcement from YAML.
-// Use boolean true/false (recommended): true means the server returns an error for put_cell kinds that conflict
-// with capture_mode; false means advisory only (same as legacy enforcement: off).
-// For backward compatibility, strings "off" and "reject" are still accepted.
+// retentionEnforcementField accepts only YAML boolean true/false.
 type retentionEnforcementField struct {
 	present bool
 	value   PolicyEnforcement
@@ -22,32 +18,18 @@ func (e *retentionEnforcementField) UnmarshalYAML(n *yaml.Node) error {
 		return nil
 	}
 	e.present = true
-	var raw any
-	if err := n.Decode(&raw); err != nil {
+	if n.Kind != yaml.ScalarNode || n.Tag != "!!bool" {
+		return fmt.Errorf("mosaic config: retention.enforcement must be boolean true or false")
+	}
+	var enabled bool
+	if err := n.Decode(&enabled); err != nil {
 		return fmt.Errorf("mosaic config: retention enforcement: %w", err)
 	}
-	switch v := raw.(type) {
-	case bool:
-		if v {
-			e.value = PolicyEnforcementReject
-		} else {
-			e.value = PolicyEnforcementOff
-		}
-		return nil
-	case string:
-		s := strings.TrimSpace(strings.ToLower(v))
-		switch s {
-		case "off":
-			e.value = PolicyEnforcementOff
-		case "reject":
-			e.value = PolicyEnforcementReject
-		default:
-			return fmt.Errorf("mosaic config: enforcement must be true or false (legacy: off or reject), got %q", v)
-		}
-		return nil
-	default:
-		return fmt.Errorf("mosaic config: enforcement must be boolean true or false, got %T", raw)
+	e.value = PolicyEnforcementOff
+	if enabled {
+		e.value = PolicyEnforcementReject
 	}
+	return nil
 }
 
 func (e retentionEnforcementField) resolved(defaultWhenAbsent PolicyEnforcement) PolicyEnforcement {

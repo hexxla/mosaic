@@ -2,6 +2,8 @@ package services
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"strings"
 
@@ -59,7 +61,20 @@ func (s *CellMutationService) PutCell(ctx context.Context, cmd *domain.PutCellCo
 	if err := s.policy.PutCellDenied(c.Kind); err != nil {
 		return domain.PutCellMutationResult{}, fmt.Errorf("cell mutation: %w", err)
 	}
-	result, err := s.writer.PutCell(ctx, c)
+	var embedding []float32
+	if c.Embed {
+		if s.embedText == nil || s.embedDim == 0 {
+			return domain.PutCellMutationResult{}, fmt.Errorf("cell mutation: embed requires an embedder and a configured database dimension")
+		}
+		embedding, err = s.embedText.Embed(ctx, c.RawContent, int(s.embedDim))
+		if err != nil {
+			return domain.PutCellMutationResult{}, fmt.Errorf("cell mutation embed cell: %w", err)
+		}
+		if len(embedding) != int(s.embedDim) {
+			return domain.PutCellMutationResult{}, fmt.Errorf("cell mutation: computed embedding has wrong dimension")
+		}
+	}
+	result, err := s.writer.PutCell(ctx, c, embedding)
 	if err != nil {
 		return domain.PutCellMutationResult{}, fmt.Errorf("cell mutation put cell: %w", err)
 	}
@@ -76,6 +91,14 @@ func (s *CellMutationService) PutEmbedding(ctx context.Context, cmd *domain.PutE
 	}
 	if s.embedDim == 0 {
 		return fmt.Errorf("cell mutation: embeddings disabled on this database (open with EmbeddingDimension)")
+	}
+	expectedHash := strings.TrimSpace(cmd.ExpectedContentSHA256)
+	if cmd.ExpectedContentSHA256 != "" {
+		decoded, err := hex.DecodeString(expectedHash)
+		if err != nil || len(decoded) != sha256.Size {
+			return fmt.Errorf("cell mutation: expected_content_sha256 must contain 64 hexadecimal characters")
+		}
+		expectedHash = strings.ToLower(expectedHash)
 	}
 	hasText := strings.TrimSpace(cmd.Text) != ""
 	hasVec := len(cmd.Vector) > 0
@@ -101,7 +124,7 @@ func (s *CellMutationService) PutEmbedding(ctx context.Context, cmd *domain.PutE
 			return fmt.Errorf("cell mutation: vector length %d does not match database embedding dimension %d", len(vec), s.embedDim)
 		}
 	}
-	if err := s.writer.PutEmbedding(ctx, cmd.Coord, vec); err != nil {
+	if err := s.writer.PutEmbedding(ctx, cmd.Coord, vec, expectedHash); err != nil {
 		return fmt.Errorf("cell mutation put embedding: %w", err)
 	}
 	return nil
@@ -195,6 +218,7 @@ func normalizePutCell(cmd *domain.PutCellCommand) (*domain.PutCellCommand, error
 		Placement:      placement,
 		MaxRadius:      maxRadius,
 		AllowOverwrite: cmd.AllowOverwrite,
+		Embed:          cmd.Embed,
 	}
 	return out, nil
 }

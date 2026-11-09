@@ -2,7 +2,6 @@ package mcpsrv
 
 import (
 	"bytes"
-	"context"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
@@ -15,8 +14,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	ratchetdomain "github.com/hexxla/mcp-ratchet/pkg/ratchet/domain"
-	ratchetsecondary "github.com/hexxla/mcp-ratchet/pkg/ratchet/ports/secondary"
+	"github.com/hexxla/mcp-ratchet/pkg/ratchet"
 )
 
 const (
@@ -44,7 +42,7 @@ type ratchetSubscriber struct {
 	events    chan RatchetEvent
 }
 
-// RatchetObserver is a bounded, live-only Ratchet EventSink and authenticated
+// RatchetObserver is a bounded, live-only Ratchet observer and authenticated
 // WebSocket handler. It retains no historical events.
 type RatchetObserver struct {
 	mu          sync.RWMutex
@@ -73,16 +71,8 @@ func NewRatchetObserver(token []byte) *RatchetObserver {
 	return observer
 }
 
-// Store implements Ratchet's EventSink as a live, non-retaining sink.
-func (o *RatchetObserver) Store(_ context.Context, event *ratchetdomain.Event) error {
-	if event == nil {
-		return nil
-	}
-	o.broadcast(event)
-	return nil
-}
-
-var _ ratchetsecondary.EventSink = (*RatchetObserver)(nil)
+// Observe receives immutable core events without retaining history.
+func (o *RatchetObserver) Observe(event ratchet.Event) { o.broadcast(event) }
 
 // ServeHTTP upgrades an authenticated, non-browser request to a WebSocket. An
 // optional session_id query filters by an observer correlation ID; omitting it
@@ -213,13 +203,13 @@ func (o *RatchetObserver) unsubscribe(id uint64) {
 	o.mu.Unlock()
 }
 
-func (o *RatchetObserver) sessionLabel(id ratchetdomain.SessionID) string {
+func (o *RatchetObserver) sessionLabel(id string) string {
 	mac := hmac.New(sha256.New, o.labelKey[:])
 	_, _ = mac.Write([]byte(id))
 	return hex.EncodeToString(mac.Sum(nil)[:16])
 }
 
-func (o *RatchetObserver) broadcast(event *ratchetdomain.Event) {
+func (o *RatchetObserver) broadcast(event ratchet.Event) {
 	redacted := RatchetEvent{
 		ID:        string(event.ID),
 		Type:      string(event.Type),

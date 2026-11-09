@@ -10,13 +10,13 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/hexxla/hexxladb"
-	ratchetadapters "github.com/hexxla/mcp-ratchet/pkg/ratchet/adapters"
-	ratchetsecondary "github.com/hexxla/mcp-ratchet/pkg/ratchet/ports/secondary"
-	ratchetservices "github.com/hexxla/mcp-ratchet/pkg/ratchet/services"
+	"github.com/hexxla/mcp-ratchet/pkg/ratchet"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/sploitzberg/mosaic/internal/adapter/primary/mcpsrv"
 	"github.com/sploitzberg/mosaic/internal/adapter/secondary/hexxlastore"
@@ -26,7 +26,7 @@ import (
 	ollamac "github.com/sploitzberg/mosaic/internal/ollama"
 )
 
-// version is set at link time by goreleaser or -ldflags.
+// version is set at link time with -ldflags.
 var version = "dev"
 
 func main() {
@@ -43,7 +43,7 @@ func run(log *slog.Logger) error {
 	dbFlag := flag.String("db", "", "path to HexxlaDB file (overrides -name and "+config.EnvDBPath+")")
 	nameFlag := flag.String("name", "", "base name: <db-dir>/<name>.hexxla (overrides "+config.EnvDBPath+"; mutually exclusive with -db)")
 	dbDirFlag := flag.String("db-dir", "", "parent directory when using -name (default: from "+config.EnvMosaicDBDir+" or .tmp)")
-	ratchetConfigFlag := flag.String("ratchet-config", "", "path to Ratchet workflow YAML (overrides "+config.EnvRatchetConfigFile+"); omitted disables Ratchet")
+	ratchetConfigFlag := flag.String("ratchet-config", "", "path to Ratchet workflow YAML (overrides "+config.EnvRatchetConfigFile+"); a custom path enables Ratchet")
 	ratchetObservabilityTokenFileFlag := flag.String("ratchet-observability-token-file", "", "private bearer-token file; enables the authenticated live Ratchet WebSocket stream")
 	ratchetObservabilityPathFlag := flag.String("ratchet-observability-path", config.DefaultRatchetObservabilityPath, "live Ratchet WebSocket endpoint path")
 	flag.Parse()
@@ -80,20 +80,20 @@ func run(log *slog.Logger) error {
 	if err != nil {
 		return fmt.Errorf("ratchet observability setup: %w", err)
 	}
-	if ratchetObservability.Enabled && ratchetConfigPath == "" {
-		return errors.New("ratchet observability requires -ratchet-config or " + config.EnvRatchetConfigFile)
+	if ratchetObservability.Enabled && !mosaicLoaded.Ratchet && ratchetConfigPath == "" {
+		return errors.New("ratchet observability requires ratchet: true, -ratchet-config, or " + config.EnvRatchetConfigFile)
 	}
 	if ratchetObservability.Enabled && ratchetObservability.Path == mcpCfg.Path {
 		return fmt.Errorf("ratchet observability path must differ from MCP path %q", mcpCfg.Path)
 	}
 
 	var ratchetObserver *mcpsrv.RatchetObserver
-	var ratchetEvents ratchetsecondary.EventSink
+	var ratchetEvents func(ratchet.Event)
 	if ratchetObservability.Enabled {
 		ratchetObserver = mcpsrv.NewRatchetObserver(ratchetObservability.BearerToken)
-		ratchetEvents = ratchetObserver
+		ratchetEvents = ratchetObserver.Observe
 	}
-	ratchetGate, err := loadRatchetGate(ratchetConfigPath, log, ratchetEvents)
+	ratchetGate, err := loadRatchetGate(mosaicLoaded.Ratchet, ratchetConfigPath, mosaicLoaded.AdvancedTools, log, ratchetEvents)
 	if err != nil {
 		return fmt.Errorf("ratchet setup: %w", err)
 	}
@@ -114,7 +114,7 @@ func run(log *slog.Logger) error {
 		"auto_maintain_after_cell_delete", mosaicLoaded.DeleteAutoMaintain.Enabled,
 		"post_delete_maintain_debounce_ms", mosaicLoaded.DeleteAutoMaintain.DebounceAfterDelete.Milliseconds(),
 		"mvcc_retain_commits_behind_head", mosaicLoaded.MVCCRetainCommitsBehindHead,
-		"ollama_base", ollamaCfg.Base.String(),
+		"ollama_base", ollamac.DiagnosticURL(ollamaCfg.Base),
 		"ollama_embed_model", ollamaCfg.Model,
 		"config_file", configPathUsed)
 
@@ -130,6 +130,11 @@ func run(log *slog.Logger) error {
 
 	openOpts := config.MergeMVCCRetainIntoOpenOptions(encOpts, mosaicLoaded.MVCCRetainCommitsBehindHead)
 
+	// Avoid creating a persistent lock sidecar for an ordinary missing path.
+	// OpenExisting still performs the authoritative locked open after this check.
+	if _, err := os.Stat(dbCfg.Path); err != nil {
+		return fmt.Errorf("open database: %w", err)
+	}
 	db, err := hexxladb.OpenExisting(dbCfg.Path, openOpts)
 	if err != nil {
 		return fmt.Errorf("open database: %w", err)
@@ -148,17 +153,15 @@ func run(log *slog.Logger) error {
 
 	cellReader := hexxlastore.NewCellReaderAdapter(live)
 	ollamaClient := ollamac.NewClient(ollamaCfg.Base, ollamaCfg.Model)
+	embeddingANN := hexxlastore.NewEmbeddingANNAdapter(live)
 	cellRetrieval := services.NewCellRetrievalService(
-		cellReader,
+		cellReader, embeddingANN,
 		ollamaembed.NewTextEmbedder(ollamaClient),
 		embeddingDimAtBoot,
 	)
 
 	contextPackLoader := hexxlastore.NewContextPackAdapter(live)
 	contextAssembly := services.NewContextAssemblyService(contextPackLoader)
-
-	embeddingANN := hexxlastore.NewEmbeddingANNAdapter(live)
-	embeddingSvc := services.NewEmbeddingSearchService(embeddingANN, ollamaembed.NewTextEmbedder(ollamaClient), embeddingDimAtBoot)
 
 	cellWriter := hexxlastore.NewCellWriterAdapter(live, mosaicLoaded.DeleteAutoMaintain)
 	defer func() {
@@ -190,26 +193,33 @@ func run(log *slog.Logger) error {
 	if ratchetGate != nil {
 		srv.AddReceivingMiddleware(ratchetGate.Middleware())
 	}
-	registrations := [...]func() error{
+	registrations := []func() error{
 		func() error { return mcpsrv.RegisterHealthTool(srv, healthSvc, log, retrievalBudget) },
-		func() error { return mcpsrv.RegisterCellQueryTool(srv, cellRetrieval, log, retrievalBudget) },
 		func() error { return mcpsrv.RegisterCellSearchTool(srv, cellRetrieval, log, retrievalBudget) },
-		func() error { return mcpsrv.RegisterEmbeddingSearchTool(srv, embeddingSvc, log, retrievalBudget) },
+		func() error { return mcpsrv.RegisterGetCellTool(srv, cellRetrieval, log, retrievalBudget) },
 		func() error { return mcpsrv.RegisterContextPackTool(srv, contextAssembly, log, retrievalBudget) },
-		func() error { return mcpsrv.RegisterContextBudgetEstimateTool(srv, log) },
-		func() error { return mcpsrv.RegisterCellMutationTools(srv, mutationSvc, log) },
-		func() error { return mcpsrv.RegisterSeamTools(srv, seamSvc, log, retrievalBudget) },
-		func() error { return mcpsrv.RegisterFacetEdgeTools(srv, facetEdgeSvc, log) },
-		func() error { return mcpsrv.RegisterFacetEdgeBrowseTools(srv, facetEdgeBrowse, log, retrievalBudget) },
-		func() error { return mcpsrv.RegisterTagBrowseTools(srv, tagBrowseSvc, log, retrievalBudget) },
-		func() error { return mcpsrv.RegisterPersistencePolicyTool(srv, runtimeCfg, configPathUsed, log) },
-		func() error { return mcpsrv.RegisterRetrievalBudgetStatusTool(srv, retrievalBudget, log) },
+		func() error { return mcpsrv.RegisterCoreCellMutationTools(srv, mutationSvc, log) },
+		func() error { return mcpsrv.RegisterListTagsTool(srv, tagBrowseSvc, log, retrievalBudget) },
+	}
+	if mosaicLoaded.AdvancedTools {
+		registrations = append(registrations,
+			func() error { return mcpsrv.RegisterPutEmbeddingTool(srv, mutationSvc, log) },
+			func() error { return mcpsrv.RegisterContextBudgetEstimateTool(srv, log) },
+			func() error { return mcpsrv.RegisterSeamTools(srv, seamSvc, log, retrievalBudget) },
+			func() error { return mcpsrv.RegisterFacetEdgeTools(srv, facetEdgeSvc, log) },
+			func() error { return mcpsrv.RegisterFacetEdgeBrowseTools(srv, facetEdgeBrowse, log, retrievalBudget) },
+			func() error { return mcpsrv.RegisterTagCountsTool(srv, tagBrowseSvc, log, retrievalBudget) },
+			func() error { return mcpsrv.RegisterPersistencePolicyTool(srv, runtimeCfg, configPathUsed, log) },
+			func() error { return mcpsrv.RegisterRetrievalBudgetStatusTool(srv, retrievalBudget, log) },
+		)
 	}
 	for _, register := range registrations {
 		if err := register(); err != nil {
 			return fmt.Errorf("register MCP tools: %w", err)
 		}
 	}
+	activeCalls := &activeToolCalls{drained: make(chan struct{})}
+	srv.AddReceivingMiddleware(activeCalls.middleware)
 	h := mcpsrv.StreamableHTTPHandler(srv, log)
 
 	mux := http.NewServeMux()
@@ -236,62 +246,116 @@ func run(log *slog.Logger) error {
 		errServe <- httpSrv.ListenAndServe()
 	}()
 
+	var serveErr error
+	serveReturned := false
 	select {
 	case <-ctx.Done():
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		if err := httpSrv.Shutdown(shutdownCtx); err != nil {
-			return fmt.Errorf("shutdown http: %w", err)
-		}
-		firstErr := <-errServe
-		if firstErr != nil && !errors.Is(firstErr, http.ErrServerClosed) {
-			return firstErr
-		}
-	case err := <-errServe:
-		if err != nil && !errors.Is(err, http.ErrServerClosed) {
-			return fmt.Errorf("http serve: %w", err)
-		}
+	case serveErr = <-errServe:
+		serveReturned = true
 	}
-
-	return nil
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	shutdownErr := shutdownMCP(shutdownCtx, httpSrv, srv, activeCalls)
+	if !serveReturned {
+		serveErr = <-errServe
+	}
+	if errors.Is(serveErr, http.ErrServerClosed) {
+		serveErr = nil
+	}
+	return errors.Join(serveErr, shutdownErr)
 }
 
-func loadRatchetGate(path string, log *slog.Logger, eventSink ratchetsecondary.EventSink) (*mcpsrv.RatchetGate, error) {
-	loaded, err := config.LoadRatchetConfig(path)
-	if err != nil {
-		return nil, fmt.Errorf("ratchet config: %w", err)
+// shutdownMCP stops accepting HTTP work and drains active tool calls before
+// closing idle MCP sessions. Closing sessions first would stop in-flight calls
+// from receiving their normal responses.
+func shutdownMCP(ctx context.Context, httpSrv *http.Server, srv *mcp.Server, calls *activeToolCalls) error {
+	drained := calls.stop()
+	shutdownErr := httpSrv.Shutdown(ctx)
+	select {
+	case <-drained:
+	case <-ctx.Done():
+		shutdownErr = errors.Join(shutdownErr, ctx.Err())
 	}
-	if loaded.Path == "" {
+	if shutdownErr != nil {
+		shutdownErr = errors.Join(shutdownErr, httpSrv.Close())
+	}
+	var closeErr error
+	for session := range srv.Sessions() {
+		closeErr = errors.Join(closeErr, session.Close())
+	}
+	return errors.Join(shutdownErr, closeErr)
+}
+
+func loadRatchetGate(enabled bool, path string, advanced bool, log *slog.Logger, observer func(ratchet.Event)) (*mcpsrv.RatchetGate, error) {
+	if !enabled && path == "" {
 		return nil, nil
 	}
-
-	// #nosec G304 -- the operator explicitly selects this configuration path.
-	configFile, err := os.Open(loaded.Path)
+	policy, err := config.LoadRatchetPolicy(path)
 	if err != nil {
-		return nil, fmt.Errorf("open ratchet config: %w", err)
-	}
-
-	configLoader := ratchetadapters.NewYAMLConfigLoader()
-	tokenStore := ratchetadapters.NewMemoryTokenStore()
-	randomGenerator := ratchetadapters.NewCryptoRandomGenerator()
-	clock := ratchetadapters.NewRealClock()
-	service := ratchetservices.NewRatchetServiceWithEventSink(configLoader, tokenStore, randomGenerator, clock, eventSink)
-	rules, loadErr := service.LoadConfiguration(context.Background(), configFile)
-	closeErr := configFile.Close()
-	if loadErr != nil {
-		return nil, fmt.Errorf("load ratchet config: %w", loadErr)
-	}
-	if closeErr != nil {
-		return nil, fmt.Errorf("close ratchet config: %w", closeErr)
-	}
-
-	gate := mcpsrv.NewRatchetGate(service, rules)
-	if err := gate.ValidateToolNames(); err != nil {
 		return nil, err
 	}
-	if err := gate.ValidateProtectedTools(mcpsrv.MutationToolNames()); err != nil {
+	if err := mcpsrv.NewRatchetGate(nil, policy).ValidateToolNames(); err != nil {
 		return nil, err
 	}
-	log.Info("ratchet enforcement enabled", "config_file", loaded.Path, "rules", len(rules))
+	policy, err = mcpsrv.PolicyForTools(policy, advanced)
+	if err != nil {
+		return nil, err
+	}
+	engine, err := ratchet.New(policy, ratchet.Options{Observer: observer})
+	if err != nil {
+		return nil, err
+	}
+	gate := mcpsrv.NewRatchetGate(engine, policy)
+	if err := gate.ValidateProtectedTools(mcpsrv.MutationToolNames(advanced)); err != nil {
+		return nil, err
+	}
+	log.Info("ratchet enforcement enabled", "custom_policy", path != "", "rules", len(policy.Rules))
 	return gate, nil
+}
+
+// activeToolCalls closes admission during shutdown and tracks handlers even when
+// their HTTP connection has already gone away.
+type activeToolCalls struct {
+	mu       sync.Mutex
+	active   int
+	stopping bool
+	drained  chan struct{}
+}
+
+func (c *activeToolCalls) middleware(next mcp.MethodHandler) mcp.MethodHandler {
+	return func(ctx context.Context, method string, req mcp.Request) (mcp.Result, error) {
+		if method != "tools/call" {
+			return next(ctx, method, req)
+		}
+		c.mu.Lock()
+		if c.stopping {
+			c.mu.Unlock()
+			result := &mcp.CallToolResult{}
+			result.SetError(errors.New("mosaic MCP server is shutting down"))
+			return result, nil
+		}
+		c.active++
+		c.mu.Unlock()
+		defer func() {
+			c.mu.Lock()
+			defer c.mu.Unlock()
+			c.active--
+			if c.stopping && c.active == 0 {
+				close(c.drained)
+			}
+		}()
+		return next(ctx, method, req)
+	}
+}
+
+func (c *activeToolCalls) stop() <-chan struct{} {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if !c.stopping {
+		c.stopping = true
+		if c.active == 0 {
+			close(c.drained)
+		}
+	}
+	return c.drained
 }

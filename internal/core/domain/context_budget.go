@@ -36,7 +36,11 @@ func ApproximateByteBudgetFromTokens(tokens int, bytesPerApproxToken float64, mi
 		return 0, fmt.Errorf("approximate byte budget: bytes_per_approx_token must be between %d and %d inclusive",
 			MinApproxBytesPerToken, MaxApproxBytesPerToken)
 	}
-	budget := max(int(math.Ceil(float64(tokens)*per)), minClamp)
+	bytes := math.Ceil(float64(tokens) * per)
+	if bytes >= float64(maxClamp) {
+		return maxClamp, nil
+	}
+	budget := max(int(bytes), minClamp)
 	budget = min(budget, maxClamp)
 	return budget, nil
 }

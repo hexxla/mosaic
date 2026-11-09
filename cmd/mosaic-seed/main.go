@@ -116,7 +116,7 @@ func run(
 	if err := oc.Ping(ctx); err != nil {
 		return fmt.Errorf("ollama: %w", err)
 	}
-	log.Info("ollama reachable", "url", oc.Base.String(), "embed_model", oc.Model)
+	log.Info("ollama reachable", "url", ollamac.DiagnosticURL(oc.Base), "embed_model", oc.Model)
 	sessionID := fmt.Sprintf("mosaic-seed-%d", time.Now().UnixNano())
 	embedDim := int(layout.EmbeddingDimension)
 	if err := hexxlastore.CreateCandidate(ctx, dbPath, opts, func(db *hexxladb.DB) error {

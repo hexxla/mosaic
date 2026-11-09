@@ -1,52 +1,51 @@
 package config
 
 import (
+	"bytes"
+	_ "embed"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/hexxla/mcp-ratchet/pkg/ratchet"
+	"github.com/hexxla/mcp-ratchet/pkg/ratchet/adapters"
 )
 
-// EnvRatchetConfigFile is the environment variable for the ratchet config path when the -ratchet-config flag is not set.
+// EnvRatchetConfigFile selects an optional custom workflow policy.
 const EnvRatchetConfigFile = "MOSAIC_RATCHET_CONFIG_FILE"
 
-// RatchetConfig represents the ratchet configuration.
-type RatchetConfig struct {
-	// Path is the file path to the ratchet YAML configuration file.
-	Path string
-}
+//go:embed ratchet_policy.yaml
+var bundledRatchetPolicy []byte
 
-// ResolveRatchetConfigPath returns -ratchet-config if set, else MOSAIC_RATCHET_CONFIG_FILE, else empty.
+// ResolveRatchetConfigPath gives an explicit flag precedence over the environment.
 func ResolveRatchetConfigPath(flagValue string) string {
-	flagValue = strings.TrimSpace(flagValue)
-	if flagValue != "" {
-		return flagValue
+	if value := strings.TrimSpace(flagValue); value != "" {
+		return value
 	}
 	return strings.TrimSpace(os.Getenv(EnvRatchetConfigFile))
 }
 
-// LoadRatchetConfig reads and validates a ratchet config YAML file.
-// Returns an error if the file cannot be read or does not exist.
-// The actual parsing and validation of ratchet rules is handled by the ratchet service.
-func LoadRatchetConfig(path string) (RatchetConfig, error) {
+// LoadRatchetPolicy loads the bundled policy unless an operator supplies a file.
+// Enabling Ratchet is decided separately so a custom file always implies opt-in.
+func LoadRatchetPolicy(path string) (ratchet.Policy, error) {
 	if strings.TrimSpace(path) == "" {
-		return RatchetConfig{}, nil
+		return adapters.LoadPolicy(bytes.NewReader(bundledRatchetPolicy))
 	}
-
 	p := filepath.Clean(strings.TrimSpace(path))
-	if p == "." {
-		return RatchetConfig{}, nil
-	}
-
-	info, err := os.Stat(p)
+	//nolint:gosec // The operator selects this startup policy file.
+	file, err := os.Open(p)
 	if err != nil {
-		return RatchetConfig{}, fmt.Errorf("stat ratchet config: %w", err)
+		return ratchet.Policy{}, fmt.Errorf("open ratchet policy: %w", err)
 	}
-	if !info.Mode().IsRegular() {
-		return RatchetConfig{}, fmt.Errorf("ratchet config %q is not a regular file", p)
+	info, statErr := file.Stat()
+	if statErr != nil || !info.Mode().IsRegular() {
+		return ratchet.Policy{}, errors.Join(fmt.Errorf("ratchet policy %q must be a regular file", p), statErr, file.Close())
 	}
-
-	return RatchetConfig{
-		Path: p,
-	}, nil
+	policy, loadErr := adapters.LoadPolicy(file)
+	if err := errors.Join(loadErr, file.Close()); err != nil {
+		return ratchet.Policy{}, fmt.Errorf("load ratchet policy: %w", err)
+	}
+	return policy, nil
 }

@@ -4,24 +4,9 @@ package domain
 type LoadContextPackCommand struct {
 	Seeds []AxialCoord
 
-	MaxRing int
-	// MaxTokens is the resolved UTF-8 byte budget enforced by Mosaic. The name is
-	// retained for compatibility; it does not select or configure an LLM tokenizer.
-	// Set after normalization in services.ContextAssemblyService; callers may use
-	// OmitBudget, BudgetTokensApprox, MaxBudgetBytes, or legacy MaxTokens first.
-	MaxTokens int
-	MaxCells  int // caps candidate pool; 0 lets engine default (256)
-
-	// OmitBudget requests Mosaic's upper clamp (sparse "no tight cap"): maximum allowed byte budget.
-	OmitBudget bool
-
-	// BudgetTokensApprox Approximate LM token budget; combined with BytesPerApproxToken → byte budget.
-	BudgetTokensApprox int
-
-	// BytesPerApproxToken defaults to DefaultApproxBytesPerToken when unset or invalid for resolution.
-	BytesPerApproxToken float64
-
-	// MaxBudgetBytes is an explicit UTF-8 byte ceiling (alternative to approximate tokens).
+	MaxRing  int
+	MaxCells int // caps candidate pool; 0 uses the engine default (256)
+	// MaxBudgetBytes is the UTF-8 byte ceiling; zero selects the 4096-byte default.
 	MaxBudgetBytes int
 
 	// SessionByteLimit further bounds the pack when MCP session budgeting is enabled.
@@ -70,15 +55,13 @@ type ContextSeamSummary struct {
 
 // ContextPackResponse is the MCP result for Mosaic context assembly.
 type ContextPackResponse struct {
-	Cells           []ContextPackCell    `json:"cells"`
-	TotalBytes      int                  `json:"total_bytes"`
-	TotalTokens     int                  `json:"total_tokens"` // Deprecated: byte count retained for compatibility.
-	Stats           ContextPackStatsDTO  `json:"stats"`
-	Seams           []ContextSeamSummary `json:"seams,omitempty"`
-	Explanations    []string             `json:"explanations,omitempty"`
-	RetrievalHint   string               `json:"retrieval_hint,omitempty"`
-	SeedCount       int                  `json:"seed_count"`
-	MaxRingApplied  int                  `json:"max_ring_applied"`
-	MaxBudgetBytes  int                  `json:"max_budget_bytes"`
-	MaxTokensBudget int                  `json:"max_tokens_budget"` // Deprecated: byte budget retained for compatibility.
+	Cells          []ContextPackCell    `json:"cells"`
+	TotalBytes     int                  `json:"total_bytes"`
+	Stats          ContextPackStatsDTO  `json:"stats"`
+	Seams          []ContextSeamSummary `json:"seams,omitempty"`
+	Explanations   []string             `json:"explanations,omitempty"`
+	RetrievalHint  string               `json:"retrieval_hint,omitempty"`
+	SeedCount      int                  `json:"seed_count"`
+	MaxRingApplied int                  `json:"max_ring_applied"`
+	MaxBudgetBytes int                  `json:"max_budget_bytes"`
 }

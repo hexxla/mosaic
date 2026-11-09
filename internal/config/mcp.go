@@ -3,8 +3,11 @@ package config
 import (
 	"fmt"
 	"net"
+	"net/url"
 	"os"
+	"path"
 	"strings"
+	"unicode"
 )
 
 const (
@@ -36,14 +39,27 @@ func LoadMCPFromEnv() (MCP, error) {
 	if err := validateLoopbackListenAddr(addr); err != nil {
 		return MCP{}, err
 	}
-	path := strings.TrimSpace(os.Getenv(envMCPPath))
-	if path == "" {
-		path = DefaultMCPPath
+	endpointPath := strings.TrimSpace(os.Getenv(envMCPPath))
+	if endpointPath == "" {
+		endpointPath = DefaultMCPPath
 	}
-	if !strings.HasPrefix(path, "/") {
-		return MCP{}, fmt.Errorf("%s must start with '/': got %q", envMCPPath, path)
+	if err := validateLiteralHTTPPath(endpointPath); err != nil {
+		return MCP{}, fmt.Errorf("%s: %w", envMCPPath, err)
 	}
-	return MCP{Addr: addr, Path: path}, nil
+	return MCP{Addr: addr, Path: endpointPath}, nil
+}
+
+// validateLiteralHTTPPath rejects ServeMux patterns and paths that redirect after cleaning.
+func validateLiteralHTTPPath(p string) error {
+	if p == "/" || !strings.HasPrefix(p, "/") || path.Clean(p) != p || strings.ContainsAny(p, "{}?#\\%") ||
+		strings.ContainsFunc(p, func(r rune) bool { return unicode.IsSpace(r) || unicode.IsControl(r) }) {
+		return fmt.Errorf("HTTP endpoint must be a canonical literal path: %q", p)
+	}
+	u, err := url.ParseRequestURI(p)
+	if err != nil || u.RawQuery != "" || u.Fragment != "" {
+		return fmt.Errorf("HTTP endpoint must be a valid literal path: %q", p)
+	}
+	return nil
 }
 
 // validateLoopbackListenAddr rejects addresses that bind to all interfaces or public interfaces.

@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/sploitzberg/mosaic/internal/core/domain"
 )
@@ -22,10 +23,10 @@ func DefaultRetrievalBudgetConfig() RetrievalBudgetConfig {
 }
 
 func validateRetrievalBytesPerApproxToken(v float64) error {
-	if v <= 0 {
+	if v == 0 {
 		return nil
 	}
-	if v < float64(domain.MinApproxBytesPerToken) || v > float64(domain.MaxApproxBytesPerToken) {
+	if math.IsNaN(v) || math.IsInf(v, 0) || v < float64(domain.MinApproxBytesPerToken) || v > float64(domain.MaxApproxBytesPerToken) {
 		return fmt.Errorf("mosaic config: retrieval.bytes_per_approx_token must be between %d and %d inclusive (or omitted)",
 			domain.MinApproxBytesPerToken, domain.MaxApproxBytesPerToken)
 	}

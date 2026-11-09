@@ -4,6 +4,8 @@ Immediate next steps. Update after each session.
 
 ## Current
 
+- [ ] Push dependency commits before Mosaic: HexxlaDB `2e5ed270ec49`, then Ratchet `6b1683627372`. Mosaic pins those exact revisions; no local replacement is shipped.
+
 ## Pending (next sessions)
 
 - [ ] **Large retrieval responses** — Context packs trim content against the remaining session budget. Query, search, and diagnostic responses still rely on the final JSON size check. Profile representative large responses before adding tool-specific shaping.
@@ -14,7 +16,7 @@ Immediate next steps. Update after each session.
 ## Recently Completed
 
 - 2026-08-26: **Agent retrieval guidance** — documented lexical vs semantic/hybrid selection, normalized empty lexical results, and recommended tagged preference queries in the MCP blueprint.
-- 2026-04-29: **Post-delete maintenance** — **`database.auto_maintain_after_cell_delete.debounce_after_delete_ms`** (default 2s when enabled); **`FlushPostDeleteMaintain`** on **`mosaic-mcp`** shutdown; prune + compact batching ([`internal/adapter/secondary/hexxlastore`](internal/adapter/secondary/hexxlastore)).
+- 2026-04-29: **Post-delete maintenance** — **`database.auto_maintain_after_cell_delete.debounce_after_delete_ms`** (default 2s when enabled); **`FlushPostDeleteMaintain`** on **`mosaic-mcp`** shutdown; bounded prune batching; compaction remains offline ([`internal/adapter/secondary/hexxlastore`](internal/adapter/secondary/hexxlastore)).
 - 2026-04-29: **`mosaic_hexxla_health`** — JSON **`disk`** (primary + WAL **`Stat`**) and **`mvcc_retain_commits_behind_head`** (effective policy).
 - 2026-04-29: **Policy / onboarding docs** — **[`docs/mosaic/MOSAIC_CONFIG.md`](docs/mosaic/MOSAIC_CONFIG.md)** full YAML reference; **[`configs/config.yaml`](configs/config.yaml)** values-only example; **[`README.md`](README.md)** Get started + feature overview.
 - 2026-04-29: **Go module & build** — **`module github.com/sploitzberg/mosaic`**; removed legacy **`cmd/go-llm-project-structure`**; **`task build`** / CI pre-push build **`mosaic-mcp`**.

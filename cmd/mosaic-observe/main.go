@@ -71,7 +71,7 @@ func run(log *slog.Logger) error {
 		}
 	}()
 
-	loggedURL := *streamURL
+	loggedURL := streamURL.Clone()
 	loggedURL.RawQuery = ""
 	log.Info("connected to Ratchet live observability", "url", loggedURL.Redacted())
 	for {

@@ -3,22 +3,24 @@ package services
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/sploitzberg/mosaic/internal/core/domain"
 )
 
 type stubCellWriter struct {
-	putCellCalls    int
-	putEmbCoords    domain.AxialCoord
-	putEmbVecLen    int
-	deleteCellCalls int
-	lastPutCellKind domain.CellPutKind
-	lastPutCell     *domain.PutCellCommand
-	putCellResult   domain.PutCellMutationResult
+	putCellCalls       int
+	putEmbCoords       domain.AxialCoord
+	putEmbVecLen       int
+	putEmbExpectedHash string
+	deleteCellCalls    int
+	lastPutCellKind    domain.CellPutKind
+	lastPutCell        *domain.PutCellCommand
+	putCellResult      domain.PutCellMutationResult
 }
 
-func (s *stubCellWriter) PutCell(_ context.Context, cmd *domain.PutCellCommand) (domain.PutCellMutationResult, error) {
+func (s *stubCellWriter) PutCell(_ context.Context, cmd *domain.PutCellCommand, _ []float32) (domain.PutCellMutationResult, error) {
 	if s == nil {
 		return domain.PutCellMutationResult{}, nil
 	}
@@ -31,12 +33,13 @@ func (s *stubCellWriter) PutCell(_ context.Context, cmd *domain.PutCellCommand) 
 	return s.putCellResult, nil
 }
 
-func (s *stubCellWriter) PutEmbedding(_ context.Context, coord domain.AxialCoord, vec []float32) error {
+func (s *stubCellWriter) PutEmbedding(_ context.Context, coord domain.AxialCoord, vec []float32, expectedHash string) error {
 	if s == nil {
 		return nil
 	}
 	s.putEmbCoords = coord
 	s.putEmbVecLen = len(vec)
+	s.putEmbExpectedHash = expectedHash
 	return nil
 }
 
@@ -282,5 +285,32 @@ func TestCellMutationService_PutEmbedding_errors(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected error when embedder nil and text supplied")
+	}
+}
+
+func TestPutEmbeddingExpectedContentHash(t *testing.T) {
+	t.Parallel()
+	for _, hash := range []string{"bad", " \t\n", strings.Repeat("g", 64), strings.Repeat("a", 62)} {
+		t.Run(hash, func(t *testing.T) {
+			t.Parallel()
+			writer := &stubCellWriter{}
+			embedder := &stubEmbedder{}
+			svc := NewCellMutationService(writer, embedder, 2)
+			if err := svc.PutEmbedding(t.Context(), &domain.PutEmbeddingCommand{Text: "text", ExpectedContentSHA256: hash}); err == nil {
+				t.Fatal("expected invalid content hash error")
+			}
+			if embedder.calls != 0 || writer.putEmbVecLen != 0 {
+				t.Fatal("invalid hash reached embedding or storage")
+			}
+		})
+	}
+	writer := &stubCellWriter{}
+	svc := NewCellMutationService(writer, nil, 2)
+	cmd := &domain.PutEmbeddingCommand{Vector: []float32{1, 0}, ExpectedContentSHA256: "  " + strings.Repeat("AB", 32) + "  "}
+	if err := svc.PutEmbedding(t.Context(), cmd); err != nil {
+		t.Fatal(err)
+	}
+	if writer.putEmbExpectedHash != strings.Repeat("ab", 32) || !strings.HasPrefix(cmd.ExpectedContentSHA256, "  ") {
+		t.Fatal("hash was not normalized separately from the caller's command")
 	}
 }

@@ -1,154 +1,94 @@
 # Ratchet integration
 
-Mosaic has an optional integration with [mcp-ratchet](https://github.com/hexxla/mcp-ratchet) for enforcing tool-call prerequisites. It is implemented as one MCP receiving middleware, so tool handlers remain independent of workflow policy.
+Mosaic optionally enforces session-local tool prerequisites with the shared
+[mcp-ratchet](https://github.com/hexxla/mcp-ratchet) receiving middleware. Mosaic
+selects governed tools and validates policy coverage; Ratchet owns execution,
+completion expiry and consumption, and final-response serialization.
 
-## Activation
+## Activation and profiles
 
-Ratchet is disabled by default. Enable it with either configuration path:
+Set `ratchet: true` in the normal Mosaic config and load it with `-policy` or
+`MOSAIC_POLICY_FILE`. This enables the embedded
+[`ratchet_policy.yaml`](../../internal/config/ratchet_policy.yaml); no separate
+workflow file is needed. In-process defaults leave Ratchet disabled. The shipped
+[`configs/config.yaml`](../../configs/config.yaml) enables it.
 
-```bash
-mosaic-mcp -db ./data/mosaic.hexxla -ratchet-config configs/ratchet.yaml
-```
+A custom `-ratchet-config PATH` or `MOSAIC_RATCHET_CONFIG_FILE` also enables
+Ratchet, even when `ratchet` is false or omitted. The flag takes precedence.
+Policies are loaded once at startup. Missing files, unknown tool names, invalid
+rules, and missing protection for enabled mutations fail startup.
 
-```bash
-MOSAIC_RATCHET_CONFIG_FILE=configs/ratchet.yaml \
-  mosaic-mcp -db ./data/mosaic.hexxla
-```
+The default profile exposes seven tools: health, search_cells, get_cell,
+load_context_pack, put_cell, delete_cell, and list_tags (all with the
+`mosaic_hexxla_` prefix). `advanced_tools: true` adds raw embedding writes,
+facets/edges, seams, tag counts, policy inspection, retrieval-budget status and
+byte-budget estimation. Policy coverage follows the enabled profile; inactive
+guards are removed before the engine is constructed. A retained guard must
+still have an enabled prerequisite.
 
-The flag takes precedence over the environment variable. A missing, invalid,
-non-regular, circular, or mutation-incomplete configuration fails server
-startup. When Ratchet is enabled, every tool classified by Mosaic as a mutation
-must have at least one prerequisite and must not have a free-pass rule.
-Omitting both settings preserves the documented opt-in behavior: Ratchet is not
-an authorization layer and Mosaic's normal runtime write policies still apply.
+## Bundled workflow
 
-## Enforcement contract
-
-The middleware applies only to tools named in the loaded rules. A configured tool call:
-
-1. obtains the actual MCP server-session ID;
-2. acquires the per-session executor gate;
-3. validates the configured prerequisite;
-4. reserves a one-time prerequisite, when configured, before running the handler;
-5. records the call and issues a token only after the handler succeeds.
-
-Calls without an MCP session fail closed for configured tools. State is isolated between clients, held in memory, and lost when the process restarts. Same-session calls are serialized so concurrent requests cannot reuse a one-time token. Finished calls release their slot when the session has no live prerequisites. The observer receives live events through Ratchet v0.3.0’s `EventSink`.
-
-If a protected handler fails after its one-time prerequisite was reserved, the client must repeat the prerequisite before retrying. This prevents two concurrent mutations from both passing on one token.
-
-## Supplied policy
-
-[`configs/ratchet.yaml`](../../configs/ratchet.yaml) defines this example operator policy:
-
-| Tool | Requirement | Token behavior |
+| Tool | Recent successful prerequisite | Consumption |
 | --- | --- | --- |
-| `mosaic_hexxla_list_tags` | none | issues a 10-minute token |
-| `mosaic_hexxla_query_cells`, `mosaic_hexxla_search_cells`, `mosaic_hexxla_search_embedding` | none | issue 10-minute tokens |
-| `mosaic_hexxla_find_seams` | none | issues a 10-minute token |
-| `mosaic_hexxla_put_cell` | `mosaic_hexxla_list_tags` | consumed once |
-| `mosaic_hexxla_put_embedding`, `mosaic_hexxla_put_facet` | any listed retrieval tool | reusable until expiry |
-| `mosaic_hexxla_load_context_pack` | any listed retrieval tool | reusable until expiry |
-| `mosaic_hexxla_link_cells` | `mosaic_hexxla_load_context_pack` | consumed once |
-| `mosaic_hexxla_mark_conflict`, `mosaic_hexxla_mark_supersedes`, `mosaic_hexxla_resolve_seam` | `mosaic_hexxla_find_seams` | consumed once |
-| `mosaic_hexxla_delete_cell` | any listed retrieval tool | reusable until expiry |
+| `put_cell` | `list_tags` | Once per write |
+| `put_embedding`, `put_facet`, `delete_cell`, `load_context_pack` | `get_cell` or `search_cells` | Reusable |
+| `link_cells` | `load_context_pack` | Once per link |
+| `mark_conflict`, `mark_supersedes`, `resolve_seam` | `find_seams` | Once per mutation |
 
-Read-only tools omitted from the file are unrestricted. A mutation omitted from
-the file—or given any empty-prerequisite rule—causes startup to fail while
-Ratchet is enabled. Multiple rules with the same `tool` are alternatives (OR),
-not cumulative requirements. An empty `prerequisite` makes that rule
-immediately callable and allows it to issue a token after success.
+Completions last ten minutes by default. Completions issued by
+`load_context_pack` last five minutes. Only tools needed as prerequisites retain
+completion state. A failed call spends any reserved one-time completion and
+issues no downstream completion, including SDK validation or serialization
+failures. Same-session execution is serialized; independent sessions remain
+isolated. State is bounded, process-local and lost on restart.
 
-Ratchet selects the first eligible alternative and reserves its one-time
-prerequisite before the handler runs. A failed handler issues no completion.
-The YAML `expiry` sets the lifetime of completions issued by its `tool`.
-All explicit expiry values for the same tool must agree. The executor admits
-up to 1,024 sessions and reclaims sessions after 30 minutes of inactivity
-on subsequent calls. It retains at most 64 pending completions per tool
-and session.
+A custom policy uses grouped alternatives:
 
-## Tool safety inventory
+```yaml
+completion_ttl: 10m
+rules:
+  - tool: mosaic_hexxla_put_cell
+    after_any: [mosaic_hexxla_list_tags]
+    consume: true
+  - tool: mosaic_hexxla_delete_cell
+    after_any: [mosaic_hexxla_get_cell, mosaic_hexxla_search_cells]
+```
 
-Mosaic keeps one explicit classification for all 23 tools. Registration fails
-at startup if a tool is absent from that inventory. The same inventory:
+`after_any` alternatives are OR requirements. `consume` spends the selected
+completion before the SDK call. `ttl` changes the lifetime of completions issued
+by that tool; `message` optionally supplies a denial message. The old
+`prerequisite`, `expiry`, `one_time_use` and `error_message` keys are rejected.
 
-- publishes MCP `readOnlyHint`, `destructiveHint`, `idempotentHint`, and
-  `openWorldHint` annotations;
-- identifies the eight mutation tools Ratchet must protect when enabled; and
-- classifies Ollama-backed operations as open-world because the configured
-  Ollama URL may be a separate service.
+## Security and live observability
 
-These annotations help clients present and approve calls, but they are hints,
-not security controls. Ratchet middleware and Mosaic runtime policy remain the
-enforcement mechanisms. A regression test rejects production registrations
-that bypass the classification wrapper.
+Ratchet controls workflow order. Authentication, resource authorization,
+argument validation, retention policy and the deletion gate remain the host's
+responsibility. Completions attest to successful calls in one session; they do
+not bind a retrieved coordinate to later mutation arguments.
 
-## Security boundary
+Mosaic keeps its loopback-only listener, Host and Origin checks, idle session
+expiry, and explicit tool safety inventory. Shutdown stops new tool admissions,
+drains active SDK handlers even after their POST connection disconnects, closes
+sessions, and flushes pending maintenance before closing the database.
 
-Ratchet is workflow ordering, not authentication, authorization, or a substitute for Mosaic's write/delete policy. Continue to bind Mosaic to a trusted interface and apply the normal transport/access controls described in the operator documentation.
+The optional live WebSocket observer requires Ratchet and a private bearer-token
+file:
 
-Mosaic does not expose Ratchet's tokens, session store, historical event store, or HTTP statistics. It also does not log session IDs or token values. An operator may explicitly enable a live-only WebSocket stream; it requires a private bearer-token file, shares Mosaic's loopback-only listener, rejects requests carrying a browser `Origin`, and omits MCP session IDs, capability tokens, and event metadata from every event.
-
-## Live WebSocket observability
-
-Observability is disabled unless both Ratchet and a bearer-token file are configured. Create a random private token, start the server, and run the bundled observer in a second terminal:
-
-```bash
+```sh
 umask 077
 openssl rand -hex 32 > ./observer.token
-
-mosaic-mcp \
-  -db ./data/mosaic.hexxla \
-  -ratchet-config configs/ratchet.yaml \
+mosaic-mcp -db ./data/mosaic.hexxla -policy configs/config.yaml \
   -ratchet-observability-token-file ./observer.token
-```
-
-```bash
 mosaic-observe -token-file ./observer.token
 ```
 
-The default stream URL is `ws://127.0.0.1:8787/observability/stream`.
-Use `-ratchet-observability-path` on the server and `-url` on the observer to
-change it. The observer receives all live sessions by default; use
-`-session-id <observer-correlation-id>` to filter one session. The
-`session_id` field is a process-local observer label. Copy it from a live event
-to filter subsequent events. Events are NDJSON with `id`, `type`,
-`session_id`, optional `tool_name`, and `timestamp`.
+The default URL is `ws://127.0.0.1:8787/observability/stream`. Server
+`-ratchet-observability-path` and observer `-url` override it. The stream rejects
+browser Origins and accepts credentials only in the Authorization header. Keep
+the file private (`0600` on Unix-like systems); restart after rotating it.
 
-The stream is operational telemetry, not a durable audit log: it retains no
-history, accepts at most 16 simultaneous observers, and drops events for a
-subscriber whose bounded buffer is full rather than delaying MCP enforcement.
-The bearer token is accepted only in the `Authorization` header; Mosaic never
-accepts it in a URL or command-line value. Keep the token file private (`0600`
-on Unix-like systems) and rotate it by replacing the file and restarting the
-server.
-
-## Current limitations
-
-- State is local to one Mosaic process; it is not shared across replicas and does not survive restart.
-- Rules are loaded only at startup; there is no hot reload.
-- Ratchet observability is live-only and process-local; there is no replay, durable event store, aggregate statistics endpoint, or browser dashboard.
-- Repeated rules implement OR semantics. AND workflows require a separate policy design or upstream Ratchet support.
-- Tokens attest only that a prerequisite tool succeeded in the same session;
-  they do not bind returned coordinates or records to a later mutation's
-  arguments. Clients must inspect the relevant cell/context/seam, and Mosaic's
-  domain validation remains authoritative.
-
-These constraints keep the integration small and explicit while preserving the normal Mosaic API when Ratchet is not configured.
-
-## Verification
-
-The integration tests use the real MCP Streamable HTTP transport and independent clients to verify:
-
-- configured prerequisites deny calls before discovery;
-- all eight Mosaic mutation tools are protected by the supplied policy;
-- one client cannot authorize another client's call;
-- a successful prerequisite authorizes the protected call;
-- a one-time token cannot be reused;
-- failed prerequisite handlers do not issue authorization tokens.
-- every registered production tool goes through the safety inventory.
-
-Run the focused tests with:
-
-```bash
-go test ./internal/adapter/primary/mcpsrv ./internal/config ./cmd/mosaic-mcp
-```
+Events contain `id`, `type`, a process-local `session_id` correlation label,
+optional `tool_name`, and `timestamp`. Raw MCP session IDs and internal event
+error/details are excluded. Filter with `-session-id` using a label from a live
+event. The observer receives immutable event values, retains no history, allows
+at most 16 clients, and drops events when a client's bounded buffer is full.

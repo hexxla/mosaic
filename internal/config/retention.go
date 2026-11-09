@@ -27,7 +27,7 @@ const (
 )
 
 // PolicyEnforcement controls whether the MCP server blocks puts that violate [CaptureMode].
-// Config YAML uses booleans: false → off, true → reject (internal string). MCP JSON exposes enforcement as a boolean; legacy YAML strings "off"/"reject" remain accepted.
+// Config YAML uses booleans: false → off, true → reject (internal string). MCP JSON exposes enforcement as a boolean.
 type PolicyEnforcement string
 
 const (

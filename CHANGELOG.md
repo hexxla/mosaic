@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking usability/API changes
+
+- Consolidate current API documentation and remove the superseded implementation tracker and historical tool-description audit.
+
+- Replace separate query and embedding-discovery tools with `search_cells` modes: lexical, pure-vector semantic, and filtered/composite hybrid. Search is global by default; positive radius opts into spatial restriction. Add exact `get_cell` with explicit presence.
+- Publish seven core tools by default; `advanced_tools: true` exposes all 22. Advanced facet/edge/seam operations, independent embeddings and policy/budget diagnostics retain their capabilities.
+- Context accepts `max_budget_bytes` and reports `total_bytes` only. Remove token-named byte aliases, `omit_budget`, and inline approximate-token alternatives; the advanced conversion tool remains available.
+- Use one strict retention shape with boolean enforcement. Sample configuration selects selective capture, disables deletion, and leaves maintenance opt-in.
+- Use the simplified Ratchet engine, typed events and shared MCP success boundary. `ratchet: true` enables the bundled grouped policy; custom policies use the same single schema. Observer correlation IDs remain separate from transport IDs.
+
+### Added
+
+- Pin the simplified Ratchet API to commit `6b1683627372` (`v0.3.1-0.20261109183504-6b1683627372`). Dependency commits must be pushed before this Mosaic revision.
+- Optional `put_cell` `embed: true` computes a vector before the transaction and commits cell/vector atomically. Model or vector-write failure saves neither; responses report `embedded`.
+
+
 - **Ratchet observer** — Emit separate observer correlation IDs in place of
   transport session IDs. Use the correlation ID for stream filters.
 - **Ratchet enforcement** — Delegate to the current executor, including
@@ -14,10 +30,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Configuration safety** — Reject unknown YAML fields, extra documents, invalid Ratchet paths, nonliteral HTTP endpoint paths, and nonfinite retrieval ratios. Validate Ollama HTTP(S) bases and preserve path prefixes.
+- **Credential diagnostics** — Redact URL credentials and query values from startup and HTTP errors while retaining inspectable error causes.
+- **MCP lifecycle** — Reject standalone GET streams, preserve POST SSE responses, validate cross-origin mutations, drain active HTTP requests, and close idle sessions before storage shutdown.
+- **Retrieval correctness** — Preserve requested lexical scan limits, validate and cap bounded hybrid scans, avoid byte-budget integer overflow, and reject ANN results canceled while waiting or searching.
+- **Storage adapter safety** — Report corrupt edge coordinates, bound Ollama response bodies, and reject embedding components outside finite float32 range.
+
 - **Configuration** — Reject files that mix retention configuration forms. Use YAML encryption credentials when seeding a database.
 - **Retrieval budgets** — Release counters when MCP sessions close and pass the remaining budget into context assembly.
 
 ### Changed
+
+- **Storage compatibility** — Pin HexxlaDB to commit `2e5ed270ec49` (`v0.7.1-0.20261109183456-2e5ed270ec49`) for current WAL/header integrity and encrypted history recovery. Back up the complete recovery set before upgrading; older writers cannot maintain the updated framing. See [database upgrade instructions](docs/mosaic/DATABASE_CREATION.md#upgrade-an-existing-database).
+- **Embedding race protection** — `mosaic_hexxla_put_embedding` accepts optional `expected_content_sha256`; compare the retrieved raw content atomically before storing a delayed embedding. Omission preserves existing behavior.
+- **Context eviction** — Sort eviction priorities once and compact retained cells once, preserving ring/confidence/tie order and explanations. The 8,192-cell eviction benchmark improves roughly 40–55×, with two extra allocations when eviction is needed; packs that already fit retain the allocation-free path.
 
 - **Health tool** — Report layout and disk usage by default. Pass `full_check: true` for the integrity scan and counts.
 

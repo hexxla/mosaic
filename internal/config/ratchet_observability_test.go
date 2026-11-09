@@ -49,6 +49,9 @@ func TestLoadRatchetObservabilityRejectsInvalidInput(t *testing.T) {
 	}{
 		{name: "relative path", path: "stream", mode: 0o600, token: strings.Repeat("a", minObservabilityTokenBytes)},
 		{name: "mux pattern", path: "/stream/{session}", mode: 0o600, token: strings.Repeat("a", minObservabilityTokenBytes)},
+		{name: "encoded alias", path: "/%73tream", mode: 0o600, token: strings.Repeat("a", minObservabilityTokenBytes)},
+		{name: "subtree root", path: "/", mode: 0o600, token: strings.Repeat("a", minObservabilityTokenBytes)},
+		{name: "whitespace", path: "/stream path", mode: 0o600, token: strings.Repeat("a", minObservabilityTokenBytes)},
 		{name: "short token", path: "/stream", mode: 0o600, token: "short"},
 	}
 	if runtime.GOOS != "windows" {

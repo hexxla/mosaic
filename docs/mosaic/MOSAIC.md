@@ -131,19 +131,16 @@ Evolution is first-class through:
 - Temporal snapshots (`ViewAtTime`)
 - Provenance tracking
 
-## Conceptual future agent tooling surface
+## Runtime tooling
 
-The full runtime envisioned here would expose a clean, LLM-friendly interface such as:
+The current server publishes seven everyday tools, or all 22 tools when
+`advanced_tools` is enabled. Discovery, exact reads, byte-bounded context, and
+optional atomic cell/embedding writes form the common workflow. Graph and seam
+operations remain available in the advanced profile. Temporal tools and other
+unimplemented product ideas belong in the [roadmap](../ROADMAP.md).
 
-- `put_memory(raw_content, tags, coord_hint?, provenance?, validity?)`
-- `search_and_load_context(query, max_tokens, strategy?)`
-- `mark_conflict(coord_a, coord_b, reason)`
-- `mark_supersedes(old_coord, new_coord, reason)`
-- `resolve_seam(seam_id, strategy, note?)`
-- `get_temporal_view(as_of_time)`
-- `explain_seams(center, radius)`
-
-These are conceptual names, not tools registered by the current `mosaic-mcp` binary. For the 23 current tools and exact payloads, use runtime MCP `tools/list` and [`MCP_AGENT_BLUEPRINT.md`](./MCP_AGENT_BLUEPRINT.md).
+Use runtime MCP `tools/list`, [the agent guide](MCP_AGENT_BLUEPRINT.md), and
+[the API mapping](HEXXLA_API_SURFACE_COVERAGE.md) for implemented contracts.
 
 ## Time and Evolution
 
