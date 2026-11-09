@@ -183,7 +183,7 @@ tasks:
   govulncheck:
     desc: Scan dependencies for known vulnerabilities
     cmds:
-      - go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+      - scripts/tool.sh govulncheck ./...
 
   update:
     desc: Update module dependencies and tidy go.mod

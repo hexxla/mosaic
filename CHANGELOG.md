@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Development workflow** — Build future tagged versions from source. Remove automatic binary publishing and narrow routine lint checks.
+
 ## [0.3.0] - 2026-11-09
 
 ### Breaking
@@ -65,7 +69,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **README** — Version badge and release link updated to **`v0.2.0`**.
 - **README & changelog links** — GitHub Actions badges, **releases**, clone URL, and **[Unreleased]** compare links use **`github.com/hexxla/mosaic`** (canonical repo). **pkg.go.dev** and **Go Report Card** remain **`github.com/sploitzberg/mosaic`** (Go module path).
 - **Dependencies** — **`github.com/modelcontextprotocol/go-sdk`** **v1.6.0** (was v1.5.0).
-- **Release workflow** — Drop mandatory **GPG** import (was failing when **`GPG_PRIVATE_KEY`** / **`GPG_PASSPHRASE`** secrets are unset); **[`.goreleaser.yml`](.goreleaser.yml)** does not define **`signs`**. Restore **`crazy-max/ghaction-import-gpg`** and **`GPG_FINGERPRINT`** when you add signing to GoReleaser and repository secrets.
+- **Release workflow** — Drop mandatory **GPG** import (was failing when **`GPG_PRIVATE_KEY`** / **`GPG_PASSPHRASE`** secrets are unset); **`.goreleaser.yml`** does not define **`signs`**. Restore **`crazy-max/ghaction-import-gpg`** and **`GPG_FINGERPRINT`** when you add signing to GoReleaser and repository secrets.
 - **README** — Remove trailing spaces (file quality / **Get started** hard breaks merged into single lines).
 
 ### Fixed

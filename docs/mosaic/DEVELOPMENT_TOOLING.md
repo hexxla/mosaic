@@ -42,14 +42,20 @@ Repository instructions guide development. Mosaic runtime policy is separate: `r
 For the recommended tool sequence, see [`MCP_AGENT_BLUEPRINT.md`](./MCP_AGENT_BLUEPRINT.md). For configuration enforcement, see [`PERSISTENCE_POLICY.md`](./PERSISTENCE_POLICY.md) and [`RATCHET_INTEGRATION.md`](./RATCHET_INTEGRATION.md).
 
 
-## Releases
+## CI and version tags
 
-The [Release workflow](../../.github/workflows/release.yml) validates the exact
-tagged commit and rehearses packaging before the publishing job can run.
-The archives contain `mosaic-mcp`, `mosaic-create-db`, and `mosaic-observe`.
-Run the workflow manually on a candidate reachable from `main` to download
-the rehearsal archives and checksums.
+`task ci` runs the validation used on pull requests and pushes to `main`.
+It checks module metadata and workflows, lints, runs race tests, builds the
+commands, and scans for known Go vulnerabilities. GitHub Actions also scans
+the commit range for secrets.
 
+Run `scripts/tool.sh golangci-lint run --enable modernize ./...` for an
+optional modernization pass.
+
+Tag a commit from `main` after CI passes. Build new versions from the tagged
+source using the [README instructions](../../README.md#get-started).
+Published archives for [v0.3.0](https://github.com/hexxla/mosaic/releases/tag/v0.3.0)
+remain available.
 
 ## Cross-repository checks
 
