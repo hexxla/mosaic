@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-09
+
+### Breaking
+
+- **Database lifecycle** — MCP startup requires an existing primary. Creation and seeding validate a separate database before copying it to an unused destination. The in-place replacement flags and destructive reseed task are retired. [Upgrade and replacement instructions](docs/mosaic/DATABASE_CREATION.md)
+
 ### Added
 
 - **Optional Ratchet enforcement** — `mosaic-mcp` can load an `mcp-ratchet` workflow with `-ratchet-config` or `MOSAIC_RATCHET_CONFIG_FILE`. Central MCP middleware isolates state by actual client session, enforces the supplied tag/retrieval prerequisites, and keeps tokens and state process-local without public observability endpoints.
@@ -15,7 +21,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Database lifecycle** — MCP startup refuses missing files. Creation and seeding validate a separate database before copying it to an unused destination. In-place replacement flags and the destructive reseed task are retired.
 - **Cell identity** — near-anchor placement skips tombstones, exact placement refuses deleted identities, vector writes require a live cell, and changing raw content invalidates the previous embedding.
 - **Bounded retrieval** — preserve partial query hits, expose scan and vector candidate limits, and validate bounded exact hybrid queries before embedding.
 
@@ -104,6 +109,7 @@ First tagged release of **Mosaic**: local **Model Context Protocol** server back
 
 - GitHub Actions **`actions/checkout@v6`**, **`actions/setup-go@v6`**; **`MOSAIC_POLICY_FILE`** forwarded in **`Makefile`** for seed/MCP/create-db when set.
 
-[Unreleased]: https://github.com/hexxla/mosaic/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/hexxla/mosaic/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/hexxla/mosaic/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/hexxla/mosaic/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/hexxla/mosaic/releases/tag/v0.1.0
