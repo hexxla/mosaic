@@ -13,8 +13,7 @@ func TestDefaultMosaicDatabaseLayout_matches_MosaicNewDatabaseOptions(t *testing
 	def := config.DefaultMosaicDatabaseLayout()
 	o := config.NewMosaicDatabaseOptions(def)
 	legacy := config.MosaicNewDatabaseOptions()
-	if o.EnableMVCC != legacy.EnableMVCC ||
-		o.PageSize != legacy.PageSize ||
+	if o.PageSize != legacy.PageSize ||
 		o.MaxValueBytes != legacy.MaxValueBytes ||
 		o.EmbeddingDimension != legacy.EmbeddingDimension ||
 		o.DistanceMetric != legacy.DistanceMetric {

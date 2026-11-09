@@ -41,12 +41,10 @@ func DefaultMosaicDatabaseLayout() MosaicDatabaseLayout {
 // NewMosaicDatabaseOptions builds [hexxladb.Options] for creating a new database file.
 // Invalid combinations are rejected by [hexxladb.Open], not here.
 func NewMosaicDatabaseOptions(layout MosaicDatabaseLayout) *hexxladb.Options {
-	opts := defaultHexxlaOptions()
-	opts.PageSize = layout.PageSize
-	opts.MaxValueBytes = layout.MaxValueBytes
-	opts.EmbeddingDimension = layout.EmbeddingDimension
-	opts.DistanceMetric = layout.DistanceMetric
-	return opts
+	return &hexxladb.Options{
+		PageSize: layout.PageSize, MaxValueBytes: layout.MaxValueBytes,
+		EmbeddingDimension: layout.EmbeddingDimension, DistanceMetric: layout.DistanceMetric,
+	}
 }
 
 // MosaicNewDatabaseOptions returns [hexxladb.Options] for creating a new Mosaic-compatible HexxlaDB file

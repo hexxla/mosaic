@@ -22,12 +22,12 @@ type CellPlacementMode string
 const (
 	// CellPlacementExact writes at Coord after applying the explicit overwrite policy.
 	CellPlacementExact CellPlacementMode = "exact"
-	// CellPlacementNearAnchor selects the first free coordinate around Coord.
+	// CellPlacementNearAnchor selects the first unused coordinate around Coord.
 	CellPlacementNearAnchor CellPlacementMode = "near_anchor"
 )
 
-// ErrCellCoordinateOccupied means an exact placement targeted a live cell
-// without explicitly allowing replacement.
+// ErrCellCoordinateOccupied means an exact placement targeted a tombstone
+// or a live cell without explicitly allowing replacement.
 var ErrCellCoordinateOccupied = errors.New("cell coordinate occupied")
 
 // PutCellCommand writes one cell at an axial coordinate (within DB.Update).

@@ -30,9 +30,9 @@ func RegisterCellSearchTool(server *mcp.Server, svc primary.CellRetrieval, log *
 
 	return addTool(server, &mcp.Tool{
 		Name: "mosaic_hexxla_search_cells",
-		Description: "Lexical relevance search (HexxlaDB SearchCells): scored substring/tag/source matches; optional scan radius; optional embed_query_text for ANN-accelerated hybrid retrieval. " +
+		Description: "Lexical relevance search within a hex radius (default 32): scored content, tag, and source matches. Optional embed_query_text adds vector candidate selection. " +
 			"Substring match can return zero hits if that phrase is not stored literally — try mosaic_hexxla_search_embedding for semantic discovery. " +
-			"Requires DB embeddings + MOSAIC_OLLAMA when embed_query_text set. Top hits only — mosaic_hexxla_load_context_pack for lattice context (retrieval_hint).",
+			"Inspect scan_limit_reached or embedding_candidate_limit_reached before treating results as complete. Use mosaic_hexxla_load_context_pack for lattice context.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in cellSearchInput) (*mcp.CallToolResult, domain.CellHitsResponse, error) {
 		if log != nil {
 			log.DebugContext(ctx, "mosaic_hexxla_search_cells invoked")
@@ -55,14 +55,12 @@ func RegisterCellSearchTool(server *mcp.Server, svc primary.CellRetrieval, log *
 			EmbedQueryText: strings.TrimSpace(in.EmbedQueryText),
 		}
 		out, err := budget.RunBudgetedRead(req, func() (domain.CellHitsResponse, error) {
-			hits, err2 := svc.SearchCells(ctx, cmd)
+			response, err2 := svc.SearchCells(ctx, cmd)
 			if err2 != nil {
 				return domain.CellHitsResponse{}, err2
 			}
-			return domain.CellHitsResponse{
-				Hits:          hits,
-				RetrievalHint: domain.RetrievalHintLexicalOrANN,
-			}, nil
+			response.RetrievalHint = domain.RetrievalHintLexicalOrANN
+			return response, nil
 		})
 		if err != nil {
 			return nil, domain.CellHitsResponse{}, err

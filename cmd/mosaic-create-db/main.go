@@ -9,16 +9,14 @@
 package main
 
 import (
-	"errors"
+	"context"
 	"flag"
 	"fmt"
 	"log/slog"
 	"os"
-	"path/filepath"
 	"strings"
 
-	"github.com/hexxla/hexxladb"
-
+	"github.com/sploitzberg/mosaic/internal/adapter/secondary/hexxlastore"
 	"github.com/sploitzberg/mosaic/internal/config"
 )
 
@@ -29,8 +27,8 @@ func main() {
 	nameFlag := flag.String("name", "", "base name for the file: <db-dir>/<name>.hexxla (mutually exclusive with -db; directory from -db-dir or "+config.EnvMosaicDBDir+")")
 	dbDirFlag := flag.String("db-dir", "", "parent directory when using -name (default: from "+config.EnvMosaicDBDir+" or .tmp)")
 	var replaceExisting bool
-	flag.BoolVar(&replaceExisting, "force", false, "replace existing file at the chosen path: delete it then create")
-	flag.BoolVar(&replaceExisting, "replace", false, "same as -force")
+	flag.BoolVar(&replaceExisting, "force", false, "retired; use a new candidate path")
+	flag.BoolVar(&replaceExisting, "replace", false, "retired; use a new candidate path")
 	dbPassphrase := flag.String("db-passphrase", "", "optional HexxlaDB encryption passphrase (overrides "+config.EnvDBPassphrase+")")
 
 	pageSize := flag.Uint("page-size", uint(config.MosaicDefaultPageSize), "page size for new file (4096, 8192, 16384, or 65536)")
@@ -63,6 +61,10 @@ func main() {
 }
 
 func run(log *slog.Logger, dbPath string, force bool, policyFlag, dbPassphraseFlag string, layout config.MosaicDatabaseLayout) error {
+	if force {
+		return fmt.Errorf("in-place replacement is retired; create a candidate at a new path and switch the database path offline")
+	}
+
 	configPath := config.ResolveMosaicConfigPath(policyFlag)
 	var yamlPass string
 	if strings.TrimSpace(configPath) != "" {
@@ -73,34 +75,6 @@ func run(log *slog.Logger, dbPath string, force bool, policyFlag, dbPassphraseFl
 		yamlPass = loaded.DatabasePassphrase
 	}
 
-	if err := os.MkdirAll(filepath.Dir(dbPath), 0o750); err != nil {
-		return fmt.Errorf("create parent directory: %w", err)
-	}
-
-	exists := false
-	if _, err := os.Stat(dbPath); err == nil {
-		exists = true
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("stat database: %w", err)
-	}
-
-	if exists && !force {
-		return fmt.Errorf("database file already exists at %q — use a different -db or -name, or pass -replace / -force to overwrite", dbPath)
-	}
-
-	if force && exists {
-		log.Info("replacing existing database file", "path", dbPath)
-	}
-
-	if force {
-		_ = os.Remove(dbPath)
-		_ = os.Remove(dbPath + "-wal")
-	}
-
-	if !exists {
-		_ = os.Remove(dbPath + "-wal")
-	}
-
 	opts := config.NewMosaicDatabaseOptions(layout)
 	if err := config.ApplyHexxlaEncryption(opts, config.HexxlaOpenParams{
 		FlagPassphrase: dbPassphraseFlag,
@@ -109,19 +83,13 @@ func run(log *slog.Logger, dbPath string, force bool, policyFlag, dbPassphraseFl
 		return fmt.Errorf("database encryption options: %w", err)
 	}
 
-	db, err := hexxladb.Open(dbPath, opts)
-	if err != nil {
-		return fmt.Errorf("open database: %w", err)
+	if err := hexxlastore.CreateCandidate(context.Background(), dbPath, opts, nil); err != nil {
+		return err
 	}
-	defer func() {
-		if cerr := db.Close(); cerr != nil {
-			log.Error("close database", "err", cerr)
-		}
-	}()
 
 	log.Info("created empty Mosaic HexxlaDB",
 		"path", dbPath,
-		"embedding_dim", db.EmbeddingDimension(),
+		"embedding_dim", layout.EmbeddingDimension,
 		"page_size", layout.PageSize,
 	)
 	return nil

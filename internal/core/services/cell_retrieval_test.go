@@ -2,11 +2,24 @@ package services_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/sploitzberg/mosaic/internal/core/domain"
 	"github.com/sploitzberg/mosaic/internal/core/services"
 )
+
+func TestCellRetrievalValidatesHybridScanBeforeEmbedding(t *testing.T) {
+	t.Parallel()
+	stub := &stubCellReader{}
+	svc := services.NewCellRetrievalService(stub, nil, 2)
+	_, err := svc.QueryCells(t.Context(), &domain.CellQueryCommand{
+		EmbedQueryText: "semantic", MaxScanRows: 10, AnyTags: []string{"any"},
+	})
+	if err == nil || !strings.Contains(err.Error(), "requires require_tags, source_id, or a positive radius") || stub.lastQuery != nil {
+		t.Fatalf("invalid hybrid scan reached embedding or storage: %v", err)
+	}
+}
 
 type stubCellReader struct {
 	lastQuery     *domain.CellQueryCommand
@@ -24,28 +37,28 @@ func (s *stubCellReader) captureEmb(emb []float32) {
 	s.lastEmbedding = append([]float32(nil), emb...)
 }
 
-func (s *stubCellReader) QueryCells(_ context.Context, q *domain.CellQueryCommand, emb []float32) ([]domain.CellHit, error) {
+func (s *stubCellReader) QueryCells(_ context.Context, q *domain.CellQueryCommand, emb []float32) (domain.CellHitsResponse, error) {
 	if q != nil {
 		c := *q
 		s.lastQuery = &c
 	}
 	s.captureEmb(emb)
 	if s.queryErr != nil {
-		return nil, s.queryErr
+		return domain.CellHitsResponse{}, s.queryErr
 	}
-	return nil, nil
+	return domain.CellHitsResponse{}, nil
 }
 
-func (s *stubCellReader) SearchCells(_ context.Context, q *domain.CellSearchCommand, emb []float32) ([]domain.CellHit, error) {
+func (s *stubCellReader) SearchCells(_ context.Context, q *domain.CellSearchCommand, emb []float32) (domain.CellHitsResponse, error) {
 	if q != nil {
 		c := *q
 		s.lastSearch = &c
 	}
 	s.captureEmb(emb)
 	if s.searchErr != nil {
-		return nil, s.searchErr
+		return domain.CellHitsResponse{}, s.searchErr
 	}
-	return nil, nil
+	return domain.CellHitsResponse{}, nil
 }
 
 type stubEmbedder struct{}

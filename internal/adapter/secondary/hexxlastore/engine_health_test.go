@@ -13,7 +13,7 @@ func TestEngineHealthAdapter_Check_includes_layout_and_integrity(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "health.hexxla")
 	db, err := hexxladb.Open(path, &hexxladb.Options{
-		EnableMVCC:         true,
+
 		EmbeddingDimension: 384,
 		DistanceMetric:     hexxladb.DistanceCosine,
 		PageSize:           4096,

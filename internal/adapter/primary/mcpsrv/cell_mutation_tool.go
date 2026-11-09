@@ -36,7 +36,7 @@ func RegisterCellMutationTools(server *mcp.Server, svc primary.CellMutation, log
 func registerPutCellTool(server *mcp.Server, svc primary.CellMutation, log *slog.Logger) error {
 	return addTool(server, &mcp.Tool{
 		Name: "mosaic_hexxla_put_cell",
-		Description: "Write one cell atomically via HexxlaDB. placement=exact (default) writes at (q,r) and refuses a live coordinate unless allow_overwrite=true. placement=near_anchor treats (q,r) as a caller-chosen semantic anchor and selects the first free coordinate in deterministic ring order within max_radius (default 8, maximum 32). The response always returns the actual coordinate, placement, occupied probes, and whether an exact write replaced a live cell. Mosaic does not infer semantic anchors. Before choosing tags, call mosaic_hexxla_list_tags (and mosaic_hexxla_tag_counts) when taxonomy is unknown — reuse existing tags when relevant instead of inventing near-duplicates. " +
+		Description: "Write one cell atomically via HexxlaDB. Exact placement refuses deleted coordinates and requires allow_overwrite=true to update a live cell. Near-anchor placement selects the first unused coordinate, skipping live and deleted cells, in deterministic ring order within max_radius (default 8, maximum 32). Changing raw content invalidates the previous embedding. The response returns the actual coordinate, placement, occupied probes, and whether an exact write replaced a live cell. Use mosaic_hexxla_list_tags to reuse relevant tags. " +
 			"kind=fact uses a fact template; user_message / assistant_response match conversational_memory-style tags. source_id is required (provenance source for fact, session id for user/assistant templates).",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in putCellInput) (*mcp.CallToolResult, domain.PutCellMutationResult, error) {
 		if log != nil {
@@ -78,7 +78,7 @@ func registerPutEmbeddingTool(server *mcp.Server, svc primary.CellMutation, log 
 
 	return addTool(server, &mcp.Tool{
 		Name:        "mosaic_hexxla_put_embedding",
-		Description: "Store an embedding vector at axial (q,r) via HexxlaDB Tx.PutEmbedding. Provide either text (embedded with MOSAIC_EMBED_MODEL) or vector (full float32[], length must match the database embedding dimension). Requires embeddings enabled on the DB (same dimension as MOSAIC_DB_PATH database).",
+		Description: "Store an embedding vector for a live cell at axial (q,r). Provide either text (embedded with MOSAIC_EMBED_MODEL) or a vector whose length matches the database embedding dimension.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in putEmbInput) (*mcp.CallToolResult, domain.MutationOK, error) {
 		if log != nil {
 			log.DebugContext(ctx, "mosaic_hexxla_put_embedding invoked", "q", in.Q, "r", in.R)

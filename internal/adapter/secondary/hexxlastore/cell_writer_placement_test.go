@@ -15,7 +15,7 @@ func TestCellWriterAdapter_exact_and_near_anchor_placement(t *testing.T) {
 	t.Parallel()
 
 	path := filepath.Join(t.TempDir(), "placement.hexxla")
-	opts := &hexxladb.Options{EnableMVCC: true, PageSize: 4096}
+	opts := &hexxladb.Options{PageSize: 4096}
 	db, err := hexxladb.Open(path, opts)
 	if err != nil {
 		t.Fatal(err)
@@ -105,7 +105,7 @@ func assertCellContent(t *testing.T, db *hexxladb.DB, coord domain.AxialCoord, w
 func TestCellWriterReportsCommittedDeleteWhenPruningFails(t *testing.T) {
 	t.Parallel()
 	db, err := hexxladb.Open(filepath.Join(t.TempDir(), "delete.hexxla"), &hexxladb.Options{
-		EnableMVCC:    true,
+
 		MVCCRetention: hexxladb.MVCCRetention{RetainCommitsBehindHead: 1},
 	})
 	if err != nil {
@@ -128,5 +128,77 @@ func TestCellWriterReportsCommittedDeleteWhenPruningFails(t *testing.T) {
 	removed, err = writer.DeleteCell(t.Context(), &domain.DeleteCellCommand{})
 	if err != nil || removed {
 		t.Fatalf("repeat delete returned removed=%t, err=%v", removed, err)
+	}
+}
+
+func TestCellWriterProtectsVectorAndSeamIdentity(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	db, err := hexxladb.Open(filepath.Join(t.TempDir(), "identity.hexxla"), &hexxladb.Options{EmbeddingDimension: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	live := NewLiveDB(db)
+	t.Cleanup(func() { _ = live.Close() })
+	writer := NewCellWriterAdapter(live, config.DeleteAutoMaintainConfig{})
+	a, b := domain.AxialCoord{Q: 1}, domain.AxialCoord{Q: 4}
+	if err := writer.PutEmbedding(ctx, a, []float32{1, 0}); !errors.Is(err, hexxladb.ErrCellNotFound) {
+		t.Fatalf("embedding at vacant coordinate = %v", err)
+	}
+	key, err := hexxladb.Pack(hexxladb.Coord{Q: a.Q, R: a.R})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Update(func(tx *hexxladb.Tx) error {
+		return tx.PutEmbedding(key, []float32{1, 0}) // Orphan left by an older Mosaic writer.
+	}); err != nil {
+		t.Fatal(err)
+	}
+	cmd := domain.PutCellCommand{Coord: a, RawContent: "original", SourceID: "test"}
+	if _, err := writer.PutCell(ctx, &cmd); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.View(func(tx *hexxladb.Tx) error {
+		_, found, err := tx.GetEmbedding(key)
+		if found {
+			t.Error("new cell inherited an orphan embedding")
+		}
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.PutEmbedding(ctx, a, []float32{1, 0}); err != nil {
+		t.Fatal(err)
+	}
+	cmd.RawContent = "replacement"
+	cmd.AllowOverwrite = true
+	if _, err := writer.PutCell(ctx, &cmd); err != nil {
+		t.Fatal(err)
+	}
+	matches, err := NewEmbeddingANNAdapter(live).Search(ctx, []float32{1, 0}, 1, 0)
+	if err != nil || len(matches) != 0 {
+		t.Fatalf("old vector still ranks replacement: %v, %v", matches, err)
+	}
+
+	if _, err := writer.PutCell(ctx, &domain.PutCellCommand{Coord: b, RawContent: "peer", SourceID: "test"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Update(func(tx *hexxladb.Tx) error {
+		return tx.MarkConflict(hexxladb.Coord{Q: a.Q}, hexxladb.Coord{Q: b.Q}, "original conflict")
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if removed, err := writer.DeleteCell(ctx, &domain.DeleteCellCommand{Coord: a}); err != nil || !removed {
+		t.Fatalf("delete = %t, %v", removed, err)
+	}
+	if _, err := writer.PutCell(ctx, &cmd); !errors.Is(err, domain.ErrCellCoordinateOccupied) {
+		t.Fatalf("exact reuse of tombstone = %v", err)
+	}
+	cmd.AllowOverwrite = false
+	cmd.Placement = domain.CellPlacementNearAnchor
+	cmd.MaxRadius = 1
+	placed, err := writer.PutCell(ctx, &cmd)
+	if err != nil || placed.Coord == a {
+		t.Fatalf("near-anchor placement = %+v, %v", placed, err)
 	}
 }

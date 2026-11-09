@@ -15,7 +15,7 @@ func TestContextPackAdapter_loads_exact_large_radius_and_facet_text(t *testing.T
 	t.Parallel()
 
 	path := filepath.Join(t.TempDir(), "context.hexxla")
-	db, err := hexxladb.Open(path, &hexxladb.Options{EnableMVCC: true, PageSize: 4096})
+	db, err := hexxladb.Open(path, &hexxladb.Options{PageSize: 4096})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,7 +88,7 @@ func TestContextPackAdapter_preserves_supersession_seams_and_origin_ring(t *test
 	t.Parallel()
 
 	path := filepath.Join(t.TempDir(), "supersession.hexxla")
-	db, err := hexxladb.Open(path, &hexxladb.Options{EnableMVCC: true, PageSize: 4096})
+	db, err := hexxladb.Open(path, &hexxladb.Options{PageSize: 4096})
 	if err != nil {
 		t.Fatal(err)
 	}

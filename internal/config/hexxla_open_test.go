@@ -78,12 +78,12 @@ func TestBuildHexxlaOpenOptions_keyAndPassphraseConflict(t *testing.T) {
 
 func TestApplyHexxlaEncryption_merge(t *testing.T) {
 	t.Setenv(config.EnvDBPassphrase, "")
-	opts := &hexxladb.Options{EnableMVCC: true}
+	opts := &hexxladb.Options{}
 	err := config.ApplyHexxlaEncryption(opts, config.HexxlaOpenParams{YAMLPassphrase: "p"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if opts.Passphrase != "p" || !opts.EnableMVCC {
+	if opts.Passphrase != "p" {
 		t.Fatalf("got %#v", opts)
 	}
 }

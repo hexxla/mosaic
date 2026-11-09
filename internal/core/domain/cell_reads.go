@@ -62,6 +62,7 @@ type CellSearchCommand struct {
 
 	MaxResults    int
 	MaxScanRadius int
+	MaxScanRows   int
 
 	// EmbedQueryText enables hybrid retrieval: embed then SearchCells with ANN-accelerated
 	// candidate selection combined with lexical score. Empty disables hybrid mode.
@@ -87,6 +88,10 @@ type CellHit struct {
 
 // CellHitsResponse is the MCP JSON body for query/search cell tools.
 type CellHitsResponse struct {
-	Hits          []CellHit `json:"hits" jsonschema:"ranked cell rows"`
-	RetrievalHint string    `json:"retrieval_hint,omitempty" jsonschema:"when to chain mosaic_hexxla_load_context_pack"`
+	Hits                           []CellHit `json:"hits" jsonschema:"ranked cell rows"`
+	RetrievalHint                  string    `json:"retrieval_hint,omitempty" jsonschema:"when to chain mosaic_hexxla_load_context_pack"`
+	ScanLimitReached               bool      `json:"scan_limit_reached,omitempty" jsonschema:"results are partial because the scan row budget was exhausted"`
+	EmbeddingPath                  string    `json:"embedding_path,omitempty" jsonschema:"vector execution path: hnsw, flat, or none"`
+	EmbeddingCandidates            int       `json:"embedding_candidates,omitempty" jsonschema:"distinct vector candidates examined"`
+	EmbeddingCandidateLimitReached bool      `json:"embedding_candidate_limit_reached,omitempty" jsonschema:"vector widening stopped at the candidate budget before filling the requested result count"`
 }

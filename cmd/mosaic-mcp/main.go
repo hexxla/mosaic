@@ -130,7 +130,7 @@ func run(log *slog.Logger) error {
 
 	openOpts := config.MergeMVCCRetainIntoOpenOptions(encOpts, mosaicLoaded.MVCCRetainCommitsBehindHead)
 
-	db, err := hexxladb.Open(dbCfg.Path, openOpts)
+	db, err := hexxladb.OpenExisting(dbCfg.Path, openOpts)
 	if err != nil {
 		return fmt.Errorf("open database: %w", err)
 	}

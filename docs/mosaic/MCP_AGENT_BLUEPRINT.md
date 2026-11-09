@@ -15,6 +15,14 @@ Hexxla upstream demos combine both: retrieve seeds → `Tx.LoadContext`. Embeddi
 
 ### HexxlaDB retrieval vs Mosaic budgeting
 
+Lexical query and search tools examine at most 20,000 rows or coordinates.
+If the scan budget runs out, Mosaic returns the ranked partial hits and
+`scan_limit_reached`. Vector queries can also report
+`embedding_candidate_limit_reached`, the execution path, and the number of
+candidates examined. In `mosaic_hexxla_query_cells`, combine a positive
+`max_scan_rows` with `require_tags`, `source_id`, or a positive `radius`
+to score a bounded filter scan exactly.
+
 HexxlaDB **`Tx.LoadContext`** retrieves deterministic, **`MaxCells`**-bounded assembled candidates from one or more seeds. It deliberately does not know about LLM providers or tokenizers. Mosaic’s **`mosaic_hexxla_load_context_pack`** wraps that API, then enforces a UTF-8 byte ceiling by evicting the lowest-confidence cell from the outermost occupied ring. Optional seams, supersession filtering, explanations, and facet text remain available.
 
 Mosaic’s **`budget_tokens_approx`** is only a configurable token-to-byte estimate. Exact fit depends on the provider, model, rendered messages, tool schemas, and reserved output; the client that constructs the final request remains responsible for exact tokenizer accounting.
@@ -84,8 +92,11 @@ policy.
 
 `mosaic_hexxla_put_cell` supports two explicit modes:
 
-- **`placement: exact`** (default) treats `(q,r)` as the final coordinate. A live cell there causes an error unless **`allow_overwrite: true`** is supplied; intentional replacement is therefore visible at the call boundary.
-- **`placement: near_anchor`** treats `(q,r)` as an application-chosen semantic anchor and atomically selects the first free coordinate in deterministic ring order. **`max_radius`** defaults to 8 and is capped at 32. `allow_overwrite` is invalid in this mode.
+- **`placement: exact`** (default) treats `(q,r)` as the final coordinate. Updating a live cell requires **`allow_overwrite: true`**. Deleted coordinates remain reserved.
+- **`placement: near_anchor`** treats `(q,r)` as an application-chosen anchor and atomically selects the first unused coordinate in ring order, skipping tombstones. **`max_radius`** defaults to 8 and is capped at 32.
+
+Changing the cell's raw content removes its previous embedding in the same
+transaction. Store the new vector against the live cell after the update.
 
 The response always reports **`coord`**, **`placement`**, **`probes`**, and **`replaced`**. Persist the returned coordinate for later embeddings, facets, edges, seams, and exact retrieval. Mosaic and HexxlaDB resolve bounded geometric collisions but do not infer anchors from content, tags, or embeddings.
 

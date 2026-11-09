@@ -128,7 +128,7 @@ Implementation tracker and coverage matrix: **[IMPLEMENTATION_PLAN.md](./IMPLEME
 
 ## Local run (seed + MCP for LM clients)
 
-Seed uses **Ollama** for **`all-minilm`** embeddings (384‑dim) plus **`PutCell`** on each turn—the same ingestion idea as **`examples/llm_context_engine`**. Defaults: **`./mosaic.hexxla`** in the working directory unless **`MOSAIC_DB_PATH`** / **`-db`** override (gitignored **`./mosaic.hexxla`** at repo root when using defaults there), **`MOSAIC_OLLAMA_URL=http://127.0.0.1:11434`**.
+Seed uses Ollama for 384-dimensional `all-minilm` embeddings and commits each cell and vector together. Defaults: **`./mosaic.hexxla`** in the working directory unless **`MOSAIC_DB_PATH`** / **`-db`** override (gitignored **`./mosaic.hexxla`** at repo root when using defaults there), **`MOSAIC_OLLAMA_URL=http://127.0.0.1:11434`**.
 
 Ensure **`ollama serve`** is running and **`ollama pull all-minilm`** has been executed once.
 
@@ -153,9 +153,9 @@ go run ./cmd/mosaic-mcp
 
 Overrides: **`task mosaic-dev MOSAIC_DB_PATH=./other.hexxla MOSAIC_OLLAMA_URL=http://127.0.0.1:11434`**.
 
-Configure your LM client MCP entry to **`http://127.0.0.1:8787/mcp`**, then call **`mosaic_hexxla_health`**. Replace the seeded file with **`go run ./cmd/mosaic-seed -force`**.
+Configure your LM client MCP entry to **`http://127.0.0.1:8787/mcp`**, then call **`mosaic_hexxla_health`**. To refresh the demo, [seed a new file and switch paths offline](./DATABASE_CREATION.md#replace-a-database-offline).
 
-See also **§5** of [HEXXLADB_API_NOTES.md](./HEXXLADB_API_NOTES.md).
+See [local seeded database](./HEXXLADB_API_NOTES.md#local-seeded-database).
 
 ---
 
@@ -167,57 +167,12 @@ The design flow mandates working **inside-out**:
 Domain → Primary Ports → Secondary Ports → Services → Adapters
 ```
 
-### What exists today
+### Current implementation
 
-| Layer                     | Status      | Notes                                                                                                                                               |
-| ------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Domain**                | Not started | No Hexxla/MOSAIC nouns or invariants in `internal/core/domain` yet.                                                                                 |
-| **Primary ports**         | Not started | No application-facing interfaces (what MCP tools ultimately invoke).                                                                                |
-| **Secondary ports**       | Not started | No abstraction over HexxlaDB persistence or workflows.                                                                                              |
-| **Services**              | Not started | No orchestration between domain and secondary ports.                                                                                                |
-| **Primary adapter (MCP)** | Partial     | [`internal/adapter/primary/mcpsrv`](../../internal/adapter/primary/mcpsrv) wires Streamable HTTP and an empty MCP `Server` only (`cmd/mosaic-mcp`). |
-| **Secondary adapter**     | Not started | No `adapter/secondary` HexxlaDB implementation.                                                                                                     |
-
-This is deliberate **bootstrap ordering**: proving the MCP transport + config (`cmd`, `internal/config`) before building business features. Once tools do real work, **new code should follow the document’s steps** so the domain and ports shape the MCP surface—not the SDK.
-
-Primary adapters normally **call primary ports** (implemented by services); here MCP tools will register handlers that delegate to services once ports exist—the same separation as HTTP handlers calling `UserService` in [Step 5 of the design-flow doc](../architecture/hexagonal-design-flow.md).
-
-### What to do next (strict design-flow order)
-
-Work in **vertical slices** (one thin tool end-to-end) while keeping layers clean.
-
-1. **Step 1 — Domain** (`internal/core/domain/`)\
-   Define minimal value types and errors for the **first real tool** (e.g. coordinates, opaque cell/session identifiers, validation rules).\
-   Stay free of MCP and HexxlaDB imports ([domain purity](../../internal/core/domain/README.md)).
-
-2. **Step 2 — Primary ports** (`internal/core/ports/primary/`)\
-   Declare one small interface per use case the LLM will trigger (e.g. “record a fact”, “run health ping”) using domain types and command structs—not MCP or JSON-RPC types.
-
-3. **Step 3 — Secondary ports** (`internal/core/ports/secondary/`)\
-   Define what the app needs from storage (e.g. open DB path, execute in transaction, primitives you choose to expose).\
-   Interfaces only; no `hexxladb` types leaking into signatures if ports can stay clean (adapt in the secondary adapter).
-
-4. **Step 4 — Services** (`internal/core/services/`)\
-   Implement primary ports: orchestrate domain rules and call secondary ports (`context.Context`, `%w` errors).
-
-5. **Step 5 — Adapters**
-   - **Secondary:** `internal/adapter/secondary/` implements HexxlaDB-backed storage (depends on [`github.com/hexxla/hexxladb`](https://github.com/hexxla/hexxladb) at the edge only).
-   - **Primary:** extend `mcpsrv` with `RegisterTools(server, svc)` (or equivalent); tool handlers parse MCP requests and **only** call primary port methods.
-
-6. **Composition root** (`cmd/mosaic-mcp`)\
-   Load config (HTTP + DB path + encryption key from env), construct secondary adapter → service → MCP server with registered tools → HTTP handler.
-
-### Suggested first vertical slice
-
-- **Thin path:** One trivial tool (e.g. **`ping`** or **`db_stats`**) that proves: primary port → service → secondary Hexxla `Open` + `HealthCheck`/`Stats` if available—or a harmless read-only operation.
-- **Then:** Expand toward [MOSAIC agent tools](./MOSAIC.md) (`put_memory`, `search_and_load_context`, …) one port + service + adapter slice at a time.
-
-### Testing (per design flow)
-
-- **Unit:** Mock secondary ports; test services and domain without a real DB file.
-- **Integration:** Tagged tests with real HexxlaDB paths under `testdata/` once behavior warrants it.
-
----
+`cmd/mosaic-mcp` composes the domain services, ports, MCP adapter, and HexxlaDB
+storage adapter. See the [architecture guide](../architecture/architecture.md)
+for ownership and [the coverage matrix](./HEXXLA_API_SURFACE_COVERAGE.md) for
+registered capabilities.
 
 ## Future (not committed)
 

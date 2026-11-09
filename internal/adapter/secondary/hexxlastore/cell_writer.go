@@ -2,6 +2,7 @@ package hexxlastore
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -54,6 +55,7 @@ func (a *CellWriterAdapter) PutCell(ctx context.Context, cmd *domain.PutCellComm
 		updErr := db.Update(func(tx *hexxladb.Tx) error {
 			selected := hexxladb.Coord{Q: cmd.Coord.Q, R: cmd.Coord.R}
 			var key hexxladb.PackedCoord
+			var prior hexxladb.CellRecord
 			switch placement {
 			case domain.CellPlacementExact:
 				var err error
@@ -61,16 +63,25 @@ func (a *CellWriterAdapter) PutCell(ctx context.Context, cmd *domain.PutCellComm
 				if err != nil {
 					return fmt.Errorf("pack exact coordinate: %w", err)
 				}
-				_, occupied, err := tx.GetCell(key)
+				previous, occupied, err := tx.GetCell(key)
 				if err != nil {
 					return fmt.Errorf("check exact coordinate: %w", err)
 				}
 				if occupied && !cmd.AllowOverwrite {
 					return fmt.Errorf("%w: (%d,%d)", domain.ErrCellCoordinateOccupied, selected.Q, selected.R)
 				}
+				if !occupied {
+					if _, err := tx.FindUnusedCellPlacement(ctx, selected, 0); err != nil {
+						if errors.Is(err, hexxladb.ErrNoFreeCellPlacement) {
+							return fmt.Errorf("%w: (%d,%d) has retained cell history", domain.ErrCellCoordinateOccupied, selected.Q, selected.R)
+						}
+						return fmt.Errorf("check unused coordinate: %w", err)
+					}
+				}
+				prior = previous
 				result.Replaced = occupied
 			case domain.CellPlacementNearAnchor:
-				placed, err := tx.FindFreeCellPlacement(ctx, selected, cmd.MaxRadius)
+				placed, err := tx.FindUnusedCellPlacement(ctx, selected, cmd.MaxRadius)
 				if err != nil {
 					return fmt.Errorf("find free cell placement: %w", err)
 				}
@@ -84,6 +95,18 @@ func (a *CellWriterAdapter) PutCell(ctx context.Context, cmd *domain.PutCellComm
 			rec, err := newCellRecord(key, cmd, kind)
 			if err != nil {
 				return fmt.Errorf("build cell record: %w", err)
+			}
+			// New cells can encounter orphan vectors written by older versions.
+			if !result.Replaced || prior.RawContent != rec.RawContent {
+				_, found, err := tx.GetEmbedding(key)
+				if err != nil {
+					return fmt.Errorf("check previous embedding: %w", err)
+				}
+				if found {
+					if err := tx.DeleteEmbedding(key); err != nil {
+						return fmt.Errorf("invalidate previous embedding: %w", err)
+					}
+				}
 			}
 			if err := tx.PutCell(ctx, rec); err != nil {
 				return fmt.Errorf("tx PutCell: %w", err)
@@ -139,6 +162,11 @@ func (a *CellWriterAdapter) PutEmbedding(ctx context.Context, coord domain.Axial
 		updErr := db.Update(func(tx *hexxladb.Tx) error {
 			if err := ctx.Err(); err != nil {
 				return fmt.Errorf("context: %w", err)
+			}
+			if _, found, err := tx.GetCell(pk); err != nil {
+				return fmt.Errorf("check embedding cell: %w", err)
+			} else if !found {
+				return fmt.Errorf("embedding needs a live cell at (%d,%d): %w", coord.Q, coord.R, hexxladb.ErrCellNotFound)
 			}
 			if err := tx.PutEmbedding(pk, vec); err != nil {
 				return fmt.Errorf("tx PutEmbedding: %w", err)

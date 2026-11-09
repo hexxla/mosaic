@@ -58,7 +58,7 @@ If the **`retention`** key is **omitted** entirely, defaults match [`DefaultRete
 
 ### Encrypted HexxlaDB files (`database`)
 
-New encrypted HexxlaDB v0.6.0 files use authenticated format v3 with XChaCha20-Poly1305 pages, an authenticated header, and keyed WAL records. Existing AES-256-XTS v1/v2 files remain readable through HexxlaDB's legacy compatibility path. Passphrases use Argon2id; raw keys are expanded with HKDF-SHA256.
+New encrypted files use authenticated HexxlaDB v3. Passphrases use Argon2id and raw keys are expanded with HKDF-SHA256. Convert retired engine v1 and AES-XTS files before starting the upgraded server. [Upgrade procedure](./DATABASE_CREATION.md#upgrade-an-existing-database)
 
 | Mechanism | Role |
 | --------- | ---- |
@@ -77,7 +77,7 @@ HexxlaDB **`Open`** creates the file when it does not exist. Mosaic wraps that i
 | **`cmd/mosaic-create-db`** | Empty DB only — builds **[`config.NewMosaicDatabaseOptions`](../../internal/config/mosaic_hexxla_db.go)(layout)**, then **[`config.ApplyHexxlaEncryption`](../../internal/config/hexxla_open.go)**, then **`hexxladb.Open`**. |
 | **`cmd/mosaic-seed`** | Same layout + optional encryption, then seeds cells/embeddings if the corpus is non-empty. |
 
-**Encryption** is never implicit: credentials come only from the command-specific mechanisms in the table above (`ApplyHexxlaEncryption` / `BuildHexxlaOpenOptions`). **Layout** (MVCC, page size, max value bytes, embedding dimension, distance metric) is optional on both commands—each flag defaults to the Mosaic values in **`DefaultMosaicDatabaseLayout`**. Plaintext MVCC creation uses format v2; supplying official encryption credentials creates authenticated format v3 regardless of the MVCC flag.
+**Encryption** is never implicit: credentials come only from the command-specific mechanisms in the table above (`ApplyHexxlaEncryption` / `BuildHexxlaOpenOptions`). Both creation commands default to `DefaultMosaicDatabaseLayout` for page size, value limit, and embedding configuration. All new databases use MVCC, including files created on first MCP startup. Plaintext uses v2 and encrypted files use authenticated v3.
 
 **CLI and Task examples:** [DATABASE_CREATION.md](./DATABASE_CREATION.md).
 

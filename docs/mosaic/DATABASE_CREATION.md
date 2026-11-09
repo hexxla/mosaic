@@ -1,229 +1,85 @@
 # Creating a Mosaic HexxlaDB file
 
-HexxlaDB creates the on-disk file when you call **`hexxladb.Open`** and the path does not exist yet. Mosaic wraps **`Open`** in two commands that apply the **same layout defaults** (MVCC, page size, embeddings — see [`internal/config/mosaic_hexxla_db.go`](../../internal/config/mosaic_hexxla_db.go)) and optionally **at-rest encryption**.
+Use [mosaic-create-db](../../cmd/mosaic-create-db) for an empty database or
+[mosaic-seed](../../cmd/mosaic-seed) for the demo corpus with Ollama embeddings.
+Both commands build a private database and run HexxlaDB integrity checks before
+copying the recovery set to the destination. The destination must be unused.
+The server opens an existing primary and reports an error for a missing path.
 
----
+## Naming the database file
 
-## Encrypted database and MCP config (end-to-end)
+| Precedence | Path |
+| --- | --- |
+| 1 | The file passed to **-db** |
+| 2 | **-name** selects a file named **name.hexxla** under **-db-dir**, **MOSAIC_DB_DIR**, or **.tmp**, in that order |
+| 3 | **MOSAIC_DB_PATH** |
+| 4 | **mosaic.hexxla** in the current directory for the creator and seed commands |
 
-1. **Create** the file with a passphrase (pick **one** secret channel; same precedence when opening):
+The **-db** and **-name** flags are mutually exclusive.
+[Path resolution](../../internal/config/mosaic_db_path.go)
 
-   ```bash
-   go run ./cmd/mosaic-create-db -db "$HOME/mosaic/secret.hexxla" -db-passphrase "$MOSAIC_DB_PASSPHRASE"
-   ```
+Defaults are 4 KiB pages, a 16 KiB maximum value, and 384-dimensional cosine
+embeddings. Both current storage formats use MVCC. Use the layout flags on
+the creator or seed command to select a compatible embedding dimension and
+distance metric. [Layout defaults](../../internal/config/mosaic_hexxla_db.go)
 
-   Prefer **`MOSAIC_DB_PASSPHRASE`** in the environment instead of **`-db-passphrase`** on the command line (avoids **`ps`** leakage); see [Encrypted database](#encrypted-database-passphrase-or-raw-key) below.
+~~~sh
+export MOSAIC_DB_PATH="$PWD/.tmp/mosaic.hexxla"
+task create-db
+task run-mosaic-mcp
+~~~
 
-2. **Open with `mosaic-mcp`** using the **same** credentials (**`-db-passphrase`** → **`MOSAIC_DB_PASSPHRASE`** → YAML **`database.passphrase`**):
-
-   ```bash
-   export MOSAIC_DB_PATH="$HOME/mosaic/secret.hexxla"
-   export MOSAIC_DB_PASSPHRASE='…'
-   go run ./cmd/mosaic-mcp -policy configs/config.yaml
-   ```
-
-   Optional: add **`database.passphrase`** under **`database:`** in policy YAML ([`MOSAIC_CONFIG.md`](./MOSAIC_CONFIG.md)) only if storing a hint on disk is acceptable — env is usually safer.
-
-3. **Align paths:** **`MOSAIC_DB_PATH`**, **`-db`**, or **`-name`** / **`MOSAIC_DB_DIR`** must resolve to the **same file** you created ([`ResolveMosaicDBPath`](../../internal/config/mosaic_db_path.go)).
-
-Further detail: **[`MOSAIC_CONFIG.md`](./MOSAIC_CONFIG.md)** (`database`), **[`PERSISTENCE_POLICY.md`](./PERSISTENCE_POLICY.md)** (encryption).
-
----
-
-### Naming the database file (`-name`, `-db`, env)
-
-Path resolution is centralized in **`internal/config/mosaic_db_path.go`** ([**`ResolveMosaicDBPath`](../../internal/config/mosaic_db_path.go)).
-
-| Precedence | Mechanism |
-| ---------- | ------- |
-| 1 | **`-db`** — full path to the `.hexxla` file |
-| 2 | **`-name`** — writes **`<db-dir>/<name>.hexxla`** · **`db-dir`** from **`-db-dir`**, else **`MOSAIC_DB_DIR`**, else **`.tmp`** |
-| 3 | **`MOSAIC_DB_PATH`** |
-| 4 | Default **`mosaic.hexxla`** in the **process working directory** (shell cwd) · *(create-db / seed only; MCP requires 1–3)* |
-
-**`-db`** and **`-name`** are mutually exclusive. **`mosaic-mcp`** accepts **`-db`** / **`-name`** / **`-db-dir`** the same way and no longer requires **`MOSAIC_DB_PATH`** when you pass **`-name`** or **`-db`**.
-
-| Tool | When to use |
-| ---- | ----------- |
-| **`mosaic-create-db`** | Empty database only (no Ollama). Fast path for “create file then point **`mosaic-mcp`** at **`MOSAIC_DB_PATH`**. |
-| **`mosaic-seed`** | Same creation step, then fills demo cells/embeddings if the built-in corpus is non-empty (needs Ollama for embeddings). |
-
-The recommended workflow is to create the file explicitly before starting **`mosaic-mcp`**. Current `mosaic-mcp` calls HexxlaDB `Open` directly, so a missing or mistyped path creates a new database with the MCP open options rather than failing. That file does not receive `mosaic-create-db`'s embedding layout. Always create the intended path first and verify `mosaic_hexxla_health` reports the expected embedding dimension and limits. A pending operator-safety item tracks changing the command to refuse missing paths.
-
----
+For the demo, use **task seed** on an unused path. It requires Ollama with the
+configured embedding model. A repeat seed on an existing primary skips it.
+**task mosaic-dev** runs the seed task before starting MCP.
+[Ollama configuration](./MOSAIC_CONFIG.md#ollama)
 
 ## Encrypted database (passphrase or raw key)
 
-Credential sources differ by command:
-
 | Command | Passphrase precedence |
-| ------- | --------------------- |
-| **`mosaic-mcp`** | `-db-passphrase` → `MOSAIC_DB_PASSPHRASE` → policy YAML `database.passphrase` |
-| **`mosaic-create-db`** | `-db-passphrase` → `MOSAIC_DB_PASSPHRASE` → policy YAML `database.passphrase` |
-| **`mosaic-seed`** | `-db-passphrase` → `MOSAIC_DB_PASSPHRASE`; policy YAML currently configures Ollama only |
+| --- | --- |
+| **mosaic-mcp** and **mosaic-create-db** | **-db-passphrase**, **MOSAIC_DB_PASSPHRASE**, YAML **database.passphrase** |
+| **mosaic-seed** | **-db-passphrase**, **MOSAIC_DB_PASSPHRASE** |
 
-All three also accept **`MOSAIC_DB_ENCRYPTION_KEY_HEX`** as a raw key; never combine it with a passphrase source. New encrypted files use authenticated HexxlaDB format v3. Plaintext files use format v2 when MVCC is enabled.
+All three accept a hexadecimal key in **MOSAIC_DB_ENCRYPTION_KEY_HEX**.
+Use one credential source. Prefer environment injection for secrets so the
+passphrase stays out of command arguments. Use matching credentials on create
+and open. [Configuration reference](./MOSAIC_CONFIG.md)
 
-**About `-force` / `-replace`:** Both flags mean the same thing: **delete the existing file at the resolved path and create (or seed) again.** They are **not** required for encryption itself — only when you want to overwrite a database that is already on disk. If a file already exists and you did not pass **`-replace`/`-force`**, the command **errors** (create-db) or **skips seed** (seed) and tells you to pick another **`-db`** / **`-name`** or overwrite explicitly.
+## Replace a database offline
 
-For a **new path**, omit them:
+1. Create or seed a candidate at a **different, unused path**. Wait for the
+   command to succeed before opening the destination.
+2. Stop Mosaic and any other process using the original database. Preserve the
+   original primary and its matching WAL and any changefeed as one recovery set.
+3. Point **MOSAIC_DB_PATH** or **-db** at the candidate and start Mosaic with
+   its matching credentials. Verify the path, layout, and integrity with
+   **mosaic_hexxla_health**.
+4. To roll back, stop Mosaic and restore the original path and credential.
+   Preserve any writes made on the candidate separately.
 
-```bash
-export MOSAIC_DB_PATH="$PWD/.tmp/brand-new.hexxla"
-go run ./cmd/mosaic-create-db -db-passphrase 'your-passphrase-here'
-```
+The creator and seed commands refuse **-replace** and **-force**.
+If copying the candidate is interrupted, keep the original configuration and
+build at another unused path. Keep each candidate's sidecars with its own primary.
 
-These examples create an **encrypted** file at **`MOSAIC_DB_PATH`**. Replace placeholder secrets; avoid committing real passphrases.
+~~~sh
+task seed MOSAIC_DB_PATH="$PWD/.tmp/demo-next.hexxla"
+# Stop Mosaic before changing its database path.
+task run-mosaic-mcp MOSAIC_DB_PATH="$PWD/.tmp/demo-next.hexxla"
+~~~
 
-### Empty encrypted DB with the password flag (new file)
+## Upgrade an existing database
 
-```bash
-export MOSAIC_DB_PATH="$PWD/.tmp/secret.hexxla"
-go run ./cmd/mosaic-create-db -db-passphrase 'your-passphrase-here'
-```
+Current plaintext v2 and authenticated v3 files use the same supported
+storage profiles. Close the old writer cleanly and take a verified backup
+before opening with the upgraded server. If the old writer left pending
+plaintext v2 redo, recover it with the old binary first.
+For engine v1 or legacy AES-XTS files,
+use the pinned v0.6.0 offline converter on a copy before upgrading. Keep the
+original recovery set for rollback and verify the converted candidate before
+switching Mosaic to it.
+[HexxlaDB offline conversion](https://github.com/hexxla/hexxladb/blob/v0.7.0/docs/hexxladb/OPERATIONS.md#offline-conversion-of-retired-files)
 
-### Same using environment (often preferable — no passphrase in shell history from `-db-passphrase`)
-
-```bash
-export MOSAIC_DB_PATH="$PWD/.tmp/secret.hexxla"
-export MOSAIC_DB_PASSPHRASE='your-passphrase-here'
-go run ./cmd/mosaic-create-db
-```
-
-### Overwriting an existing file
-
-Use **`-force`** or **`-replace`** when **`MOSAIC_DB_PATH`** already exists:
-
-```bash
-go run ./cmd/mosaic-create-db -replace -db-passphrase 'your-passphrase-here'
-```
-
-### Encrypted seed database (Ollama required for embeddings)
-
-```bash
-export MOSAIC_DB_PATH="$PWD/.tmp/seed-secret.hexxla"
-go run ./cmd/mosaic-seed -db "$MOSAIC_DB_PATH" -db-passphrase 'your-passphrase-here'
-```
-
-(Re-seed from scratch: add **`-replace`** or **`-force`** if the file already exists.)
-
-### Open encrypted DB with MCP (existing file + passphrase)
-
-```bash
-export MOSAIC_DB_PATH="$PWD/.tmp/secret.hexxla"
-go run ./cmd/mosaic-mcp -policy configs/config.yaml -db-passphrase 'your-passphrase-here'
-```
-
-Or only env (no flag):
-
-```bash
-export MOSAIC_DB_PATH="$PWD/.tmp/secret.hexxla"
-export MOSAIC_DB_PASSPHRASE='your-passphrase-here'
-go run ./cmd/mosaic-mcp -policy configs/config.yaml
-```
-
-### Task (append flags; quote multiple arguments)
-
-```bash
-# New encrypted DB at Taskfile MOSAIC_DB_PATH (no -replace unless file exists)
-task create-db MOSAIC_CREATE_DB_FLAGS='-db-passphrase your-passphrase-here'
-
-# Overwrite existing file
-task create-db MOSAIC_CREATE_DB_FLAGS='-replace -db-passphrase your-passphrase-here'
-
-task run-mosaic-mcp MOSAIC_MCP_FLAGS='-policy configs/config.yaml -db-passphrase your-passphrase-here'
-```
-
-**Security:** **`-db-passphrase`** may appear in process listings (`ps`). Prefer **`MOSAIC_DB_PASSPHRASE`** or a secrets manager that injects env for production-like setups.
-
----
-
-## Examples: shell (`go run`)
-
-From the **repository root**, paths are stable relative to `configs/config.yaml`.
-
-### Empty DB at the default path (`mosaic.hexxla` in cwd, or **`MOSAIC_DB_PATH`**)
-
-```bash
-go run ./cmd/mosaic-create-db
-```
-
-### Empty DB at an explicit path, replace if present, load passphrase hints from policy YAML
-
-```bash
-go run ./cmd/mosaic-create-db -db ./.tmp/my.hexxla -force -policy configs/config.yaml
-```
-
-### Encrypted empty DB
-
-See **[Encrypted database](#encrypted-database-passphrase-or-raw-key)** above (`-db-passphrase` or **`MOSAIC_DB_PASSPHRASE`**).
-
-### Seed with defaults (Ollama must be up; **`MOSAIC_OLLAMA_URL`**, **`MOSAIC_EMBED_MODEL`**)
-
-```bash
-export MOSAIC_DB_PATH="$PWD/mosaic.hexxla"
-go run ./cmd/mosaic-seed -db "$MOSAIC_DB_PATH"
-```
-
-### Reseed from scratch with non-default page size
-
-```bash
-go run ./cmd/mosaic-seed -db ./mosaic.hexxla -force -page-size 4096
-```
-
-### Run MCP against an existing DB + policy file
-
-```bash
-export MOSAIC_DB_PATH="$PWD/mosaic.hexxla"
-go run ./cmd/mosaic-mcp -policy configs/config.yaml
-```
-
-Layout and encryption flags are documented on **`go run ./cmd/mosaic-create-db -help`**, **`go run ./cmd/mosaic-seed -help`**, **`go run ./cmd/mosaic-mcp -help`**.
-
----
-
-## Examples: Task
-
-The Taskfile sets **`MOSAIC_DB_PATH`** (default **`./mosaic.hexxla`** and passes it as **`-db`** to create-db/seed), Ollama URL/model for seed, and MCP listen options. Extra **`go run`** arguments are appended via:
-
-| Variable | Used by |
-| -------- | ------- |
-| **`MOSAIC_CREATE_DB_FLAGS`** | **`task create-db`** / **`task run-mosaic-create-db`** |
-| **`MOSAIC_SEED_FLAGS`** | **`task seed`**, **`task reseed`**, **`task run-mosaic-seed`** |
-| **`MOSAIC_MCP_FLAGS`** | **`task run-mosaic-mcp`**, **`task mosaic-dev`** (MCP half only) |
-
-Quote the value when passing multiple flags.
-
-```bash
-# Empty DB at Taskfile default path
-task create-db
-
-# Empty DB with force + policy file (YAML database.passphrase optional)
-task create-db MOSAIC_CREATE_DB_FLAGS='-force -policy configs/config.yaml'
-
-# Custom DB path + explicit page size for new file
-task create-db MOSAIC_DB_PATH=./projects/custom.hexxla MOSAIC_CREATE_DB_FLAGS='-force -page-size 4096'
-
-# Seed (skips if DB exists unless you reseed)
-task seed
-
-task reseed MOSAIC_SEED_FLAGS='-page-size 8192'
-
-# MCP with persistence policy YAML
-task run-mosaic-mcp MOSAIC_MCP_FLAGS='-policy configs/config.yaml'
-
-# Encrypted DB / MCP (see "Encrypted database" section — use -replace only if path exists)
-task create-db MOSAIC_CREATE_DB_FLAGS='-db-passphrase your-passphrase-here'
-task run-mosaic-mcp MOSAIC_MCP_FLAGS='-policy configs/config.yaml -db-passphrase your-passphrase-here'
-
-# Dev loop: seed (if missing) then MCP — pass seed layout flags only on the seed step:
-task mosaic-dev MOSAIC_SEED_FLAGS='-embedding-dim 384' MOSAIC_MCP_FLAGS='-policy configs/config.yaml'
-```
-
-**Note:** **`task mosaic-dev`** runs **`seed`** first. Only **`MOSAIC_SEED_FLAGS`** affects that step; **`MOSAIC_MCP_FLAGS`** applies when **`mosaic-mcp`** starts.
-
----
-
-## Quick reference (defaults)
-
-Unless overridden by flags, **`DefaultMosaicDatabaseLayout`** uses: MVCC on, page size **4096**, max value bytes **16384**, embedding dimension **384**, distance metric **cosine**. Existing database files retain the page size persisted at creation. See [`mosaic_hexxla_db.go`](../../internal/config/mosaic_hexxla_db.go).
+Previously stored vectors may already be stale after an earlier cell
+overwrite. If affected, regenerate embeddings from the current cell content.
+Rebuilding HNSW alone reuses the stored vectors.

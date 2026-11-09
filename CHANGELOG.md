@@ -13,11 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **MCP tool safety inventory** — all 23 tools publish explicit read-only, destructive, idempotent, and open-world hints from one fail-closed registration inventory; tests prevent production registrations from bypassing it.
 - **Secure Ratchet live observability** — an opt-in, bearer-authenticated WebSocket stream shares the loopback MCP listener and emits a redacted live event shape without Ratchet capability tokens, metadata, or history. The bounded `mosaic-observe` CLI provides a self-contained operator workflow.
 
-### Changed
-
-- Plaintext creation always enables MVCC, including first startup of `mosaic-mcp`. The creation and seed commands now use a fixed storage policy and have removed the `--mvcc` flag.
-
 ### Fixed
+
+- **Database lifecycle** — MCP startup refuses missing files. Creation and seeding validate a separate database before copying it to an unused destination. In-place replacement flags and the destructive reseed task are retired.
+- **Cell identity** — near-anchor placement skips tombstones, exact placement refuses deleted identities, vector writes require a live cell, and changing raw content invalidates the previous embedding.
+- **Bounded retrieval** — preserve partial query hits, expose scan and vector candidate limits, and validate bounded exact hybrid queries before embedding.
 
 - Reject unsupported one-time Ratchet alternatives with the pinned dependency. Delegate to Ratchet workflow execution when available.
 - Report committed deletes separately from pruning errors. Live database replacement is an offline operator procedure. Existing configurations that enable live compaction must remove `compact: true` before startup.
@@ -25,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dependency security** — build Mosaic with the fixed Go crypto module version used by HexxlaDB.
 
 ### Changed
+
+- **API documentation** — align the MCP tool inventory, seed workflow, and persistence guide with the pinned HexxlaDB dependency.
+- Pin HexxlaDB `v0.7.0`. MVCC is intrinsic to both current storage profiles. Convert engine v1 and AES-XTS files offline before upgrading.
 
 - Move write policy into application values and compose text embedding with vector search through separate ports.
 
@@ -35,7 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Editor configuration** — keep Zed and VS Code settings local and use the shared Taskfile for development commands.
 
 - **Codex development setup** — document local MCP registration and verification, clarify host ownership of transcript capture, and use the JetBrains Modern Go Guidelines plugin for version-specific idioms.
-- **Cell placement safety** ⚠️ **breaking write behavior** — `mosaic_hexxla_put_cell` now defaults to safe exact placement: writing over a live coordinate requires explicit `allow_overwrite: true`. New `placement: near_anchor` atomically composes HexxlaDB `FindFreeCellPlacement` with `PutCell` using a caller-owned anchor and bounded radius (default 8, maximum 32). Responses report the actual coordinate, placement mode, occupied probes, and whether an exact write replaced a live cell.
+- **Cell placement safety** ⚠️ **breaking write behavior** — `mosaic_hexxla_put_cell` now defaults to safe exact placement: writing over a live coordinate requires explicit `allow_overwrite: true`. New `placement: near_anchor` atomically composes HexxlaDB `FindUnusedCellPlacement` with `PutCell` using a caller-owned anchor and bounded radius (default 8, maximum 32). Responses report the actual coordinate, placement mode, occupied probes, and whether an exact write replaced a live cell.
 
 - **HexxlaDB v0.6.0 compatibility** — context assembly now retrieves count-bounded candidates with `Tx.LoadContext`; Mosaic owns approximate-token conversion, UTF-8 byte accounting, outer-ring/low-confidence eviction, and compatibility byte aliases in MCP responses.
 - **Toolchain and storage defaults** — require Go **1.27.0**, depend on `github.com/hexxla/hexxladb` **v0.6.0**, and use HexxlaDB’s validated **4096-byte** page profile for newly created databases (existing files retain their persisted layout).
@@ -43,7 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Repository agent tooling** — replace generated Cursor/Windsurf rules, workflow installers, and platform hook scripts with shared `AGENTS.md` guidance.
 - **Build tooling** — replace GNU Make with Task while retaining build, cross-compile, test, integration, install, database setup, MCP development, and maintenance commands.
 - **Context responses** — add authoritative `total_bytes` / `max_budget_bytes` fields and optional returned facet text; deprecated `total_tokens` / `max_tokens_budget` remain byte-valued compatibility aliases.
-- **Documentation, agent guidance, and seed corpus** — align current HexxlaDB retrieval, embeddings, authenticated-v3 encryption, changefeed, page allocation, retention, and tokenizer ownership; reconcile branch-divergent Ratchet documentation with the implemented opt-in enforcement contract; distinguish runtime MCP schemas from historical and aspirational blueprints; and document current missing-path and seed-policy credential limitations.
+- **Documentation, agent guidance, and seed corpus** — align current HexxlaDB retrieval, embeddings, authenticated-v3 encryption, changefeed, page allocation, retention, and tokenizer ownership; reconcile branch-divergent Ratchet documentation with the implemented opt-in enforcement contract; distinguish runtime MCP schemas from historical and aspirational blueprints; and document the database creation and seed credential contracts.
 - **Ratchet observability boundary** — the development branch's unauthenticated HTTP event/statistics handlers and cross-origin WebSocket were replaced by an explicit opt-in live stream that rejects browser origins, requires a private bearer-token file, redacts credential-bearing fields, retains no event history, and never blocks enforcement for slow observers.
 - **Ratchet mutation coverage** — when Ratchet is enabled, startup now fails unless every Mosaic mutation has a real prerequisite and no free-pass rule. The supplied policy governs all eight mutation tools through taxonomy, retrieval, context, or seam-inspection workflows.
 - **HexxlaDB API coverage documentation** — map every v0.6.0 public feature family to an MCP, composition, native, candidate, or operator-only disposition; record bounded read-only experiments without exposing maintenance, retention, migration, encryption, or raw-KV operations.

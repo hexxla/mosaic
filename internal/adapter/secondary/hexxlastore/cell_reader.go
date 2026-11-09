@@ -22,85 +22,57 @@ func NewCellReaderAdapter(live *LiveDB) *CellReaderAdapter {
 }
 
 // QueryCells implements [secondary.CellReader].
-func (a *CellReaderAdapter) QueryCells(ctx context.Context, q *domain.CellQueryCommand, embedding []float32) ([]domain.CellHit, error) {
+func (a *CellReaderAdapter) QueryCells(ctx context.Context, q *domain.CellQueryCommand, embedding []float32) (domain.CellHitsResponse, error) {
 	if a == nil || a.live == nil {
-		return nil, fmt.Errorf("hexxlastore cell reader: nil database")
-	}
-	if q == nil {
-		return nil, fmt.Errorf("hexxlastore cell reader: nil query command")
+		return domain.CellHitsResponse{}, fmt.Errorf("hexxlastore cell reader: nil database")
 	}
 	hq, err := toCellQuery(q)
 	if err != nil {
-		return nil, err
+		return domain.CellHitsResponse{}, err
 	}
-	if len(embedding) > 0 {
-		hq.Embedding = embedding
-	}
-	var out []domain.CellHit
+	hq.Embedding = embedding
+	var out domain.CellHitsResponse
 	err = a.live.WithRead(func(db *hexxladb.DB) error {
 		return db.View(func(tx *hexxladb.Tx) error {
-			res, err := tx.QueryCells(ctx, hq)
-			if err != nil {
+			res, stats, err := tx.QueryCellsWithStats(ctx, hq)
+			out.ScanLimitReached = errors.Is(err, hexxladb.ErrQueryScanLimit)
+			if err != nil && !out.ScanLimitReached {
 				return fmt.Errorf("tx QueryCells: %w", err)
 			}
-			out = make([]domain.CellHit, 0, len(res))
+			out.EmbeddingPath = string(stats.EmbeddingPath)
+			out.EmbeddingCandidates = stats.EmbeddingCandidates
+			out.EmbeddingCandidateLimitReached = stats.EmbeddingCandidateLimitReached
+			out.Hits = make([]domain.CellHit, 0, len(res))
 			for i := range res {
 				r := &res[i]
-				out = append(out, viewToCellHit(&r.Cell, r.Score, r.Explanation))
+				out.Hits = append(out.Hits, viewToCellHit(&r.Cell, r.Score, r.Explanation))
 			}
 			return nil
 		})
 	})
 	if err != nil {
-		return nil, fmt.Errorf("hexxlastore query cells: %w", err)
+		return domain.CellHitsResponse{}, fmt.Errorf("hexxlastore query cells: %w", err)
 	}
 	return out, nil
 }
 
-// SearchCells implements [secondary.CellReader].
-func (a *CellReaderAdapter) SearchCells(ctx context.Context, q *domain.CellSearchCommand, embedding []float32) ([]domain.CellHit, error) {
-	if a == nil || a.live == nil {
-		return nil, fmt.Errorf("hexxlastore cell reader: nil database")
-	}
+// SearchCells preserves the search tool's implicit 32-ring scope.
+func (a *CellReaderAdapter) SearchCells(ctx context.Context, q *domain.CellSearchCommand, embedding []float32) (domain.CellHitsResponse, error) {
 	if q == nil {
-		return nil, fmt.Errorf("hexxlastore cell reader: nil search command")
+		return domain.CellHitsResponse{}, fmt.Errorf("hexxlastore cell reader: nil search command")
 	}
-	cfg := hexxladb.CellSearchConfig{
-		Query:         q.Query,
-		RequireTags:   append([]string(nil), q.RequireTags...),
-		AnyTags:       append([]string(nil), q.AnyTags...),
-		MinConfidence: q.MinConfidence,
-		MaxConfidence: q.MaxConfidence,
-		SourceID:      q.SourceID,
-		MaxResults:    q.MaxResults,
-		MaxScanRadius: q.MaxScanRadius,
+	radius := q.Radius
+	if radius <= 0 {
+		radius = q.MaxScanRadius
+		if radius <= 0 {
+			radius = 32
+		}
 	}
-	if q.Center != nil {
-		cfg.Center = hexxladb.Coord{Q: q.Center.Q, R: q.Center.R}
-	}
-	cfg.Radius = q.Radius
-	if len(embedding) > 0 {
-		cfg.Embedding = embedding
-	}
-	var out []domain.CellHit
-	err := a.live.WithRead(func(db *hexxladb.DB) error {
-		return db.View(func(tx *hexxladb.Tx) error {
-			res, err := tx.SearchCells(ctx, cfg)
-			if err != nil {
-				return fmt.Errorf("tx SearchCells: %w", err)
-			}
-			out = make([]domain.CellHit, 0, len(res))
-			for i := range res {
-				r := &res[i]
-				out = append(out, viewToCellHit(&r.Cell, r.Score, ""))
-			}
-			return nil
-		})
-	})
-	if err != nil {
-		return nil, fmt.Errorf("hexxlastore search cells: %w", err)
-	}
-	return out, nil
+	return a.QueryCells(ctx, &domain.CellQueryCommand{
+		Query: q.Query, RequireTags: q.RequireTags, AnyTags: q.AnyTags,
+		MinConfidence: q.MinConfidence, MaxConfidence: q.MaxConfidence, SourceID: q.SourceID,
+		Center: q.Center, Radius: radius, MaxResults: q.MaxResults, MaxScanRows: q.MaxScanRows,
+	}, embedding)
 }
 
 func toCellQuery(q *domain.CellQueryCommand) (hexxladb.CellQuery, error) {

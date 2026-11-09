@@ -1,6 +1,5 @@
-// Command mosaic-seed creates or refreshes a HexxlaDB file with conversational cells and Ollama
-// embeddings — the same ingestion pattern as github.com/hexxla/hexxladb/examples/llm_context_engine
-// (PutCell + PutEmbedding per turn) overlaid on coordinates from conversational_memory's spiral grid.
+// Command mosaic-seed builds a HexxlaDB candidate with conversational cells and
+// Ollama embeddings. Each turn and its embedding share one transaction.
 //
 // Requires a running Ollama with the embedding model (default: all-minilm).
 // Path resolution matches cmd/mosaic-create-db — see [config.ResolveMosaicDBPath].
@@ -14,12 +13,12 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/hexxla/hexxladb"
 
+	"github.com/sploitzberg/mosaic/internal/adapter/secondary/hexxlastore"
 	"github.com/sploitzberg/mosaic/internal/config"
 	ollamac "github.com/sploitzberg/mosaic/internal/ollama"
 )
@@ -32,8 +31,8 @@ func main() {
 	nameFlag := flag.String("name", "", "base name for the file: <db-dir>/<name>.hexxla (mutually exclusive with -db; directory from -db-dir or "+config.EnvMosaicDBDir+")")
 	dbDirFlag := flag.String("db-dir", "", "parent directory when using -name (default: from "+config.EnvMosaicDBDir+" or .tmp)")
 	var replaceExisting bool
-	flag.BoolVar(&replaceExisting, "force", false, "replace existing file at the chosen path: delete it then seed")
-	flag.BoolVar(&replaceExisting, "replace", false, "same as -force")
+	flag.BoolVar(&replaceExisting, "force", false, "retired; use a new candidate path")
+	flag.BoolVar(&replaceExisting, "replace", false, "retired; use a new candidate path")
 	ollamaFlag := flag.String("ollama", "", "Ollama base URL (overrides policy YAML then "+config.EnvOllamaURL+")")
 	embedModel := flag.String("embed-model", "", "embeddings model (overrides policy YAML then "+config.EnvEmbedModel+")")
 	dbPassphrase := flag.String("db-passphrase", "", "optional HexxlaDB encryption passphrase (overrides "+config.EnvDBPassphrase+")")
@@ -99,39 +98,14 @@ func run(
 ) error {
 	ctx := context.Background()
 
-	if err := oc.Ping(ctx); err != nil {
-		return fmt.Errorf("ollama: %w", err)
+	if force {
+		return fmt.Errorf("in-place replacement is retired; seed a candidate at a new path and switch the database path offline")
 	}
-	log.Info("ollama reachable", "url", oc.Base.String(), "embed_model", oc.Model)
-
-	if err := os.MkdirAll(filepath.Dir(dbPath), 0o750); err != nil {
-		return fmt.Errorf("create parent directory: %w", err)
-	}
-
-	exists := false
-	if _, err := os.Stat(dbPath); err == nil {
-		exists = true
+	if _, err := os.Lstat(dbPath); err == nil {
+		log.Info("database file already exists; skipping seed", "path", dbPath)
+		return nil
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("stat database: %w", err)
-	}
-
-	if exists && !force {
-		log.Info("database file already exists; skipping seed — use a different -db or -name, or pass -replace / -force to overwrite",
-			"path", dbPath)
-		return nil
-	}
-
-	if force && exists {
-		log.Info("replacing existing database file", "path", dbPath)
-	}
-
-	if force {
-		_ = os.Remove(dbPath)
-		_ = os.Remove(dbPath + "-wal")
-	}
-
-	if !exists {
-		_ = os.Remove(dbPath + "-wal")
 	}
 
 	opts := config.NewMosaicDatabaseOptions(layout)
@@ -141,24 +115,22 @@ func run(
 		return fmt.Errorf("database encryption options: %w", err)
 	}
 
-	db, err := hexxladb.Open(dbPath, opts)
-	if err != nil {
-		return fmt.Errorf("open database: %w", err)
+	if err := oc.Ping(ctx); err != nil {
+		return fmt.Errorf("ollama: %w", err)
 	}
-	defer func() {
-		if cerr := db.Close(); cerr != nil {
-			log.Error("close database", "err", cerr)
-		}
-	}()
-
+	log.Info("ollama reachable", "url", oc.Base.String(), "embed_model", oc.Model)
 	sessionID := fmt.Sprintf("mosaic-seed-%d", time.Now().UnixNano())
 	embedDim := int(layout.EmbeddingDimension)
-
-	if len(seedConversation) == 0 {
-		log.Info("no seed corpus; database opened empty", "path", dbPath)
-		return nil
+	if err := hexxlastore.CreateCandidate(ctx, dbPath, opts, func(db *hexxladb.DB) error {
+		return seedDatabase(ctx, log, db, oc, sessionID, embedDim)
+	}); err != nil {
+		return err
 	}
+	log.Info("seeded HexxlaDB", "path", dbPath, "turns", len(seedConversation), "embedding_dim", embedDim, "sessionID", sessionID)
+	return nil
+}
 
+func seedDatabase(ctx context.Context, log *slog.Logger, db *hexxladb.DB, oc *ollamac.Client, sessionID string, embedDim int) error {
 	log.Info("seeding corpus with embeddings", "turns", len(seedConversation), "embedding_dim", embedDim)
 
 	for i := range seedConversation {
@@ -205,11 +177,5 @@ func run(
 		}
 	}
 
-	log.Info("seeded HexxlaDB",
-		"path", dbPath,
-		"turns", len(seedConversation),
-		"embedding_dim", embedDim,
-		"sessionID", sessionID,
-	)
 	return nil
 }

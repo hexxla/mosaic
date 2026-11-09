@@ -28,7 +28,7 @@ func RegisterCellQueryTool(server *mcp.Server, svc primary.CellRetrieval, log *s
 		CenterR        *int     `json:"center_r,omitempty"`
 		Radius         int      `json:"radius,omitempty" jsonschema:"hex rings from center; 0 disables spatial filter"`
 		MaxResults     int      `json:"max_results,omitempty" jsonschema:"default 20, max 100"`
-		MaxScanRows    int      `json:"max_scan_rows,omitempty" jsonschema:"cap index rows scanned (safety)"`
+		MaxScanRows    int      `json:"max_scan_rows,omitempty" jsonschema:"scan work cap, at most 20000; with embed_query_text requires require_tags, source_id, or positive radius for exact scoring"`
 		SortBy         string   `json:"sort_by,omitempty" jsonschema:"score|confidence|recency|coord"`
 		Explain        bool     `json:"explain,omitempty" jsonschema:"populate per-hit explanation text"`
 		EmbedQueryText string   `json:"embed_query_text,omitempty" jsonschema:"when set, Ollama embeds this text and Hexxla uses ANN+filters hybrid QueryCells"`
@@ -38,7 +38,8 @@ func RegisterCellQueryTool(server *mcp.Server, svc primary.CellRetrieval, log *s
 		Name: "mosaic_hexxla_query_cells",
 		Description: "Indexed cell query (HexxlaDB QueryCells): tags, source, time window, spatial radius, sort, explain. " +
 			"Use require_tags (e.g. preference) for structured slices instead of vague query-only search when fetching tagged memories. " +
-			"Optional embed_query_text: Ollama embeds then ANN-accelerated candidate selection with same predicates (hybrid retrieval). Requires DB embeddings + MOSAIC_OLLAMA for hybrid. " +
+			"Optional embed_query_text uses vector candidate selection. With max_scan_rows and a supported filter, it scores the bounded scan exactly. " +
+			"Inspect scan_limit_reached or embedding_candidate_limit_reached before treating results as complete. " +
 			"Returns ranked hits only — mosaic_hexxla_load_context_pack with hit coords for neighbourhood context (retrieval_hint).",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in cellQueryInput) (*mcp.CallToolResult, domain.CellHitsResponse, error) {
 		if log != nil {
@@ -79,14 +80,12 @@ func RegisterCellQueryTool(server *mcp.Server, svc primary.CellRetrieval, log *s
 			EmbedQueryText: strings.TrimSpace(in.EmbedQueryText),
 		}
 		out, err := budget.RunBudgetedRead(req, func() (domain.CellHitsResponse, error) {
-			hits, err2 := svc.QueryCells(ctx, cmd)
+			response, err2 := svc.QueryCells(ctx, cmd)
 			if err2 != nil {
 				return domain.CellHitsResponse{}, err2
 			}
-			return domain.CellHitsResponse{
-				Hits:          hits,
-				RetrievalHint: domain.RetrievalHintLexicalOrANN,
-			}, nil
+			response.RetrievalHint = domain.RetrievalHintLexicalOrANN
+			return response, nil
 		})
 		if err != nil {
 			return nil, domain.CellHitsResponse{}, err

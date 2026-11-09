@@ -13,6 +13,7 @@ import (
 const (
 	defaultCellReadMaxResults = 20
 	maxCellReadMaxResults     = 100
+	maxCellScanRows           = 20_000
 )
 
 // CellRetrievalService implements [primary.CellRetrieval] on top of [secondary.CellReader].
@@ -48,44 +49,44 @@ func (s *CellRetrievalService) resolveHybridEmbedding(ctx context.Context, embed
 }
 
 // QueryCells implements [primary.CellRetrieval].
-func (s *CellRetrievalService) QueryCells(ctx context.Context, q *domain.CellQueryCommand) ([]domain.CellHit, error) {
+func (s *CellRetrievalService) QueryCells(ctx context.Context, q *domain.CellQueryCommand) (domain.CellHitsResponse, error) {
 	if s == nil || s.reader == nil {
-		return nil, fmt.Errorf("cell retrieval: nil dependencies")
+		return domain.CellHitsResponse{}, fmt.Errorf("cell retrieval: nil dependencies")
 	}
 	if q == nil {
-		return nil, fmt.Errorf("cell retrieval: nil query command")
+		return domain.CellHitsResponse{}, fmt.Errorf("cell retrieval: nil query command")
 	}
 	q2, err := normalizeCellQuery(q)
 	if err != nil {
-		return nil, err
+		return domain.CellHitsResponse{}, err
 	}
 	emb, err := s.resolveHybridEmbedding(ctx, q.EmbedQueryText)
 	if err != nil {
-		return nil, err
+		return domain.CellHitsResponse{}, err
 	}
 	out, err := s.reader.QueryCells(ctx, q2, emb)
 	if err != nil {
-		return nil, fmt.Errorf("cell retrieval query: %w", err)
+		return domain.CellHitsResponse{}, fmt.Errorf("cell retrieval query: %w", err)
 	}
 	return out, nil
 }
 
 // SearchCells implements [primary.CellRetrieval].
-func (s *CellRetrievalService) SearchCells(ctx context.Context, q *domain.CellSearchCommand) ([]domain.CellHit, error) {
+func (s *CellRetrievalService) SearchCells(ctx context.Context, q *domain.CellSearchCommand) (domain.CellHitsResponse, error) {
 	if s == nil || s.reader == nil {
-		return nil, fmt.Errorf("cell retrieval: nil dependencies")
+		return domain.CellHitsResponse{}, fmt.Errorf("cell retrieval: nil dependencies")
 	}
 	if q == nil {
-		return nil, fmt.Errorf("cell retrieval: nil search command")
+		return domain.CellHitsResponse{}, fmt.Errorf("cell retrieval: nil search command")
 	}
 	q2 := normalizeCellSearch(q)
 	emb, err := s.resolveHybridEmbedding(ctx, q.EmbedQueryText)
 	if err != nil {
-		return nil, err
+		return domain.CellHitsResponse{}, err
 	}
 	out, err := s.reader.SearchCells(ctx, q2, emb)
 	if err != nil {
-		return nil, fmt.Errorf("cell retrieval search: %w", err)
+		return domain.CellHitsResponse{}, fmt.Errorf("cell retrieval search: %w", err)
 	}
 	return out, nil
 }
@@ -98,6 +99,17 @@ func normalizeCellQuery(q *domain.CellQueryCommand) (*domain.CellQueryCommand, e
 		return nil, fmt.Errorf("cell retrieval: invalid sort_by %q", q.SortBy)
 	}
 	out := *q
+	if out.MaxScanRows < 0 {
+		return nil, fmt.Errorf("cell retrieval: max_scan_rows must be non-negative")
+	}
+	if strings.TrimSpace(out.EmbedQueryText) == "" {
+		if out.MaxScanRows == 0 {
+			out.MaxScanRows = maxCellScanRows
+		}
+	} else if out.MaxScanRows > 0 && out.Radius <= 0 && len(out.RequireTags) == 0 && strings.TrimSpace(out.SourceID) == "" {
+		return nil, fmt.Errorf("cell retrieval: max_scan_rows with embed_query_text requires require_tags, source_id, or a positive radius")
+	}
+	out.MaxScanRows = min(out.MaxScanRows, maxCellScanRows)
 	if out.MaxResults <= 0 {
 		out.MaxResults = defaultCellReadMaxResults
 	}
@@ -109,6 +121,9 @@ func normalizeCellQuery(q *domain.CellQueryCommand) (*domain.CellQueryCommand, e
 
 func normalizeCellSearch(q *domain.CellSearchCommand) *domain.CellSearchCommand {
 	out := *q
+	if strings.TrimSpace(out.EmbedQueryText) == "" {
+		out.MaxScanRows = maxCellScanRows
+	}
 	if out.MaxResults <= 0 {
 		out.MaxResults = defaultCellReadMaxResults
 	}

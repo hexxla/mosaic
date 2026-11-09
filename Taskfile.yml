@@ -134,16 +134,6 @@ tasks:
     cmds:
       - go run ./cmd/mosaic-seed -db "$MOSAIC_DB_PATH" {{.MOSAIC_SEED_FLAGS | default ""}}
 
-  reseed:
-    desc: Replace the configured database and seed it with the demo corpus
-    env:
-      MOSAIC_DB_PATH: '{{.MOSAIC_DB_PATH | default "./mosaic.hexxla"}}'
-      MOSAIC_OLLAMA_URL: '{{.MOSAIC_OLLAMA_URL | default "http://127.0.0.1:11434"}}'
-      MOSAIC_EMBED_MODEL: '{{.MOSAIC_EMBED_MODEL | default "all-minilm"}}'
-      MOSAIC_POLICY_FILE: '{{.MOSAIC_POLICY_FILE | default ""}}'
-    cmds:
-      - go run ./cmd/mosaic-seed -db "$MOSAIC_DB_PATH" -force {{.MOSAIC_SEED_FLAGS | default ""}}
-
   mosaic-dev:
     desc: Seed the database if needed, then run mosaic-mcp until interrupted
     deps: [seed]

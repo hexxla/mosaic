@@ -56,7 +56,7 @@ task build-mosaic-mcp build-mosaic-create-db build-mosaic-observe
 
 After the build tasks run, your programs are under **`bin/<platform>/`** (the command prints the paths). Later steps assume **`bin/linux-amd64/`** — use the folder Task created on your machine (add **`.exe`** on Windows).
 
-**Developers:** **`task seed`** / **`task reseed`**; **`task build-mosaic-seed`** builds a **`mosaic-seed`** binary.
+**Developers:** **`task seed`**; **`task build-mosaic-seed`** builds a **`mosaic-seed`** binary.
 
 ---
 
@@ -118,7 +118,11 @@ Mosaic fronts **[HexxlaDB](https://github.com/hexxla/hexxladb)** — a single em
 
 Memories sit on **hex coordinates**; **related** items can be **near** in the same way they are near on disk. Expansion from a seed is **spatial and bounded** — you pull context in **rings** with intent, not by hoping the top similarity hits cohere. The benefit: **reproducible, explainable** neighbourhoods instead of a black-box vector grab bag.
 
-Cell writes make placement explicit. `mosaic_hexxla_put_cell` defaults to an exact coordinate and refuses to replace a live cell unless `allow_overwrite` is set. With `placement: near_anchor`, `(q,r)` is a caller-chosen semantic anchor and Mosaic atomically selects the first free coordinate in deterministic ring order within a bounded radius. The response returns the actual coordinate; Mosaic does not infer semantic meaning or silently relocate existing cells.
+Cell writes make placement explicit. Exact placement requires
+`allow_overwrite` to update a live cell and refuses to reuse a deleted
+coordinate. With `placement: near_anchor`, Mosaic finds the first unused
+coordinate within a bounded radius of the caller's anchor. The response
+returns the actual coordinate.
 
 ### Retrieval that stacks
 
