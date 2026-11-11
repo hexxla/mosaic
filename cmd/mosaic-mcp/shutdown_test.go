@@ -12,7 +12,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/sploitzberg/mosaic/internal/adapter/primary/mcpsrv"
+	"github.com/hexxla/mosaic/internal/adapter/primary/mcpsrv"
 )
 
 func TestShutdownDrainsDefaultClientMutationAndClosesSessions(t *testing.T) {

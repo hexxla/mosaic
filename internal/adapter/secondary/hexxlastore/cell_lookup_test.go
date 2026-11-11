@@ -6,9 +6,9 @@ import (
 
 	"github.com/hexxla/hexxladb"
 
-	"github.com/sploitzberg/mosaic/internal/config"
-	"github.com/sploitzberg/mosaic/internal/core/domain"
-	"github.com/sploitzberg/mosaic/internal/core/services"
+	"github.com/hexxla/mosaic/internal/config"
+	"github.com/hexxla/mosaic/internal/core/domain"
+	"github.com/hexxla/mosaic/internal/core/services"
 )
 
 func TestCellLookupAndDefaultLexicalSearchReachFarCoordinate(t *testing.T) {

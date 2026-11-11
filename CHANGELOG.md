@@ -9,11 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Publish the `v0.4.0-alpha.1` snapshot against HexxlaDB `v0.8.0-alpha.1` and MCP Ratchet `v0.4.0-alpha.1`, resolving both through normal Go modules with local workspaces disabled. This alpha snapshot does not establish beta/v1 qualification.
+- Publish the `v0.4.0-alpha.2` snapshot against HexxlaDB `v0.8.0-alpha.1` and MCP Ratchet `v0.4.0-alpha.1`, resolving both through normal Go modules with local workspaces disabled. This alpha snapshot does not establish beta/v1 qualification.
 
 - Mark the repository and combined stack as alpha; preserve published tags, define independent v0 prerelease milestones and evidence-gated beta/v1 promotion, and link the shared practical qualification plan.
 
 ### Breaking usability/API changes
+
+- Align the module path with `github.com/hexxla/mosaic`; the former `github.com/sploitzberg/mosaic` repository no longer resolves. Update CLI installation/import references and local tooling to the canonical path. `v0.4.0-alpha.2` supersedes the preserved `alpha.1` snapshot for Go installation; storage and MCP wire contracts are unchanged.
 
 - External query/write vectors must declare the database's `embedding_model` identity. Existing custom Ratchet policies enabling advanced tools must guard `put_cells`, `put_seam`, `delete_embedding` and `rebuild_embedding_index`.
 

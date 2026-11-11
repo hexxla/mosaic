@@ -23,51 +23,51 @@ linters:
           files:
             - "**/internal/core/domain/**.go"
           deny:
-            - pkg: "github.com/sploitzberg/mosaic/internal/adapter"
+            - pkg: "github.com/hexxla/mosaic/internal/adapter"
               desc: Dependencies must point toward the core.
-            - pkg: "github.com/sploitzberg/mosaic/internal/core/services"
+            - pkg: "github.com/hexxla/mosaic/internal/core/services"
               desc: Dependencies must point toward the core.
-            - pkg: "github.com/sploitzberg/mosaic/internal/core/ports"
+            - pkg: "github.com/hexxla/mosaic/internal/core/ports"
               desc: Dependencies must point toward the core.
 
         service_clean:
           files:
             - "**/internal/core/services/**.go"
           deny:
-            - pkg: "github.com/sploitzberg/mosaic/internal/adapter"
+            - pkg: "github.com/hexxla/mosaic/internal/adapter"
               desc: Dependencies must point toward the core.
-            - pkg: "github.com/sploitzberg/mosaic/internal/config"
+            - pkg: "github.com/hexxla/mosaic/internal/config"
               desc: Startup maps settings into application-owned values.
         storage_embedder_boundary:
           files:
             - "**/internal/adapter/secondary/hexxlastore/**.go"
           deny:
-            - pkg: "github.com/sploitzberg/mosaic/internal/ollama"
+            - pkg: "github.com/hexxla/mosaic/internal/ollama"
               desc: The application composes embedding and vector search.
 
         port_clean:
           files:
             - "**/internal/core/ports/**.go"
           deny:
-            - pkg: "github.com/sploitzberg/mosaic/internal/adapter"
+            - pkg: "github.com/hexxla/mosaic/internal/adapter"
               desc: Dependencies must point toward the core.
-            - pkg: "github.com/sploitzberg/mosaic/internal/core/services"
+            - pkg: "github.com/hexxla/mosaic/internal/core/services"
               desc: Dependencies must point toward the core.
 
         primary_adapter_clean:
           files:
             - "**/internal/adapter/primary/**.go"
           deny:
-            - pkg: "github.com/sploitzberg/mosaic/internal/core/services"
+            - pkg: "github.com/hexxla/mosaic/internal/core/services"
               desc: Dependencies must point toward the core.
-            - pkg: "github.com/sploitzberg/mosaic/internal/adapter/secondary"
+            - pkg: "github.com/hexxla/mosaic/internal/adapter/secondary"
               desc: Dependencies must point toward the core.
 
         secondary_adapter_clean:
           files:
             - "**/internal/adapter/secondary/**.go"
           deny:
-            - pkg: "github.com/sploitzberg/mosaic/internal/adapter/primary"
+            - pkg: "github.com/hexxla/mosaic/internal/adapter/primary"
               desc: Dependencies must point toward the core.
 
     gocritic:
@@ -87,7 +87,7 @@ formatters:
   settings:
     goimports:
       local-prefixes:
-        - github.com/sploitzberg/mosaic
+        - github.com/hexxla/mosaic
 
 issues:
   max-issues-per-linter: 0

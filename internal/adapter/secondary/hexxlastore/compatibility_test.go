@@ -11,8 +11,8 @@ import (
 
 	"github.com/hexxla/hexxladb"
 
-	"github.com/sploitzberg/mosaic/internal/config"
-	"github.com/sploitzberg/mosaic/internal/core/domain"
+	"github.com/hexxla/mosaic/internal/config"
+	"github.com/hexxla/mosaic/internal/core/domain"
 )
 
 //go:embed testdata/hexxladb-177f2a3.hexxla.gz testdata/hexxladb-177f2a3.hexxla-wal.gz

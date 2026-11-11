@@ -6,9 +6,9 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/sploitzberg/mosaic/internal/core/domain"
-	"github.com/sploitzberg/mosaic/internal/core/ports/primary"
-	"github.com/sploitzberg/mosaic/internal/core/ports/secondary"
+	"github.com/hexxla/mosaic/internal/core/domain"
+	"github.com/hexxla/mosaic/internal/core/ports/primary"
+	"github.com/hexxla/mosaic/internal/core/ports/secondary"
 )
 
 const (

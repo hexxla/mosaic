@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/sploitzberg/mosaic/internal/core/domain"
-	"github.com/sploitzberg/mosaic/internal/core/services"
+	"github.com/hexxla/mosaic/internal/core/domain"
+	"github.com/hexxla/mosaic/internal/core/services"
 )
 
 type stubTagCatalog struct {

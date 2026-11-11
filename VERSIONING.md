@@ -56,7 +56,7 @@ combination passes the stack beta gates.
 
 ## Alpha snapshot dependency set
 
-Mosaic `v0.4.0-alpha.1` uses the following independently versioned upstream
+Mosaic `v0.4.0-alpha.2` uses the following independently versioned upstream
 snapshots. These pins describe a reproducible alpha combination; they do not
 certify beta/v1 gates or the operational pilot.
 
@@ -64,6 +64,11 @@ certify beta/v1 gates or the operational pilot.
 | --- | --- | --- |
 | HexxlaDB | `v0.8.0-alpha.1` | `96070acab89eebca49aab51fe598d572f42041f0` |
 | MCP Ratchet | `v0.4.0-alpha.1` | `43d4ffb110d4ea0180d0d7104943a61a44bbdaa9` |
+
+The canonical module path is `github.com/hexxla/mosaic`. The preserved
+`v0.4.0-alpha.1` snapshot declared the former, unavailable
+`github.com/sploitzberg/mosaic` path and is superseded for Go installation.
+Use `v0.4.0-alpha.2` or later; existing tag contents are not rewritten.
 
 Candidate validation must use normal module resolution with `GOWORK=off`.
 Local replacement/workspace results remain additional integration evidence.

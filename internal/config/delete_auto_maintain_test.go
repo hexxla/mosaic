@@ -3,7 +3,7 @@ package config_test
 import (
 	"testing"
 
-	"github.com/sploitzberg/mosaic/internal/config"
+	"github.com/hexxla/mosaic/internal/config"
 )
 
 func TestParseMosaicConfigYAML_auto_maintain_sets_default_retain_when_pruning(t *testing.T) {

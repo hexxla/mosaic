@@ -10,8 +10,8 @@ import (
 
 	"github.com/hexxla/hexxladb"
 
-	"github.com/sploitzberg/mosaic/internal/config"
-	"github.com/sploitzberg/mosaic/internal/core/domain"
+	"github.com/hexxla/mosaic/internal/config"
+	"github.com/hexxla/mosaic/internal/core/domain"
 )
 
 func TestPutEmbeddingChecksExpectedCellContentAtomically(t *testing.T) {

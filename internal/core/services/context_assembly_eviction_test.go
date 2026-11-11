@@ -8,7 +8,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/sploitzberg/mosaic/internal/core/domain"
+	"github.com/hexxla/mosaic/internal/core/domain"
 )
 
 func TestContextByteBudgetMatchesRepeatedEviction(t *testing.T) {

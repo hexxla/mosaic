@@ -3,7 +3,7 @@ package primary
 import (
 	"context"
 
-	"github.com/sploitzberg/mosaic/internal/core/domain"
+	"github.com/hexxla/mosaic/internal/core/domain"
 )
 
 // MemoryBrowser reads deterministic regional pages and snapshot-pinned byte chunks.

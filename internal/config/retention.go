@@ -3,7 +3,7 @@ package config
 import (
 	"fmt"
 
-	"github.com/sploitzberg/mosaic/internal/core/domain"
+	"github.com/hexxla/mosaic/internal/core/domain"
 )
 
 // MosaicConfigVersion is the top-level config file schema version.

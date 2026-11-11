@@ -18,12 +18,12 @@ import (
 	"github.com/hexxla/mcp-ratchet/pkg/ratchet"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/sploitzberg/mosaic/internal/adapter/primary/mcpsrv"
-	"github.com/sploitzberg/mosaic/internal/adapter/secondary/hexxlastore"
-	"github.com/sploitzberg/mosaic/internal/adapter/secondary/ollamaembed"
-	"github.com/sploitzberg/mosaic/internal/config"
-	"github.com/sploitzberg/mosaic/internal/core/services"
-	ollamac "github.com/sploitzberg/mosaic/internal/ollama"
+	"github.com/hexxla/mosaic/internal/adapter/primary/mcpsrv"
+	"github.com/hexxla/mosaic/internal/adapter/secondary/hexxlastore"
+	"github.com/hexxla/mosaic/internal/adapter/secondary/ollamaembed"
+	"github.com/hexxla/mosaic/internal/config"
+	"github.com/hexxla/mosaic/internal/core/services"
+	ollamac "github.com/hexxla/mosaic/internal/ollama"
 )
 
 // version is set at link time with -ldflags.

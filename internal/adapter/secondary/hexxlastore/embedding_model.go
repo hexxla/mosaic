@@ -8,7 +8,7 @@ import (
 
 	"github.com/hexxla/hexxladb"
 
-	"github.com/sploitzberg/mosaic/internal/core/ports/secondary"
+	"github.com/hexxla/mosaic/internal/core/ports/secondary"
 )
 
 const embeddingModelKey = "app/mosaic/embedding-model"

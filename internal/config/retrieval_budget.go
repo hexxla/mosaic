@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/sploitzberg/mosaic/internal/core/domain"
+	"github.com/hexxla/mosaic/internal/core/domain"
 )
 
 // RetrievalBudgetConfig limits cumulative approximate LM tokens in JSON structured outputs

@@ -1,4 +1,4 @@
-module github.com/sploitzberg/mosaic
+module github.com/hexxla/mosaic
 
 go 1.27.4
 

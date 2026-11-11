@@ -3,7 +3,7 @@ package secondary
 import (
 	"context"
 
-	"github.com/sploitzberg/mosaic/internal/core/domain"
+	"github.com/hexxla/mosaic/internal/core/domain"
 )
 
 // FacetEdgeStore applies facet and edge writes inside HexxlaDB transactions.

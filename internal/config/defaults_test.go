@@ -3,7 +3,7 @@ package config_test
 import (
 	"testing"
 
-	"github.com/sploitzberg/mosaic/internal/config"
+	"github.com/hexxla/mosaic/internal/config"
 )
 
 func TestDefaultMosaicConfig_llm_curates_and_gates(t *testing.T) {

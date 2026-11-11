@@ -6,7 +6,7 @@ import (
 
 	"github.com/hexxla/hexxladb"
 
-	"github.com/sploitzberg/mosaic/internal/config"
+	"github.com/hexxla/mosaic/internal/config"
 )
 
 func TestBuildHexxlaOpenOptions_empty(t *testing.T) {

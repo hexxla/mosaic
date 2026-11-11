@@ -5,7 +5,7 @@ import (
 
 	"github.com/hexxla/hexxladb"
 
-	"github.com/sploitzberg/mosaic/internal/config"
+	"github.com/hexxla/mosaic/internal/config"
 )
 
 func TestMosaicDatabaseDefaultOptions(t *testing.T) {

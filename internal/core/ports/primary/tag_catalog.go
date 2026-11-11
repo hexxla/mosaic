@@ -3,7 +3,7 @@ package primary
 import (
 	"context"
 
-	"github.com/sploitzberg/mosaic/internal/core/domain"
+	"github.com/hexxla/mosaic/internal/core/domain"
 )
 
 // TagBrowse exposes Hexxla tag discovery for MCP (reuse tags on writes; broaden search vocabulary).

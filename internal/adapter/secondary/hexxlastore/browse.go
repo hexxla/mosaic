@@ -10,7 +10,7 @@ import (
 
 	"github.com/hexxla/hexxladb"
 
-	"github.com/sploitzberg/mosaic/internal/core/domain"
+	"github.com/hexxla/mosaic/internal/core/domain"
 )
 
 // Browse pins a sequence, then resumes by geometric ring/offset without storing results.

@@ -6,7 +6,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/sploitzberg/mosaic/internal/core/domain"
+	"github.com/hexxla/mosaic/internal/core/domain"
 )
 
 type atomicMutationWriter struct {

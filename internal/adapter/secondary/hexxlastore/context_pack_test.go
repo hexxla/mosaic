@@ -7,8 +7,8 @@ import (
 
 	"github.com/hexxla/hexxladb"
 
-	"github.com/sploitzberg/mosaic/internal/core/domain"
-	"github.com/sploitzberg/mosaic/internal/core/services"
+	"github.com/hexxla/mosaic/internal/core/domain"
+	"github.com/hexxla/mosaic/internal/core/services"
 )
 
 func TestContextPackAdapter_loads_exact_large_radius_and_facet_text(t *testing.T) {

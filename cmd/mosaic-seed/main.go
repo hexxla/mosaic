@@ -17,9 +17,9 @@ import (
 
 	"github.com/hexxla/hexxladb"
 
-	"github.com/sploitzberg/mosaic/internal/adapter/secondary/hexxlastore"
-	"github.com/sploitzberg/mosaic/internal/config"
-	ollamac "github.com/sploitzberg/mosaic/internal/ollama"
+	"github.com/hexxla/mosaic/internal/adapter/secondary/hexxlastore"
+	"github.com/hexxla/mosaic/internal/config"
+	ollamac "github.com/hexxla/mosaic/internal/ollama"
 )
 
 func main() {

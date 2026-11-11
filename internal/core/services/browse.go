@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/sploitzberg/mosaic/internal/core/domain"
-	"github.com/sploitzberg/mosaic/internal/core/ports/secondary"
+	"github.com/hexxla/mosaic/internal/core/domain"
+	"github.com/hexxla/mosaic/internal/core/ports/secondary"
 )
 
 // MemoryBrowseService owns page and chunk work/output limits.

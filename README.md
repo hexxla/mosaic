@@ -12,6 +12,15 @@ embedding service.
 
 ## Start
 
+The canonical Go module is `github.com/hexxla/mosaic`. For the published alpha:
+
+```sh
+go install github.com/hexxla/mosaic/cmd/mosaic-mcp@v0.4.0-alpha.2
+```
+
+The preserved `v0.4.0-alpha.1` snapshot uses the former unavailable module path;
+use `alpha.2` or later for Go installation.
+
 Use Go 1.27.4 or newer and run from the repository root:
 
 ```sh

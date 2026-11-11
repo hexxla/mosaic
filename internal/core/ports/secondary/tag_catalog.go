@@ -3,7 +3,7 @@ package secondary
 import (
 	"context"
 
-	"github.com/sploitzberg/mosaic/internal/core/domain"
+	"github.com/hexxla/mosaic/internal/core/domain"
 )
 
 // TagCatalog provides read-only tag discovery over visible MVCC cells.

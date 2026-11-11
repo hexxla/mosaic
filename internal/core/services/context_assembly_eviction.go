@@ -6,7 +6,7 @@ import (
 	"math"
 	"slices"
 
-	"github.com/sploitzberg/mosaic/internal/core/domain"
+	"github.com/hexxla/mosaic/internal/core/domain"
 )
 
 // applyContextByteBudget preserves nearest lattice context first, evicting the

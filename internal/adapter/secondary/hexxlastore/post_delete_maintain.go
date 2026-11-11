@@ -8,7 +8,7 @@ import (
 
 	"github.com/hexxla/hexxladb"
 
-	"github.com/sploitzberg/mosaic/internal/config"
+	"github.com/hexxla/mosaic/internal/config"
 )
 
 // runPostDeleteMaintain runs bounded MVCC pruning after a committed delete.

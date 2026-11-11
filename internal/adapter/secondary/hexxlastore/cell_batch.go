@@ -7,7 +7,7 @@ import (
 
 	"github.com/hexxla/hexxladb"
 
-	"github.com/sploitzberg/mosaic/internal/core/domain"
+	"github.com/hexxla/mosaic/internal/core/domain"
 )
 
 // PutCells shares placement, metadata, embedding and receipt semantics with PutCell.

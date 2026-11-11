@@ -6,7 +6,7 @@ import (
 
 	"github.com/hexxla/hexxladb"
 
-	"github.com/sploitzberg/mosaic/internal/core/domain"
+	"github.com/hexxla/mosaic/internal/core/domain"
 )
 
 func updateMutation(db *hexxladb.DB, apply func(*hexxladb.Tx) error) error {

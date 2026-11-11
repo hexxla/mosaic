@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sploitzberg/mosaic/internal/config"
+	"github.com/hexxla/mosaic/internal/config"
 )
 
 func TestMCPPolicyInstructions_defaultNoFile(t *testing.T) {

@@ -15,12 +15,12 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/jsonrpc"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/sploitzberg/mosaic/internal/adapter/primary/mcpsrv"
-	"github.com/sploitzberg/mosaic/internal/adapter/secondary/hexxlastore"
-	"github.com/sploitzberg/mosaic/internal/config"
-	"github.com/sploitzberg/mosaic/internal/core/domain"
-	"github.com/sploitzberg/mosaic/internal/core/ports/secondary"
-	"github.com/sploitzberg/mosaic/internal/core/services"
+	"github.com/hexxla/mosaic/internal/adapter/primary/mcpsrv"
+	"github.com/hexxla/mosaic/internal/adapter/secondary/hexxlastore"
+	"github.com/hexxla/mosaic/internal/config"
+	"github.com/hexxla/mosaic/internal/core/domain"
+	"github.com/hexxla/mosaic/internal/core/ports/secondary"
+	"github.com/hexxla/mosaic/internal/core/services"
 )
 
 func TestNearAnchorRetryAfterLostMCPResponse(t *testing.T) {

@@ -14,10 +14,10 @@ import (
 	"github.com/hexxla/hexxladb"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/sploitzberg/mosaic/internal/adapter/primary/mcpsrv"
-	"github.com/sploitzberg/mosaic/internal/adapter/secondary/hexxlastore"
-	"github.com/sploitzberg/mosaic/internal/config"
-	"github.com/sploitzberg/mosaic/internal/core/services"
+	"github.com/hexxla/mosaic/internal/adapter/primary/mcpsrv"
+	"github.com/hexxla/mosaic/internal/adapter/secondary/hexxlastore"
+	"github.com/hexxla/mosaic/internal/config"
+	"github.com/hexxla/mosaic/internal/core/services"
 )
 
 func TestOpenMosaicDatabaseWithCustomChangefeed(t *testing.T) {

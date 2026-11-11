@@ -3,8 +3,8 @@ package ollamaembed
 import (
 	"context"
 
-	"github.com/sploitzberg/mosaic/internal/core/ports/secondary"
-	ollamac "github.com/sploitzberg/mosaic/internal/ollama"
+	"github.com/hexxla/mosaic/internal/core/ports/secondary"
+	ollamac "github.com/hexxla/mosaic/internal/ollama"
 )
 
 type textEmbedder struct {

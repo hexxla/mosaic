@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sploitzberg/mosaic/internal/core/domain"
-	"github.com/sploitzberg/mosaic/internal/core/ports/secondary"
+	"github.com/hexxla/mosaic/internal/core/domain"
+	"github.com/hexxla/mosaic/internal/core/ports/secondary"
 )
 
 // SeamRecordService validates custom records while native storage owns seam invariants.

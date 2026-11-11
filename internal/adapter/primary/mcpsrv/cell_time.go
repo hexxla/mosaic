@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sploitzberg/mosaic/internal/core/domain"
+	"github.com/hexxla/mosaic/internal/core/domain"
 )
 
 func parseOptionalRFC3339(s string) (*time.Time, error) {

@@ -3,7 +3,7 @@ package secondary
 import (
 	"context"
 
-	"github.com/sploitzberg/mosaic/internal/core/domain"
+	"github.com/hexxla/mosaic/internal/core/domain"
 )
 
 // MemoryExplorer reads bounded graph, spatial and retained-history views.

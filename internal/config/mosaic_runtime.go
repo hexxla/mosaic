@@ -1,7 +1,7 @@
 package config
 
 import (
-	"github.com/sploitzberg/mosaic/internal/core/domain"
+	"github.com/hexxla/mosaic/internal/core/domain"
 )
 
 // MosaicRuntimeConfig aggregates startup-loaded settings used to gate mutating MCP tools

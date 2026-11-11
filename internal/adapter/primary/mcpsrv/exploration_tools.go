@@ -5,8 +5,8 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/sploitzberg/mosaic/internal/core/domain"
-	"github.com/sploitzberg/mosaic/internal/core/ports/primary"
+	"github.com/hexxla/mosaic/internal/core/domain"
+	"github.com/hexxla/mosaic/internal/core/ports/primary"
 )
 
 func (rb *RetrievalBudgetTracker) registerReadTool[In, Out any](server *mcp.Server, name, description string, fn func(context.Context, In) (Out, error)) error {

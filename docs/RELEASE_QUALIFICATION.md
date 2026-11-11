@@ -58,7 +58,7 @@ where needed; record its source and seed with the report.
 
 | Step | Work | Completion evidence |
 | --- | --- | --- |
-| 1. Select and baseline | Choose sources, dependency combination, deployment profile and targets. Review open defects and migrations. Run the repository checks below. | Manifest, command logs, test/build results and blocker list; any skipped check remains unmet. |
+| 1. Select and baseline | Choose sources, dependency combination, deployment profile and targets. Check the declared Go module path against the canonical repository before tagging. Review open defects and migrations. Run the repository checks below. | Manifest, command logs, test/build results and blocker list; any skipped check remains unmet. |
 | 2. Exercise contracts | Run both Mosaic profiles through real MCP sessions. Exercise enabled tools, policy acceptance/rejection, session isolation, state/cursor expiry, cancellation, failed SDK results, model mismatch and bounded/sparse/oversized retrieval. | Expected/observed outcomes and bounded-resource measurements; check that invalid calls do not produce unintended effects or authorization completions. |
 | 3. Rehearse recovery | Use disposable recovery-set copies for crash/reopen, lost-response replay, sidecar continuity, backup/restore, pruning/compaction and install/upgrade/rollback checks. | Oracle comparison, backup integrity/content checks, actual RPO/RTO and complete recovery instructions. |
 | 4. Run beta workload | At least 24 continuous hours of periodic mixed work, with at least 10,000 completed operations/calls distributed through the run. Include idle/expiry, session churn, cancellation, retries, reopen and maintenance. | Timed logs, operation counts, expected-denial/failure counts, oracle checks and latency/memory/disk trends meeting the predeclared targets. Idle time alone cannot pass. |
@@ -100,6 +100,15 @@ resolution, and test Mosaic with `GOWORK=off`. Record actual `go list -m all`
 output and build provenance. An explicit temporary workspace is useful extra
 integration evidence, but cannot replace the published dependency test. Do not
 handcraft pseudo-versions or silently change dependencies during qualification.
+Before assigning a new tag, verify `go list -m` names the canonical module:
+`github.com/hexxla/hexxladb`, `github.com/hexxla/mcp-ratchet`, or
+`github.com/hexxla/mosaic`. Local compilation cannot prove that an obsolete
+repository/module path remains resolvable. After publication, verify module
+download and install the exact tagged Mosaic command into an isolated `GOBIN`
+from outside the checkout. Record its build information and pinned dependencies.
+If a published snapshot has an identity/install defect, preserve it and issue a
+corrected prerelease; never move the tag.
+
 This plan itself does not publish or move any tags.
 
 ## Required scenarios and observations

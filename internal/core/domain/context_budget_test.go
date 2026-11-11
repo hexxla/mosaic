@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/sploitzberg/mosaic/internal/core/domain"
+	"github.com/hexxla/mosaic/internal/core/domain"
 )
 
 func TestApproximateByteBudgetLargeInputsRemainCapped(t *testing.T) {
