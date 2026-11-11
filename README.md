@@ -1,5 +1,10 @@
 # Mosaic
 
+**Status: alpha.** This repository and the HexxlaDB–Mosaic–MCP Ratchet stack
+are under active development. Use controlled evaluation with recoverable data;
+general production sign-off has not been given. Existing tags remain intact.
+[Release policy and beta/v1 gates](VERSIONING.md)
+
 Mosaic is a local MCP server for persistent agent memory backed by HexxlaDB.
 It stores cells on a hex lattice, discovers matching memories, and assembles
 bounded neighbourhood context. You operate the database and optional Ollama

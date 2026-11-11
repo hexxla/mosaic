@@ -17,3 +17,9 @@
 - Preserve unrelated work and keep commits focused.
 - Track pending work in the [roadmap](docs/ROADMAP.md) and user-visible changes in [CHANGELOG.md](CHANGELOG.md).
 - Keep repository skills under `.agents/skills/` and reserve new skills for recurring Mosaic-specific work.
+
+## Release maturity
+
+The repository and combined stack are alpha. Follow [VERSIONING.md](VERSIONING.md):
+preserve published tags, keep versions independent, publish deliberate v0
+prerelease milestones and require recorded beta/v1 qualification before promotion.

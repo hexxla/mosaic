@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Mark the repository and combined stack as alpha; preserve published tags, define independent v0 prerelease milestones and evidence-gated beta/v1 promotion, and link the shared practical qualification plan.
+
 ### Breaking usability/API changes
 
 - External query/write vectors must declare the database's `embedding_model` identity. Existing custom Ratchet policies enabling advanced tools must guard `put_cells`, `put_seam`, `delete_embedding` and `rebuild_embedding_index`.

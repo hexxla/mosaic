@@ -2,6 +2,14 @@
 
 For completed work, see [`CHANGELOG.md`](../CHANGELOG.md).
 
+## Release qualification
+
+Current repository and stack maturity is alpha. The [release policy](../VERSIONING.md)
+owns beta/v1 gates; the [qualification plan](RELEASE_QUALIFICATION.md) owns
+candidate selection, distributable dependency checks, the 24-hour beta workload
+and the 14-day named-owner operating pilot. Qualification and stabilization
+are the next release milestone. No promotion evidence is recorded yet.
+
 ## Near-term
 
 - **Large retrieval responses** — Context packs trim against the remaining session budget. Search and diagnostics rely on a final serialized-size check. Profile representative workloads before adding response shaping or pre-estimation.

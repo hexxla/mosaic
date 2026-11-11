@@ -2,6 +2,12 @@
 
 ## Supported Versions
 
+**Maturity: alpha.** The support entries below concern security-report
+handling; they do not certify production readiness or a stable API. Qualification
+and release promotion follow [VERSIONING.md](VERSIONING.md). Existing tags
+remain immutable. Fixes may require upgrading to a newer prerelease; no alpha
+long-term-support or automatic backport commitment is made.
+
 | Version | Supported          |
 | ------- | ------------------ |
 | 0.3.x   | :white_check_mark: |
