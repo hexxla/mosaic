@@ -7,7 +7,7 @@ embedding service.
 
 ## Start
 
-Use Go 1.27.3 or newer and run from the repository root:
+Use Go 1.27.4 or newer and run from the repository root:
 
 ```sh
 export MOSAIC_DB_PATH="$PWD/.tmp/mosaic.hexxla"

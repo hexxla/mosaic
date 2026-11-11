@@ -48,6 +48,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Go and dependencies** — Require Go 1.27.4 and update imported Go modules.
+
 - **Storage compatibility** — Pin HexxlaDB to commit `2e5ed270ec49` (`v0.7.1-0.20261109183456-2e5ed270ec49`) for current WAL/header integrity and encrypted history recovery. Back up the complete recovery set before upgrading; older writers cannot maintain the updated framing. See [database upgrade instructions](docs/mosaic/DATABASE_CREATION.md#upgrade-an-existing-database).
 - **Embedding race protection** — `mosaic_hexxla_put_embedding` accepts optional `expected_content_sha256`; compare the retrieved raw content atomically before storing a delayed embedding. Omission preserves existing behavior.
 - **Context eviction** — Sort eviction priorities once and compact retained cells once, preserving ring/confidence/tie order and explanations. The 8,192-cell eviction benchmark improves roughly 40–55×, with two extra allocations when eviction is needed; packs that already fit retain the allocation-free path.
