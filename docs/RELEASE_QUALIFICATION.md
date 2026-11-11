@@ -73,6 +73,16 @@ observation window restarted. Preserve unaffected evidence with its original
 revision and scope. Documentation-only changes may carry evidence forward only
 with the source diff and justification recorded.
 
+## Staged bounded soak runner
+
+The qualification owner is **void, the requesting repository maintainer**.
+Use the [bounded soak runbook](SOAK_RUNBOOK.md) for the prepared Linux runner,
+frozen initial workload/acceptance targets, resource limits, actual compaction
+procedure and live Ollama prerequisites. Review a 30-minute stage, then a 1-hour
+stage, before authorizing the 24-hour stage. The runner never chains stages or
+promotes releases. Lexical passes exclude live-model qualification. Encrypted
+compaction with retained encrypted feed history is outside its initial profile.
+
 ## Repository baseline commands
 
 Run commands from each repository's own root using the declared toolchain.

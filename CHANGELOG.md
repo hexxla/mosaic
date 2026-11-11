@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Add a Linux qualification runner with explicit 30-minute, 1-hour and 24-hour stages, bounded OS resources, verified backup/prune/compaction cycles, correctness oracles, and optional digest-pinned live Ollama preflight. Record the maintainer as qualification owner and document resource limits and staged acceptance targets.
+
 - Publish the `v0.4.0-alpha.2` snapshot against HexxlaDB `v0.8.0-alpha.1` and MCP Ratchet `v0.4.0-alpha.1`, resolving both through normal Go modules with local workspaces disabled. This alpha snapshot does not establish beta/v1 qualification.
 
 - Mark the repository and combined stack as alpha; preserve published tags, define independent v0 prerelease milestones and evidence-gated beta/v1 promotion, and link the shared practical qualification plan.
