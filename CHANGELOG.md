@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Publish the `v0.4.0-alpha.1` snapshot against HexxlaDB `v0.8.0-alpha.1` and MCP Ratchet `v0.4.0-alpha.1`, resolving both through normal Go modules with local workspaces disabled. This alpha snapshot does not establish beta/v1 qualification.
+
 - Mark the repository and combined stack as alpha; preserve published tags, define independent v0 prerelease milestones and evidence-gated beta/v1 promotion, and link the shared practical qualification plan.
 
 ### Breaking usability/API changes
@@ -31,7 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add optional Ollama digest pinning and lexical-only startup for native databases with unknown vector provenance. Expose ANN/candidate controls, historical lexical/context reads, graph context and richer metadata.
 - Forward cache size, primary fdatasync and lazy changefeed settings from database configuration.
 
-- Pin the simplified Ratchet API to commit `6b1683627372` (`v0.3.1-0.20261109183504-6b1683627372`). Dependency commits must be pushed before this Mosaic revision.
+- Pin the simplified Ratchet API and cancellation fixes to the published `v0.4.0-alpha.1` tag.
 - Optional `put_cell` `embed: true` computes a vector before the transaction and commits cell/vector atomically. Model or vector-write failure saves neither; responses report `embedded`.
 
 
@@ -69,7 +71,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Go and dependencies** — Require Go 1.27.4 and update imported Go modules.
 
-- **Storage compatibility** — Pin HexxlaDB to commit `2e5ed270ec49` (`v0.7.1-0.20261109183456-2e5ed270ec49`) for current WAL/header integrity and encrypted history recovery. Back up the complete recovery set before upgrading; older writers cannot maintain the updated framing. See [database upgrade instructions](docs/mosaic/DATABASE_CREATION.md#upgrade-an-existing-database).
+- **Storage compatibility** — Pin HexxlaDB to `v0.8.0-alpha.1` for current WAL/header integrity, encrypted history recovery and typed capability inspection. Back up the complete recovery set before upgrading; older writers cannot maintain the updated framing. See [database upgrade instructions](docs/mosaic/DATABASE_CREATION.md#upgrade-an-existing-database).
 - **Embedding race protection** — `mosaic_hexxla_put_embedding` accepts optional `expected_content_sha256`; compare the retrieved raw content atomically before storing a delayed embedding. Omission preserves existing behavior.
 - **Context eviction** — Sort eviction priorities once and compact retained cells once, preserving ring/confidence/tie order and explanations. The 8,192-cell eviction benchmark improves roughly 40–55×, with two extra allocations when eviction is needed; packs that already fit retain the allocation-free path.
 

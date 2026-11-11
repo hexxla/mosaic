@@ -54,6 +54,20 @@ alone does not qualify the distributable stack. Repository promotion may happen
 independently, but the combined stack remains alpha until its complete selected
 combination passes the stack beta gates.
 
+## Alpha snapshot dependency set
+
+Mosaic `v0.4.0-alpha.1` uses the following independently versioned upstream
+snapshots. These pins describe a reproducible alpha combination; they do not
+certify beta/v1 gates or the operational pilot.
+
+| Dependency | Published tag | Source commit |
+| --- | --- | --- |
+| HexxlaDB | `v0.8.0-alpha.1` | `96070acab89eebca49aab51fe598d572f42041f0` |
+| MCP Ratchet | `v0.4.0-alpha.1` | `43d4ffb110d4ea0180d0d7104943a61a44bbdaa9` |
+
+Candidate validation must use normal module resolution with `GOWORK=off`.
+Local replacement/workspace results remain additional integration evidence.
+
 ## Beta gates
 
 Current status: **unmet / alpha**. The 43-tool advanced profile is functional

@@ -6,10 +6,10 @@ github.com/google/jsonschema-go v0.4.3 h1:/DBOLZTfDow7pe2GmaJNhltueGTtDKICi8V8p+
 github.com/google/jsonschema-go v0.4.3/go.mod h1:r5quNTdLOYEz95Ru18zA0ydNbBuYoo9tgaYcxEYhJVE=
 github.com/gorilla/websocket v1.5.3 h1:saDtZ6Pbx/0u+bgYQ3q96pZgCzfhKXGPqt7kZ72aNNg=
 github.com/gorilla/websocket v1.5.3/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
-github.com/hexxla/hexxladb v0.7.1-0.20261109183456-2e5ed270ec49 h1:ZEAVv4RaYku9ypOIzGns+nSh00m4En9lS36cDbRgQZc=
-github.com/hexxla/hexxladb v0.7.1-0.20261109183456-2e5ed270ec49/go.mod h1:w/CIvwVrHb94hJP4qRm9L2GWYZToboQtMfKMuvmQMm4=
-github.com/hexxla/mcp-ratchet v0.3.1-0.20261109183504-6b1683627372 h1:OGdZofcspnk1KmKc3I9JcxFJi8pLe1ghfB4SIeTSw1A=
-github.com/hexxla/mcp-ratchet v0.3.1-0.20261109183504-6b1683627372/go.mod h1:wcSnmJ168i/2u5GW7HzvNfSy7ivWDoG3qIbf3cq5Cls=
+github.com/hexxla/hexxladb v0.8.0-alpha.1 h1:gSiliTbWigNkJ6NleJoEWHWRhyRBHSnVIwaHmtGVOws=
+github.com/hexxla/hexxladb v0.8.0-alpha.1/go.mod h1:RXHIKqgXMKJ9bRvv84fYumalhh3A8wMPoUKv+0/nPpw=
+github.com/hexxla/mcp-ratchet v0.4.0-alpha.1 h1:8tTlAQMrdIv7DtFoj2NblRmF1dvqpB7eC/YH4MYrDKg=
+github.com/hexxla/mcp-ratchet v0.4.0-alpha.1/go.mod h1:V7e+tr1ZAZnAuLyapNkjV1dVfWPDPsQX6uqDoELjQME=
 github.com/modelcontextprotocol/go-sdk v1.8.0 h1:KIvahhYqwtbeniWVPs3TcXEA7b8jEtwfBpOTAI+Urx4=
 github.com/modelcontextprotocol/go-sdk v1.8.0/go.mod h1:dL7u98E/zjJTGzEq+j30jQ8K2k1mb6LeAH4inEcSGts=
 github.com/oklog/ulid/v2 v2.1.2 h1:IEclFb9JNvzYA6MW2SCxbLzcHTVsfqm3PrqGQJH5zec=

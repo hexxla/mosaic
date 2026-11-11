@@ -101,12 +101,13 @@ Mosaic persists model identity, requires explicit `-reembed` on change, supports
 optional provider digest pinning, and permits safe `-lexical-only` access to
 unknown native vector stores. [Configuration](MOSAIC_CONFIG.md#ollama-optional)
 
-The published HexxlaDB dependency pin remains supported. New HexxlaDB builds
-provide `HasRetainedChangefeed`, `CountEmbeddings` and `ReadSequence`; Mosaic
-uses these typed APIs when present. The older pin retains isolated compatibility
-scans for changefeed/vector status and a full MVCC count to acquire the initial
-browse sequence. Remove those fallbacks after publishing and adopting the new
-minimum dependency. A local workspace is not required to build Mosaic.
+The alpha snapshot pins HexxlaDB `v0.8.0-alpha.1` and MCP Ratchet
+`v0.4.0-alpha.1`. The pinned database provides `HasRetainedChangefeed`,
+`CountEmbeddings` and `ReadSequence`, so normal builds use typed introspection.
+Older explicitly overridden dependencies still take the isolated compatibility
+paths for changefeed/vector status and the initial browse sequence; those
+fallbacks are candidates for removal. A local workspace is not required to
+build or test the published alpha combination.
 
 ## Native and operator boundaries
 
