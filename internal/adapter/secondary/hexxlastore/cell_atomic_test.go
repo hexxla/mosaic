@@ -32,7 +32,9 @@ func TestPutCellWithEmbeddingPublishesOneCommitAtSelectedCoordinate(t *testing.T
 			db, live := openLifecycleDB(t)
 			writer := NewCellWriterAdapter(live, config.DeleteAutoMaintainConfig{})
 			anchor := domain.AxialCoord{Q: 10, R: -3}
+			var idempotencyKey string
 			if placement == domain.CellPlacementNearAnchor {
+				idempotencyKey = "atomic-placement"
 				if _, err := writer.PutCell(t.Context(), &domain.PutCellCommand{Coord: anchor, RawContent: "anchor", SourceID: "test"}, nil); err != nil {
 					t.Fatal(err)
 				}
@@ -47,7 +49,7 @@ func TestPutCellWithEmbeddingPublishesOneCommitAtSelectedCoordinate(t *testing.T
 			service := services.NewCellMutationService(writer, embedder, 2)
 			before := atomicCommitSeq(t, db)
 			out, err := service.PutCell(t.Context(), &domain.PutCellCommand{
-				Coord: anchor, RawContent: "embedded content", SourceID: "test", Placement: placement, Embed: true,
+				Coord: anchor, RawContent: "embedded content", SourceID: "test", Placement: placement, Embed: true, IdempotencyKey: idempotencyKey,
 			})
 			if err != nil || !out.OK || !out.Embedded || out.Replaced || out.Placement != placement {
 				t.Fatalf("atomic put = %+v, %v", out, err)

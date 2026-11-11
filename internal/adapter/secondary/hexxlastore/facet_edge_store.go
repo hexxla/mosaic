@@ -36,7 +36,7 @@ func (a *FacetEdgeStoreAdapter) PutFacet(ctx context.Context, cmd *domain.PutFac
 	now := time.Now().UTC().UnixNano()
 	rec := hexxladb.NewFacetDerived(pk, cmd.FacetID, cmd.DerivedContent, now)
 	updErr := a.live.WithRead(func(db *hexxladb.DB) error {
-		return db.Update(func(tx *hexxladb.Tx) error {
+		return updateMutation(db, func(tx *hexxladb.Tx) error {
 			if err := ctx.Err(); err != nil {
 				return fmt.Errorf("context: %w", err)
 			}
@@ -62,7 +62,7 @@ func (a *FacetEdgeStoreAdapter) LinkCells(ctx context.Context, cmd *domain.LinkC
 	}
 	prov := hexxladb.NewProvenanceWire(cmd.SourceID, cmd.Confidence)
 	updErr := a.live.WithRead(func(db *hexxladb.DB) error {
-		return db.Update(func(tx *hexxladb.Tx) error {
+		return updateMutation(db, func(tx *hexxladb.Tx) error {
 			if err := ctx.Err(); err != nil {
 				return fmt.Errorf("context: %w", err)
 			}

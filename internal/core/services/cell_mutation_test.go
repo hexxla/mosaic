@@ -20,6 +20,10 @@ type stubCellWriter struct {
 	putCellResult      domain.PutCellMutationResult
 }
 
+func (*stubCellWriter) LookupPutCell(context.Context, *domain.PutCellCommand) (domain.PutCellMutationResult, bool, error) {
+	return domain.PutCellMutationResult{}, false, nil
+}
+
 func (s *stubCellWriter) PutCell(_ context.Context, cmd *domain.PutCellCommand, _ []float32) (domain.PutCellMutationResult, error) {
 	if s == nil {
 		return domain.PutCellMutationResult{}, nil
@@ -160,11 +164,12 @@ func TestCellMutationService_PutCell_placement(t *testing.T) {
 		writer := &stubCellWriter{putCellResult: want}
 		svc := NewCellMutationService(writer, nil, 384)
 		got, err := svc.PutCell(t.Context(), &domain.PutCellCommand{
-			Coord:      domain.AxialCoord{Q: 3, R: -2},
-			RawContent: "hello",
-			SourceID:   "source",
-			Confidence: 0.8,
-			Placement:  domain.CellPlacementNearAnchor,
+			Coord:          domain.AxialCoord{Q: 3, R: -2},
+			RawContent:     "hello",
+			SourceID:       "source",
+			Confidence:     0.8,
+			Placement:      domain.CellPlacementNearAnchor,
+			IdempotencyKey: "placement-test",
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -192,6 +197,10 @@ func TestCellMutationService_PutCell_placement(t *testing.T) {
 			cmd: domain.PutCellCommand{
 				Placement: domain.CellPlacementNearAnchor, MaxRadius: maximumCellPlacementMaxRadius + 1,
 			},
+		},
+		{
+			name: "near_anchor_requires_key",
+			cmd:  domain.PutCellCommand{Placement: domain.CellPlacementNearAnchor},
 		},
 		{
 			name: "exact_rejects_radius",

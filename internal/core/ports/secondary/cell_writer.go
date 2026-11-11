@@ -8,6 +8,8 @@ import (
 
 // CellWriter runs HexxlaDB mutations inside DB.Update (PutCell, PutEmbedding, DeleteCell).
 type CellWriter interface {
+	// LookupPutCell checks a keyed request before any embedding work.
+	LookupPutCell(ctx context.Context, cmd *domain.PutCellCommand) (domain.PutCellMutationResult, bool, error)
 	// PutCell resolves placement and writes atomically, returning the actual coordinate.
 	PutCell(ctx context.Context, cmd *domain.PutCellCommand, embedding []float32) (domain.PutCellMutationResult, error)
 	// PutEmbedding checks an optional content hash atomically with the write.

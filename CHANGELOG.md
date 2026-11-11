@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking usability/API changes
 
+- Near-anchor `put_cell` calls require an `idempotency_key`. Retries with the same key and arguments return the original result.
+
 - Consolidate current API documentation and remove the superseded implementation tracker and historical tool-description audit.
 
 - Replace separate query and embedding-discovery tools with `search_cells` modes: lexical, pure-vector semantic, and filtered/composite hybrid. Search is global by default; positive radius opts into spatial restriction. Add exact `get_cell` with explicit presence.
@@ -29,6 +31,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   one-time alternatives, and reject policies naming unknown Mosaic tools.
 
 ### Fixed
+
+- **Changefeed continuity** — Continue existing default HexxlaDB changefeeds on MCP startup. Use `-changefeed` to start a feed or `-changefeed-path` to select a custom sidecar. Startup rejects a missing sidecar when the primary retains changefeed state, even without registered consumers.
+- **Ratchet profiles** — Keep usable prerequisite alternatives in policy order and reject enabled guarded tools only when all alternatives are unavailable.
+- **Embedding compatibility** — Persist the configured embedding model and reject same-width model swaps until `mosaic-mcp -reembed` regenerates the vectors.
+- **Mutation recovery** — Distinguish known-durable and uncertain HexxlaDB commit errors in MCP mutation responses.
 
 - **Configuration safety** — Reject unknown YAML fields, extra documents, invalid Ratchet paths, nonliteral HTTP endpoint paths, and nonfinite retrieval ratios. Validate Ollama HTTP(S) bases and preserve path prefixes.
 - **Credential diagnostics** — Redact URL credentials and query values from startup and HTTP errors while retaining inspectable error causes.

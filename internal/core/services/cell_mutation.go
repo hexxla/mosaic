@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -17,6 +18,7 @@ const (
 	maxSourceIDBytes              = 512
 	defaultCellPlacementMaxRadius = 8
 	maximumCellPlacementMaxRadius = 32
+	maxIdempotencyKeyBytes        = 128
 )
 
 // CellMutationService implements [primary.CellMutation] with validation and optional Ollama for embed text.
@@ -61,6 +63,15 @@ func (s *CellMutationService) PutCell(ctx context.Context, cmd *domain.PutCellCo
 	if err := s.policy.PutCellDenied(c.Kind); err != nil {
 		return domain.PutCellMutationResult{}, fmt.Errorf("cell mutation: %w", err)
 	}
+	if c.IdempotencyKey != "" {
+		result, found, err := s.writer.LookupPutCell(ctx, c)
+		if err != nil {
+			return domain.PutCellMutationResult{}, fmt.Errorf("cell mutation check put cell receipt: %w", err)
+		}
+		if found {
+			return result, nil
+		}
+	}
 	var embedding []float32
 	if c.Embed {
 		if s.embedText == nil || s.embedDim == 0 {
@@ -76,7 +87,10 @@ func (s *CellMutationService) PutCell(ctx context.Context, cmd *domain.PutCellCo
 	}
 	result, err := s.writer.PutCell(ctx, c, embedding)
 	if err != nil {
-		return domain.PutCellMutationResult{}, fmt.Errorf("cell mutation put cell: %w", err)
+		if !errors.Is(err, domain.ErrMutationCommitDurable) {
+			result = domain.PutCellMutationResult{}
+		}
+		return result, fmt.Errorf("cell mutation put cell: %w", err)
 	}
 	return result, nil
 }
@@ -191,6 +205,9 @@ func normalizePutCell(cmd *domain.PutCellCommand) (*domain.PutCellCommand, error
 	maxRadius := cmd.MaxRadius
 	switch placement {
 	case domain.CellPlacementExact:
+		if cmd.IdempotencyKey != "" {
+			return nil, fmt.Errorf("cell mutation: idempotency_key applies only to near_anchor placement")
+		}
 		if maxRadius != 0 {
 			return nil, fmt.Errorf("cell mutation: max_radius applies only to near_anchor placement")
 		}
@@ -203,6 +220,9 @@ func normalizePutCell(cmd *domain.PutCellCommand) (*domain.PutCellCommand, error
 		}
 		if maxRadius == 0 {
 			maxRadius = defaultCellPlacementMaxRadius
+		}
+		if key := cmd.IdempotencyKey; key == "" || strings.TrimSpace(key) != key || len(key) > maxIdempotencyKeyBytes {
+			return nil, fmt.Errorf("cell mutation: near_anchor requires a nonempty idempotency_key of at most %d bytes with no surrounding whitespace", maxIdempotencyKeyBytes)
 		}
 	default:
 		return nil, fmt.Errorf("cell mutation: placement must be %q or %q",
@@ -219,6 +239,7 @@ func normalizePutCell(cmd *domain.PutCellCommand) (*domain.PutCellCommand, error
 		MaxRadius:      maxRadius,
 		AllowOverwrite: cmd.AllowOverwrite,
 		Embed:          cmd.Embed,
+		IdempotencyKey: cmd.IdempotencyKey,
 	}
 	return out, nil
 }

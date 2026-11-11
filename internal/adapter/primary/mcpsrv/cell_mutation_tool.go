@@ -2,6 +2,8 @@ package mcpsrv
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log/slog"
 	"slices"
 	"strings"
@@ -24,6 +26,7 @@ type putCellInput struct {
 	Placement      string   `json:"placement,omitempty" jsonschema:"exact (default) | near_anchor"`
 	MaxRadius      int      `json:"max_radius,omitempty" jsonschema:"near_anchor search radius; default 8, maximum 32"`
 	AllowOverwrite bool     `json:"allow_overwrite,omitempty" jsonschema:"exact placement only: explicitly replace a live cell at q,r"`
+	IdempotencyKey string   `json:"idempotency_key,omitempty" jsonschema:"required for near_anchor: unique key per logical write, reuse on retries (maximum 128 bytes)"`
 }
 
 // RegisterCoreCellMutationTools registers normal cell writes and deletes.
@@ -39,7 +42,7 @@ func registerPutCellTool(server *mcp.Server, svc primary.CellMutation, log *slog
 		Name: "mosaic_hexxla_put_cell",
 		Description: "Write one cell atomically via HexxlaDB. Set embed:true to compute and commit its embedding in the same transaction; model failure writes nothing. Exact placement refuses deleted coordinates and requires allow_overwrite=true to update a live cell. Near-anchor placement selects the first unused coordinate, skipping live and deleted cells, in deterministic ring order within max_radius (default 8, maximum 32). Changing raw content invalidates the previous embedding. The response returns the actual coordinate, placement, occupied probes, and whether an exact write replaced a live cell. Use mosaic_hexxla_list_tags to reuse relevant tags. " +
 			"kind=fact uses a fact template; user_message / assistant_response match conversational_memory-style tags. source_id is required (provenance source for fact, session id for user/assistant templates). " +
-			"A durable-commit or uncertain finalization error can mean the cell was saved. Before retrying, query by source_id and content to reconcile the result; blindly retrying near_anchor can create duplicates.",
+			"Near-anchor writes require a unique idempotency_key per logical write. Retry with the same key and arguments to recover the original result. A commit_outcome=durable error confirms the cell was saved; commit_outcome=uncertain requires reopening the database before reconciling or retrying.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in putCellInput) (*mcp.CallToolResult, domain.PutCellMutationResult, error) {
 		if log != nil {
 			log.DebugContext(ctx, "mosaic_hexxla_put_cell invoked", "q", in.Q, "r", in.R, "placement", in.Placement)
@@ -50,6 +53,9 @@ func registerPutCellTool(server *mcp.Server, svc primary.CellMutation, log *slog
 		}
 		result, err := svc.PutCell(ctx, putCellCommand(&in, kind))
 		if err != nil {
+			if errors.Is(err, domain.ErrMutationCommitDurable) && result.OK {
+				err = fmt.Errorf("cell saved at (%d,%d): %w", result.Coord.Q, result.Coord.R, err)
+			}
 			return nil, domain.PutCellMutationResult{}, err
 		}
 		return nil, result, nil
@@ -68,6 +74,7 @@ func putCellCommand(in *putCellInput, kind domain.CellPutKind) *domain.PutCellCo
 		MaxRadius:      in.MaxRadius,
 		AllowOverwrite: in.AllowOverwrite,
 		Embed:          in.Embed,
+		IdempotencyKey: in.IdempotencyKey,
 	}
 }
 

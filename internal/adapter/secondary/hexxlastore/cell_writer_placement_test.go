@@ -100,6 +100,7 @@ func TestCellWriterAdapter_exact_and_near_anchor_placement(t *testing.T) {
 	near := base
 	near.RawContent = "neighbor"
 	near.Placement = domain.CellPlacementNearAnchor
+	near.IdempotencyKey = "neighbor"
 	near.MaxRadius = 1
 	neighbor, err := writer.PutCell(t.Context(), &near, nil)
 	if err != nil {
@@ -114,6 +115,17 @@ func TestCellWriterAdapter_exact_and_near_anchor_placement(t *testing.T) {
 		t.Fatalf("placed coordinate %+v is not adjacent to anchor %+v", actual, anchor)
 	}
 	assertCellContent(t, db, neighbor.Coord, "neighbor")
+	before := atomicCommitSeq(t, db)
+	if replay, err := writer.PutCell(t.Context(), &near, nil); err != nil || replay != neighbor {
+		t.Fatalf("transactional replay = %+v, %v; want %+v", replay, err, neighbor)
+	}
+	near.RawContent = "different request"
+	if _, err := writer.PutCell(t.Context(), &near, nil); !errors.Is(err, domain.ErrIdempotencyKeyConflict) {
+		t.Fatalf("reused key = %v, want conflict", err)
+	}
+	if got := atomicCommitSeq(t, db); got != before {
+		t.Fatalf("replay or conflict advanced commit sequence from %d to %d", before, got)
+	}
 }
 
 func assertCellContent(t *testing.T, db *hexxladb.DB, coord domain.AxialCoord, want string) {
@@ -234,6 +246,7 @@ func TestCellWriterProtectsVectorAndSeamIdentity(t *testing.T) {
 	}
 	cmd.AllowOverwrite = false
 	cmd.Placement = domain.CellPlacementNearAnchor
+	cmd.IdempotencyKey = "skip-tombstone"
 	cmd.MaxRadius = 1
 	placed, err := writer.PutCell(ctx, &cmd, nil)
 	if err != nil || placed.Coord == a {

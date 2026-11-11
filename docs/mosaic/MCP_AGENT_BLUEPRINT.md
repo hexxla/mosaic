@@ -83,7 +83,7 @@ policy.
 `mosaic_hexxla_put_cell` supports two explicit modes:
 
 - **`placement: exact`** (default) treats `(q,r)` as the final coordinate. Updating a live cell requires **`allow_overwrite: true`**. Deleted coordinates remain reserved.
-- **`placement: near_anchor`** treats `(q,r)` as an application-chosen anchor and atomically selects the first unused coordinate in ring order, skipping tombstones. **`max_radius`** defaults to 8 and is capped at 32.
+- **`placement: near_anchor`** treats `(q,r)` as an application-chosen anchor and atomically selects the first unused coordinate in ring order, skipping tombstones. **`max_radius`** defaults to 8 and is capped at 32. Supply a unique **`idempotency_key`** per logical write, such as a UUID. It must be nonempty, at most 128 bytes, and have no surrounding whitespace.
 
 Changing the cell's raw content removes its previous embedding in the same
 transaction. Set `embed: true` on `put_cell` to compute and commit its new vector atomically. Independent embedding repair remains an advanced operation.
@@ -95,10 +95,22 @@ the live cell and rejects a mismatch, preserving any current vector. Both
 text and vector inputs support this guard. Omit it to retain unconditional
 embedding replacement; the embedding text may deliberately differ from raw content.
 
-A durable-commit or uncertain finalization error can mean a mutation was
-saved. Reconcile by source ID and content before retrying, especially with
-near-anchor placement, which can otherwise create another cell. A tool error
-alone does not establish rollback.
+After a lost response, repeat the same near-anchor arguments and key to recover
+the original result. Mosaic stores the receipt in the same transaction as the
+cell and any embedding, so it survives a new MCP session or a database reopen.
+Reusing a key for different arguments is rejected. Receipts are database-wide
+and retained even if the original cell is later changed or deleted. Use a new
+key for a new write. When Ratchet is enabled, satisfy its prerequisites again
+before retrying.
+
+An error containing `commit_outcome=durable` confirms that HexxlaDB saved the
+mutation. Reopen the database to complete recovery. An error containing
+`commit_outcome=uncertain` means the storage outcome must be resolved by
+reopening the database before reconciliation. Reopen with the same changefeed
+configuration. After recovery, a keyed
+near-anchor retry returns the saved receipt if the write committed, or
+performs the write if it did not. For other writes, inspect the recovered
+state before retrying.
 
 The response always reports **`coord`**, **`placement`**, **`probes`**, and **`replaced`**. Persist the returned coordinate for later embeddings, facets, edges, seams, and exact retrieval. Mosaic and HexxlaDB resolve bounded geometric collisions but do not infer anchors from content, tags, or embeddings.
 
@@ -111,7 +123,7 @@ policy controls the kinds accepted for submitted calls.
 
 For an authorized client-managed write sequence:
 
-1. Right after the user message is known → **`put_cell`** with **`kind=user_message`** (session **`source_id`**, tags, and either an exact coordinate or `near_anchor` placement); retain the returned coordinate.
+1. Right after the user message is known → **`put_cell`** with **`kind=user_message`** (session **`source_id`**, tags, and either an exact coordinate or `near_anchor` placement with an **`idempotency_key`**); retain the returned coordinate.
 2. Generate the reply (retrieval steps from [Recommended workflow](#recommended-workflow) as needed).
 3. After the assistant reply is finalized → **`put_cell`** with **`kind=assistant_response`** (same **`source_id`** and an explicit placement choice); retain the returned coordinate.
 

@@ -52,9 +52,35 @@ func (a *CellWriterAdapter) PutCell(ctx context.Context, cmd *domain.PutCellComm
 	if placement == "" {
 		placement = domain.CellPlacementExact
 	}
+	keyed := placement == domain.CellPlacementNearAnchor
+	if keyed != (cmd.IdempotencyKey != "") {
+		return domain.PutCellMutationResult{}, errors.New("hexxlastore put cell: idempotency_key is required for near_anchor and applies only to that placement")
+	}
+	var request putCellRequest
+	if keyed {
+		var err error
+		request, err = newPutCellRequest(cmd)
+		if err != nil {
+			return domain.PutCellMutationResult{}, err
+		}
+	}
 	result := domain.PutCellMutationResult{Placement: placement}
 	err := a.live.WithRead(func(db *hexxladb.DB) error {
-		updErr := db.Update(func(tx *hexxladb.Tx) error {
+		updErr := updateMutation(db, func(tx *hexxladb.Tx) error {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			if keyed {
+				saved, found, err := request.lookup(tx)
+				if err != nil {
+					return err
+				}
+				if found {
+					result = saved
+					// Abort this no-op transaction without advancing CommitSeq.
+					return errPutCellReplay
+				}
+			}
 			selected := hexxladb.Coord{Q: cmd.Coord.Q, R: cmd.Coord.R}
 			var key hexxladb.PackedCoord
 			var prior hexxladb.CellRecord
@@ -121,14 +147,20 @@ func (a *CellWriterAdapter) PutCell(ctx context.Context, cmd *domain.PutCellComm
 			result.Embedded = len(embedding) > 0
 			result.OK = true
 			result.Coord = domain.AxialCoord{Q: selected.Q, R: selected.R}
+			if keyed {
+				return request.store(tx, result)
+			}
 			return nil
 		})
-		if updErr != nil {
+		if updErr != nil && !errors.Is(updErr, errPutCellReplay) {
 			return fmt.Errorf("hexxlastore put cell: %w", updErr)
 		}
 		return nil
 	})
 	if err != nil {
+		if errors.Is(err, domain.ErrMutationCommitDurable) {
+			return result, err
+		}
 		return domain.PutCellMutationResult{}, err
 	}
 	return result, nil
@@ -167,7 +199,7 @@ func (a *CellWriterAdapter) PutEmbedding(ctx context.Context, coord domain.Axial
 		if len(vec) != int(dim) {
 			return fmt.Errorf("hexxlastore put embedding: vector length %d, want %d", len(vec), dim)
 		}
-		updErr := db.Update(func(tx *hexxladb.Tx) error {
+		updErr := updateMutation(db, func(tx *hexxladb.Tx) error {
 			if err := ctx.Err(); err != nil {
 				return fmt.Errorf("context: %w", err)
 			}
@@ -210,7 +242,7 @@ func (a *CellWriterAdapter) DeleteCell(ctx context.Context, cmd *domain.DeleteCe
 	}
 	var removed bool
 	delErr := a.live.WithRead(func(db *hexxladb.DB) error {
-		return db.Update(func(tx *hexxladb.Tx) error {
+		return updateMutation(db, func(tx *hexxladb.Tx) error {
 			var err error
 			removed, err = tx.DeleteCellWithOutcome(ctx, pk)
 			return err

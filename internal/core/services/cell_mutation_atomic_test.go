@@ -18,6 +18,10 @@ type atomicMutationWriter struct {
 	err        error
 }
 
+func (*atomicMutationWriter) LookupPutCell(context.Context, *domain.PutCellCommand) (domain.PutCellMutationResult, bool, error) {
+	return domain.PutCellMutationResult{}, false, nil
+}
+
 func (w *atomicMutationWriter) PutCell(_ context.Context, cmd *domain.PutCellCommand, vector []float32) (domain.PutCellMutationResult, error) {
 	w.calls++
 	w.command = cmd
@@ -58,7 +62,7 @@ func TestPutCellEmbedComputesStoredTextAndUsesOneAtomicWriterCall(t *testing.T) 
 	service := NewCellMutationService(writer, embedder, 2)
 	cmd := &domain.PutCellCommand{
 		Coord: domain.AxialCoord{Q: 1}, RawContent: "  exact stored content  ", SourceID: " source ",
-		Tags: []string{" topic "}, Placement: domain.CellPlacementNearAnchor, Embed: true,
+		Tags: []string{" topic "}, Placement: domain.CellPlacementNearAnchor, Embed: true, IdempotencyKey: "atomic-test",
 	}
 	got, err := service.PutCell(t.Context(), cmd)
 	if err != nil || got != want {
@@ -160,5 +164,16 @@ func TestPutCellAtomicWriterFailurePreservesCauseAndNoSuccess(t *testing.T) {
 	out, err := service.PutCell(t.Context(), &domain.PutCellCommand{RawContent: "content", SourceID: "source", Embed: true})
 	if !errors.Is(err, writeErr) || out != (domain.PutCellMutationResult{}) || writer.calls != 1 || writer.standalone != 0 || embedder.calls != 1 {
 		t.Fatalf("failed atomic put = %+v, %v; writes=%d, standalone=%d, embeds=%d", out, err, writer.calls, writer.standalone, embedder.calls)
+	}
+}
+
+func TestPutCellKnownDurableErrorPreservesResult(t *testing.T) {
+	t.Parallel()
+	want := domain.PutCellMutationResult{OK: true, Coord: domain.AxialCoord{Q: 2, R: -1}}
+	writer := &atomicMutationWriter{err: domain.ErrMutationCommitDurable, result: want}
+	service := NewCellMutationService(writer, nil, 0)
+	out, err := service.PutCell(t.Context(), &domain.PutCellCommand{RawContent: "content", SourceID: "source"})
+	if !errors.Is(err, domain.ErrMutationCommitDurable) || out != want {
+		t.Fatalf("known-durable put = %+v, %v; want %+v with commit error", out, err, want)
 	}
 }

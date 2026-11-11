@@ -120,6 +120,9 @@ func run(
 	sessionID := fmt.Sprintf("mosaic-seed-%d", time.Now().UnixNano())
 	embedDim := int(layout.EmbeddingDimension)
 	if err := hexxlastore.CreateCandidate(ctx, dbPath, opts, func(db *hexxladb.DB) error {
+		if err := hexxlastore.EnsureEmbeddingModel(db, oc.Model); err != nil {
+			return fmt.Errorf("bind seed embedding model: %w", err)
+		}
 		return seedDatabase(ctx, log, db, oc, sessionID, embedDim)
 	}); err != nil {
 		return err

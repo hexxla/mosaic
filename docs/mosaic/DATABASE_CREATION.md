@@ -38,6 +38,39 @@ configured embedding model. A repeat seed on an existing primary skips it.
 **task mosaic-dev** runs the seed task before starting MCP.
 [Ollama configuration](./MOSAIC_CONFIG.md#ollama)
 
+## Change the embedding model
+
+Mosaic records the configured Ollama model name and tag inside HexxlaDB.
+`mosaic-seed` records it before writing vectors. An empty vector store binds
+on its first MCP startup without contacting Ollama. Startup rejects a
+different model name even when its vector width matches. A database with
+existing vectors and no recorded model requires the same migration.
+
+Stop the server, keep a backup of the recovery set, and explicitly regenerate
+embeddings with the target model available in Ollama.
+
+~~~sh
+MOSAIC_EMBED_MODEL=target-model:tag mosaic-mcp -db PATH -reembed
+~~~
+
+Use the same database credentials and custom changefeed options as normal.
+If the policy YAML specifies `ollama.embed_model`, set the target there
+because YAML takes precedence over the environment. The command exits after
+regenerating vectors from every live cell's current text. Start Mosaic again
+with the same model configuration after it succeeds.
+
+Re-embedding preserves the database's existing vector width and distance
+metric. The vectors and model identity commit together, subject to
+HexxlaDB's transaction and WAL limits. A failed model call leaves both
+unchanged. Choose a new database layout when the target model needs a different
+vector width.
+
+Model names and tags are configuration identifiers. If the weights behind a
+tag change, run `-reembed` explicitly with that same tag. When supplying raw
+vectors through the advanced tool, use the database's recorded model.
+Older Mosaic binaries ignore the recorded model. Use the pre-migration backup
+if you need to return to an older writer.
+
 ## Encrypted database (passphrase or raw key)
 
 | Command | Passphrase precedence |
@@ -70,6 +103,21 @@ task seed MOSAIC_DB_PATH="$PWD/.tmp/demo-next.hexxla"
 # Stop Mosaic before changing its database path.
 task run-mosaic-mcp MOSAIC_DB_PATH="$PWD/.tmp/demo-next.hexxla"
 ~~~
+
+## Continue a HexxlaDB changefeed
+
+Mosaic automatically continues an existing `<database-path>-changelog` sidecar.
+Use `mosaic-mcp -db PATH -changefeed` to start a feed at the default path, or
+`mosaic-mcp -db PATH -changefeed-path SIDECAR` to select a custom path. For an
+existing custom feed, pass its matching sidecar on every startup. Mosaic
+cannot discover a custom sidecar from the primary path.
+
+Mosaic uses HexxlaDB's synchronous changefeed mode. HexxlaDB validates retained
+history and recovers pending feed entries on open. If the primary has retained
+changefeed history, pending entries, or registered consumers and the default
+sidecar is missing, Mosaic requires the matching custom sidecar or restoration
+of the default one before serving writes.
+Starting a new feed records future writes. It does not backfill earlier writes.
 
 ## Upgrade an existing database
 

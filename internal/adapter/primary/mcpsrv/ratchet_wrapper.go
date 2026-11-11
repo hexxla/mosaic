@@ -70,13 +70,15 @@ func (g *RatchetGate) ValidateProtectedTools(required []string) error {
 }
 
 // PolicyForTools removes inactive guards and alternatives from an already
-// name-validated policy. Enabled guards must retain an enabled prerequisite.
+// name-validated policy. Each enabled guarded tool must retain a usable block.
 func PolicyForTools(policy ratchet.Policy, advanced bool) (ratchet.Policy, error) {
 	enabled := make(map[string]bool)
 	for _, tool := range EnabledToolNames(advanced) {
 		enabled[tool] = true
 	}
 	filtered := ratchet.Policy{CompletionTTL: policy.CompletionTTL}
+	firstGuard := make(map[string]int)
+	var dropped []ratchet.Rule
 	for _, rule := range policy.Rules {
 		if !enabled[rule.Tool] {
 			continue
@@ -88,10 +90,26 @@ func PolicyForTools(policy ratchet.Policy, advanced bool) (ratchet.Policy, error
 				copy.AfterAny = append(copy.AfterAny, prerequisite)
 			}
 		}
-		if len(rule.AfterAny) > 0 && len(copy.AfterAny) == 0 {
-			return ratchet.Policy{}, fmt.Errorf("ratchet policy tool %q has no enabled prerequisite", rule.Tool)
+		if len(rule.AfterAny) > 0 {
+			if len(copy.AfterAny) == 0 {
+				dropped = append(dropped, rule)
+				continue
+			}
+			if _, exists := firstGuard[rule.Tool]; !exists {
+				firstGuard[rule.Tool] = len(filtered.Rules)
+			}
 		}
 		filtered.Rules = append(filtered.Rules, copy)
+	}
+	for _, rule := range dropped {
+		index, ok := firstGuard[rule.Tool]
+		if !ok {
+			return ratchet.Policy{}, fmt.Errorf("ratchet policy tool %q has no enabled prerequisite", rule.Tool)
+		}
+		// TTL belongs to the tool's completions, independent of the chosen block.
+		if rule.TTL > 0 {
+			filtered.Rules[index].TTL = rule.TTL
+		}
 	}
 	return filtered, nil
 }

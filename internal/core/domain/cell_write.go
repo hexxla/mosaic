@@ -33,6 +33,15 @@ var ErrCellCoordinateOccupied = errors.New("cell coordinate occupied")
 // ErrCellContentChanged means an embedding guard no longer matches its cell.
 var ErrCellContentChanged = errors.New("cell content changed")
 
+// ErrIdempotencyKeyConflict means the key already identifies a different write.
+var ErrIdempotencyKeyConflict = errors.New("idempotency_key already used for different put_cell arguments")
+
+// ErrMutationCommitDurable means the primary commit succeeded and recovery is required.
+var ErrMutationCommitDurable = errors.New("commit_outcome=durable: mutation saved; reopen the database to finish recovery")
+
+// ErrMutationCommitUncertain means recovery is required before reconciling the write.
+var ErrMutationCommitUncertain = errors.New("commit_outcome=uncertain: reopen the database before reconciling or retrying the mutation")
+
 // PutCellCommand writes one cell at an axial coordinate (within DB.Update).
 type PutCellCommand struct {
 	Coord      AxialCoord
@@ -49,6 +58,8 @@ type PutCellCommand struct {
 	MaxRadius      int
 	AllowOverwrite bool
 	Embed          bool // compute and commit an embedding with this cell when requested
+	// IdempotencyKey identifies one near-anchor write across sessions and restarts.
+	IdempotencyKey string
 }
 
 // PutEmbeddingCommand stores a vector at coord: supply either embed Text (Ollama) or Vector (raw).

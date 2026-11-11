@@ -43,6 +43,9 @@ func run(log *slog.Logger) error {
 	dbFlag := flag.String("db", "", "path to HexxlaDB file (overrides -name and "+config.EnvDBPath+")")
 	nameFlag := flag.String("name", "", "base name: <db-dir>/<name>.hexxla (overrides "+config.EnvDBPath+"; mutually exclusive with -db)")
 	dbDirFlag := flag.String("db-dir", "", "parent directory when using -name (default: from "+config.EnvMosaicDBDir+" or .tmp)")
+	changefeedFlag := flag.Bool("changefeed", false, "enable the HexxlaDB changefeed; an existing default sidecar is continued automatically")
+	changefeedPathFlag := flag.String("changefeed-path", "", "use this HexxlaDB changefeed sidecar instead of the default; implies -changefeed")
+	reembedFlag := flag.Bool("reembed", false, "regenerate all live-cell embeddings with the configured Ollama model and exit")
 	ratchetConfigFlag := flag.String("ratchet-config", "", "path to Ratchet workflow YAML (overrides "+config.EnvRatchetConfigFile+"); a custom path enables Ratchet")
 	ratchetObservabilityTokenFileFlag := flag.String("ratchet-observability-token-file", "", "private bearer-token file; enables the authenticated live Ratchet WebSocket stream")
 	ratchetObservabilityPathFlag := flag.String("ratchet-observability-path", config.DefaultRatchetObservabilityPath, "live Ratchet WebSocket endpoint path")
@@ -129,15 +132,32 @@ func run(log *slog.Logger) error {
 	}
 
 	openOpts := config.MergeMVCCRetainIntoOpenOptions(encOpts, mosaicLoaded.MVCCRetainCommitsBehindHead)
+	openOpts.ChangelogPath = *changefeedPathFlag
+	openOpts.ChangelogEnabled = *changefeedFlag || openOpts.ChangelogPath != ""
 
 	// Avoid creating a persistent lock sidecar for an ordinary missing path.
 	// OpenExisting still performs the authoritative locked open after this check.
 	if _, err := os.Stat(dbCfg.Path); err != nil {
 		return fmt.Errorf("open database: %w", err)
 	}
-	db, err := hexxladb.OpenExisting(dbCfg.Path, openOpts)
+	db, err := openMosaicDatabase(dbCfg.Path, openOpts)
 	if err != nil {
 		return fmt.Errorf("open database: %w", err)
+	}
+	ollamaClient := ollamac.NewClient(ollamaCfg.Base, ollamaCfg.Model)
+	embedder := ollamaembed.NewTextEmbedder(ollamaClient)
+	if *reembedFlag {
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer stop()
+		err := hexxlastore.Reembed(ctx, db, ollamaCfg.Model, embedder)
+		if err := errors.Join(err, db.Close()); err != nil {
+			return fmt.Errorf("re-embed database: %w", err)
+		}
+		log.Info("re-embedded database", "path", dbCfg.Path, "model", ollamaCfg.Model)
+		return nil
+	}
+	if err := hexxlastore.EnsureEmbeddingModel(db, ollamaCfg.Model); err != nil {
+		return fmt.Errorf("database embedding model: %w", errors.Join(err, db.Close()))
 	}
 	embeddingDimAtBoot := db.EmbeddingDimension()
 
@@ -152,11 +172,10 @@ func run(log *slog.Logger) error {
 	healthSvc := services.NewHealthService(engineHealth, version, mosaicLoaded.MVCCRetainCommitsBehindHead)
 
 	cellReader := hexxlastore.NewCellReaderAdapter(live)
-	ollamaClient := ollamac.NewClient(ollamaCfg.Base, ollamaCfg.Model)
 	embeddingANN := hexxlastore.NewEmbeddingANNAdapter(live)
 	cellRetrieval := services.NewCellRetrievalService(
 		cellReader, embeddingANN,
-		ollamaembed.NewTextEmbedder(ollamaClient),
+		embedder,
 		embeddingDimAtBoot,
 	)
 
@@ -174,7 +193,7 @@ func run(log *slog.Logger) error {
 
 	runtimeCfg := config.NewMosaicRuntimeConfig(mosaicLoaded.Retention, mosaicLoaded.AllowDeleteCell)
 	mutationSvc := services.NewCellMutationService(
-		cellWriter, ollamaembed.NewTextEmbedder(ollamaClient), embeddingDimAtBoot,
+		cellWriter, embedder, embeddingDimAtBoot,
 		services.WithMutationPolicy(runtimeCfg.MutationPolicy()),
 	)
 
@@ -263,6 +282,44 @@ func run(log *slog.Logger) error {
 		serveErr = nil
 	}
 	return errors.Join(serveErr, shutdownErr)
+}
+
+func openMosaicDatabase(path string, opts *hexxladb.Options) (*hexxladb.DB, error) {
+	if opts.ChangelogPath != "" {
+		return hexxladb.OpenExisting(path, opts)
+	}
+	withoutFeed := *opts
+	withoutFeed.ChangelogEnabled = false
+	db, err := hexxladb.OpenExisting(path, &withoutFeed)
+	if err != nil {
+		return nil, err
+	}
+
+	// Inspect the sidecar while holding the primary lock. A prior writer may
+	// have enabled its feed while Mosaic was waiting to open the database.
+	_, err = os.Lstat(path + "-changelog")
+	if errors.Is(err, os.ErrNotExist) {
+		retained, err := hexxlastore.HasRetainedChangefeed(db)
+		if err != nil {
+			return nil, errors.Join(fmt.Errorf("inspect changefeed history: %w", err), db.Close())
+		}
+		if retained {
+			err := errors.New("database has retained changefeed state but no default sidecar; set -changefeed-path to the matching sidecar or restore the default sidecar")
+			return nil, errors.Join(err, db.Close())
+		}
+		if !opts.ChangelogEnabled {
+			return db, nil
+		}
+	} else if err != nil {
+		return nil, errors.Join(fmt.Errorf("inspect default changefeed: %w", err), db.Close())
+	}
+
+	if err := db.Close(); err != nil {
+		return nil, fmt.Errorf("close before enabling changefeed: %w", err)
+	}
+	withFeed := *opts
+	withFeed.ChangelogEnabled = true
+	return hexxladb.OpenExisting(path, &withFeed)
 }
 
 // shutdownMCP stops accepting HTTP work and drains active tool calls before

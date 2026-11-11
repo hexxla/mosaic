@@ -104,7 +104,7 @@ func (a *SeamStoreAdapter) updateSeam(ctx context.Context, operation, method str
 		return fmt.Errorf("hexxlastore seam store: nil database")
 	}
 	err := a.live.WithRead(func(db *hexxladb.DB) error {
-		return db.Update(func(tx *hexxladb.Tx) error {
+		return updateMutation(db, func(tx *hexxladb.Tx) error {
 			if err := ctx.Err(); err != nil {
 				return fmt.Errorf("context: %w", err)
 			}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -77,6 +78,32 @@ func TestRatchetGateRejectsUnknownPrerequisite(t *testing.T) {
 	if err := gate.ValidateToolNames(); err == nil || !strings.Contains(err.Error(), "typo") {
 		t.Fatalf("policy validation error = %v", err)
 	}
+}
+
+func TestPolicyForToolsDefaultProfile(t *testing.T) {
+	const tool = "mosaic_hexxla_put_cell"
+	unavailable := ratchet.Rule{Tool: tool, AfterAny: []string{"mosaic_hexxla_find_seams"}, TTL: time.Minute}
+	first := ratchet.Rule{Tool: tool, AfterAny: []string{"mosaic_hexxla_list_tags", "mosaic_hexxla_tag_counts", "mosaic_hexxla_get_cell"}, Consume: true}
+	second := ratchet.Rule{Tool: tool, AfterAny: []string{"mosaic_hexxla_search_cells"}}
+	t.Run("keeps usable alternatives in order", func(t *testing.T) {
+		policy := ratchet.Policy{Rules: []ratchet.Rule{unavailable, first, second}}
+		filtered, err := PolicyForTools(policy, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		wantFirst := first
+		wantFirst.AfterAny = []string{"mosaic_hexxla_list_tags", "mosaic_hexxla_get_cell"}
+		wantFirst.TTL = unavailable.TTL
+		if want := []ratchet.Rule{wantFirst, second}; !reflect.DeepEqual(filtered.Rules, want) {
+			t.Fatalf("filtered rules = %+v, want %+v", filtered.Rules, want)
+		}
+	})
+	t.Run("rejects a guard with no usable alternatives", func(t *testing.T) {
+		policy := ratchet.Policy{Rules: []ratchet.Rule{unavailable}}
+		if _, err := PolicyForTools(policy, false); err == nil || !strings.Contains(err.Error(), tool) {
+			t.Fatalf("filter error = %v, want missing prerequisite for %s", err, tool)
+		}
+	})
 }
 
 func newRatchetTestServer(t *testing.T, failDiscovery bool, mutationCalls *atomic.Int32) *httptest.Server {

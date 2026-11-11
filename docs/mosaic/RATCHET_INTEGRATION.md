@@ -23,8 +23,9 @@ load_context_pack, put_cell, delete_cell, and list_tags (all with the
 `mosaic_hexxla_` prefix). `advanced_tools: true` adds raw embedding writes,
 facets/edges, seams, tag counts, policy inspection, retrieval-budget status and
 byte-budget estimation. Policy coverage follows the enabled profile; inactive
-guards are removed before the engine is constructed. A retained guard must
-still have an enabled prerequisite.
+tools and alternatives are removed before the engine is constructed. The
+remaining blocks and prerequisites keep their configured order. Startup fails
+if an enabled guarded tool has no usable block.
 
 ## Bundled workflow
 
