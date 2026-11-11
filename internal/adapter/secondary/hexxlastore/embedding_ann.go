@@ -23,21 +23,29 @@ func NewEmbeddingANNAdapter(live *LiveDB) *EmbeddingANNAdapter {
 
 // Search implements [secondary.EmbeddingANN].
 func (a *EmbeddingANNAdapter) Search(ctx context.Context, vector []float32, limit int, minScore float64) ([]domain.CellHit, error) {
+	out, err := a.SearchWithStats(ctx, vector, limit, minScore, 0)
+	return out.Hits, err
+}
+
+// SearchWithStats returns native execution path and effective ANN breadth.
+func (a *EmbeddingANNAdapter) SearchWithStats(ctx context.Context, vector []float32, limit int, minScore float64, efSearch int) (domain.CellHitsResponse, error) {
 	if a == nil || a.live == nil {
-		return nil, fmt.Errorf("hexxlastore embedding: nil database")
+		return domain.CellHitsResponse{}, fmt.Errorf("hexxlastore embedding: nil database")
 	}
 	if err := ctx.Err(); err != nil {
-		return nil, err
+		return domain.CellHitsResponse{}, err
 	}
 
 	var matches []domain.CellHit
+	var stats hexxladb.EmbeddingSearchStats
 	err := a.live.WithRead(func(db *hexxladb.DB) error {
 		return db.View(func(tx *hexxladb.Tx) error {
 			if err := ctx.Err(); err != nil {
 				return err
 			}
-			hits, err := tx.SearchByEmbedding(ctx, vector, hexxladb.EmbeddingSearchConfig{
+			hits, searchStats, err := tx.SearchByEmbeddingWithStats(ctx, vector, hexxladb.EmbeddingSearchConfig{
 				MaxResults: limit,
+				EfSearch:   efSearch,
 				MinScore:   minScore,
 			})
 			if err != nil {
@@ -46,6 +54,7 @@ func (a *EmbeddingANNAdapter) Search(ctx context.Context, vector []float32, limi
 			if err := ctx.Err(); err != nil {
 				return err
 			}
+			stats = searchStats
 			matches = make([]domain.CellHit, 0, len(hits))
 			for _, hit := range hits {
 				if err := ctx.Err(); err != nil {
@@ -62,26 +71,35 @@ func (a *EmbeddingANNAdapter) Search(ctx context.Context, vector []float32, limi
 				if !ok {
 					continue
 				}
+				var hint *hexxladb.Coord
+				if rec.ClusterHint != nil {
+					coord, err := hexxladb.Unpack(*rec.ClusterHint)
+					if err != nil {
+						return err
+					}
+					hint = &coord
+				}
 				matches = append(matches, domain.CellHit{
-					Coord:      domain.AxialCoord{Q: ax.Q, R: ax.R},
-					Score:      hit.Score,
-					RawContent: rec.RawContent,
-					Tags:       append([]string(nil), rec.Tags...),
-					SourceID:   rec.Provenance.SourceID,
-					Confidence: rec.Provenance.Confidence,
-					CreatedAt:  nanoWallToRFC3339(rec.Provenance.CreatedAt),
-					UpdatedAt:  nanoWallToRFC3339(rec.Provenance.UpdatedAt),
-					ValidFrom:  nanoWallPtrToRFC3339(rec.Validity.ValidFrom),
-					ValidTo:    nanoWallPtrToRFC3339(rec.Validity.ValidTo),
+					ClusterHint: domainCoordPtr(hint),
+					Coord:       domain.AxialCoord{Q: ax.Q, R: ax.R},
+					Score:       hit.Score,
+					RawContent:  rec.RawContent,
+					Tags:        append([]string(nil), rec.Tags...),
+					SourceID:    rec.Provenance.SourceID,
+					Confidence:  rec.Provenance.Confidence,
+					CreatedAt:   nanoWallToRFC3339(rec.Provenance.CreatedAt),
+					UpdatedAt:   nanoWallToRFC3339(rec.Provenance.UpdatedAt),
+					ValidFrom:   nanoWallPtrToRFC3339(rec.Validity.ValidFrom),
+					ValidTo:     nanoWallPtrToRFC3339(rec.Validity.ValidTo),
 				})
 			}
 			return ctx.Err()
 		})
 	})
 	if err != nil {
-		return nil, fmt.Errorf("hexxlastore embedding search: %w", err)
+		return domain.CellHitsResponse{}, fmt.Errorf("hexxlastore embedding search: %w", err)
 	}
-	return matches, nil
+	return domain.CellHitsResponse{Hits: matches, EmbeddingPath: string(stats.Path), EfSearch: stats.EfSearch}, nil
 }
 
 // Ensure EmbeddingANNAdapter implements secondary.EmbeddingANN.

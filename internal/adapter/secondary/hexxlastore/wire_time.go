@@ -8,7 +8,7 @@ import (
 
 // nanoWallToRFC3339 converts Hexxla wire timestamps (unix nanoseconds since epoch, UTC semantics on write).
 func nanoWallToRFC3339(ns int64) string {
-	if ns <= 0 {
+	if ns == 0 {
 		return ""
 	}
 	return time.Unix(0, ns).UTC().Format(time.RFC3339Nano)
@@ -19,7 +19,7 @@ func nanoWallPtrToRFC3339(p *int64) string {
 	if p == nil {
 		return ""
 	}
-	return nanoWallToRFC3339(*p)
+	return time.Unix(0, *p).UTC().Format(time.RFC3339Nano)
 }
 
 // timingsFromCellView maps provenance and validity onto domain cell projections.

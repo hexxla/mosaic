@@ -51,6 +51,7 @@ type MVCCSnapshot struct {
 
 // DatabaseLayout summarizes persisted parameters from the HexxlaDB file header (operator-facing).
 type DatabaseLayout struct {
+	EmbeddingModel     string `json:"embedding_model,omitempty" jsonschema:"recorded model name with optional SHA256 digest pin"`
 	PageSize           uint32 `json:"page_size_bytes" jsonschema:"B-tree page size"`
 	MaxValueBytes      uint32 `json:"max_value_bytes" jsonschema:"max encoded value size"`
 	EmbeddingDimension uint16 `json:"embedding_dimension" jsonschema:"fixed embedding vector dimension (0 if disabled)"`

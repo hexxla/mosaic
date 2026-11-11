@@ -39,7 +39,7 @@ func EnsureEmbeddingModel(db *hexxladb.DB, model string) error {
 		if err != nil || found {
 			return err
 		}
-		count, err := countEmbeddingRows(tx, 1)
+		count, err := countEmbeddingRows(context.Background(), tx, 1)
 		if err != nil {
 			return err
 		}
@@ -87,7 +87,7 @@ func Reembed(ctx context.Context, db *hexxladb.DB, model string, embedder second
 		if err != nil {
 			return err
 		}
-		count, err := countEmbeddingRows(tx, replaced+1)
+		count, err := countEmbeddingRows(ctx, tx, replaced+1)
 		if err != nil {
 			return err
 		}
@@ -103,15 +103,30 @@ func Reembed(ctx context.Context, db *hexxladb.DB, model string, embedder second
 
 // The pinned HexxlaDB API has no vector count. Scan only the documented
 // embed/ family and use the typed reindex API for vector changes.
-func countEmbeddingRows(tx *hexxladb.Tx, limit int) (int, error) {
+func countEmbeddingRows(ctx context.Context, tx *hexxladb.Tx, limit int) (int, error) {
+	if counter, ok := any(tx).(interface {
+		CountEmbeddings(context.Context, int) (int, error)
+	}); ok {
+		return counter.CountEmbeddings(ctx, limit)
+	}
 	prefix := []byte("embed/")
 	var count int
+	var canceled error
 	err := tx.AscendRange(prefix, []byte("embed0"), func(key, _ []byte) bool {
+		if canceled = ctx.Err(); canceled != nil {
+			return false
+		}
 		if !bytes.HasPrefix(key, prefix) {
 			return false
 		}
 		count++
 		return count < limit
 	})
-	return count, err
+	if err != nil {
+		return count, err
+	}
+	if canceled != nil {
+		return count, canceled
+	}
+	return count, ctx.Err()
 }

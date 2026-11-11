@@ -36,7 +36,7 @@ task run-mosaic-mcp
 For the demo, use **task seed** on an unused path. It requires Ollama with the
 configured embedding model. A repeat seed on an existing primary skips it.
 **task mosaic-dev** runs the seed task before starting MCP.
-[Ollama configuration](./MOSAIC_CONFIG.md#ollama)
+[Ollama configuration](./MOSAIC_CONFIG.md#ollama-optional)
 
 ## Change the embedding model
 
@@ -118,6 +118,14 @@ changefeed history, pending entries, or registered consumers and the default
 sidecar is missing, Mosaic requires the matching custom sidecar or restoration
 of the default one before serving writes.
 Starting a new feed records future writes. It does not backfill earlier writes.
+
+## Diagnose deletes and disk usage
+
+- Check `allow_delete_cell` in the startup policy and restart Mosaic after editing it. With advanced tools enabled, `get_persistence_policy` shows the active setting and `retrieval_budget_status` explains budget failures on reads between deletes. Deletes themselves do not charge the read budget.
+- A successful delete with `cell_removed: false` means the coordinate had no live cell. Use `get_cell` to verify an exact coordinate. Deleting a cell leaves any referencing seams in place, including resolved ones. A full health check can report them as orphans. Repair requires restoring the missing endpoint through an appropriate recovery procedure or reviewing an offline migration that omits the obsolete seam.
+- The default `health` call reports layout, file sizes, and the effective retention setting. Use `full_check: true` for integrity and MVCC counts. The full scan can delay writes. Compare primary and WAL sizes separately with `mvcc.commit_seq`, `mvcc.versioned_rows`, and `mvcc.logical_cells`.
+- A delete leaves a tombstone. Pruning can remove older versions while preserving the head tombstone, so the logical coordinate count can exceed the number of visible cells. Compaction copies the remaining keys, including tombstones.
+- File size reflects allocated pages and can stay stable while new records fit into existing pages. Page size is fixed at creation. Plaintext v2 needs compaction to reclaim dead pages. Authenticated v3 reuses free pages and supports reclaiming a contiguous free tail. Stop Mosaic for offline compaction and keep the recovery set together. [HexxlaDB maintenance procedures](https://github.com/hexxla/hexxladb/blob/2e5ed270ec49/docs/hexxladb/OPERATIONS.md#compaction)
 
 ## Upgrade an existing database
 

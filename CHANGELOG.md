@@ -9,17 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking usability/API changes
 
+- External query/write vectors must declare the database's `embedding_model` identity. Existing custom Ratchet policies enabling advanced tools must guard `put_cells`, `put_seam`, `delete_embedding` and `rebuild_embedding_index`.
+
 - Near-anchor `put_cell` calls require an `idempotency_key`. Retries with the same key and arguments return the original result.
 
 - Consolidate current API documentation and remove the superseded implementation tracker and historical tool-description audit.
 
 - Replace separate query and embedding-discovery tools with `search_cells` modes: lexical, pure-vector semantic, and filtered/composite hybrid. Search is global by default; positive radius opts into spatial restriction. Add exact `get_cell` with explicit presence.
-- Publish seven core tools by default; `advanced_tools: true` exposes all 22. Advanced facet/edge/seam operations, independent embeddings and policy/budget diagnostics retain their capabilities.
+- Publish seven core tools by default; `advanced_tools: true` exposes all 43. Advanced facet/edge/seam operations, independent embeddings and policy/budget diagnostics retain their capabilities.
 - Context accepts `max_budget_bytes` and reports `total_bytes` only. Remove token-named byte aliases, `omit_budget`, and inline approximate-token alternatives; the advanced conversion tool remains available.
 - Use one strict retention shape with boolean enforcement. Sample configuration selects selective capture, disables deletion, and leaves maintenance opt-in.
 - Use the simplified Ratchet engine, typed events and shared MCP success boundary. `ratchet: true` enables the bundled grouped policy; custom policies use the same single schema. Observer correlation IDs remain separate from transport IDs.
 
 ### Added
+
+- Expand advanced MCP coverage with bounded graph/FOV/Voronoi exploration, density/grid/taxonomy tools, retained snapshots/diffs, changefeed inspection, vector read/delete/rebuild, storage diagnostics, snapshot-pinned regional browsing/export and record chunks, and atomic idempotent capture batches.
+- Add optional Ollama digest pinning and lexical-only startup for native databases with unknown vector provenance. Expose ANN/candidate controls, historical lexical/context reads, graph context and richer metadata.
+- Forward cache size, primary fdatasync and lazy changefeed settings from database configuration.
 
 - Pin the simplified Ratchet API to commit `6b1683627372` (`v0.3.1-0.20261109183504-6b1683627372`). Dependency commits must be pushed before this Mosaic revision.
 - Optional `put_cell` `embed: true` computes a vector before the transaction and commits cell/vector atomically. Model or vector-write failure saves neither; responses report `embedded`.
@@ -31,6 +37,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   one-time alternatives, and reject policies naming unknown Mosaic tools.
 
 ### Fixed
+
+- Preserve omitted tags, creation timestamps, validity and cluster hints on cell overwrite; support explicit metadata overrides, exact tags and system-prompt templates. Guard facet derivation against concurrent source edits when a content hash is supplied.
+- Prefer typed upstream changefeed/vector/snapshot introspection when available while retaining compatibility with the published dependency pin.
+
+- Return database close failures from the MCP server command, preserving any serve or shutdown error.
+
+- Honor the shutdown context while waiting for active post-delete maintenance.
 
 - **Changefeed continuity** — Continue existing default HexxlaDB changefeeds on MCP startup. Use `-changefeed` to start a feed or `-changefeed-path` to select a custom sidecar. Startup rejects a missing sidecar when the primary retains changefeed state, even without registered consumers.
 - **Ratchet profiles** — Keep usable prerequisite alternatives in policy order and reject enabled guarded tools only when all alternatives are unavailable.
@@ -47,6 +60,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Retrieval budgets** — Release counters when MCP sessions close and pass the remaining budget into context assembly.
 
 ### Changed
+
+- Consolidate Mosaic architecture, API mapping, database troubleshooting, and roadmap guidance. Correct the demo encryption guidance and the persistence-policy tool description.
 
 - **Go and dependencies** — Require Go 1.27.4 and update imported Go modules.
 

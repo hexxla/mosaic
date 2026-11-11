@@ -163,7 +163,7 @@ var seedConversation = []seedMessage{
 	},
 	{
 		"assistant",
-		"Yes. New encrypted databases use authenticated XChaCha20-Poly1305 pages; existing AES-256-XTS files remain readable through the legacy path. A raw Options.EncryptionKey is expanded with HKDF-SHA256, while Options.Passphrase uses Argon2id with the per-database salt. Official encryption also authenticates the header, WAL, verifier, and optional changelog.",
+		"Yes. New encrypted databases use authenticated XChaCha20-Poly1305 pages; retired AES-256-XTS files require offline conversion before opening. A raw Options.EncryptionKey is expanded with HKDF-SHA256, while Options.Passphrase uses Argon2id with the per-database salt. Official encryption also authenticates the header, WAL, verifier, and optional changelog.",
 		[]string{"fact", "security", "encryption", "aes-xts", "argon2id", "user-123"},
 	},
 	{
@@ -428,7 +428,7 @@ var seedConversation = []seedMessage{
 	},
 	{
 		"assistant",
-		"3-2-1 rule: 3 copies, 2 different media, 1 offsite. For HexxlaDB: snapshot the data file + WAL while the DB is closed (or use RotateEncryption with a backup key as a copy mechanism). Test restores monthly. Use object storage (S3, GCS) with versioning for offsite. Automate and alert on backup age.",
+		"3-2-1 rule: 3 copies, 2 different media, 1 offsite. For HexxlaDB: use DB.BackupTo for a consistent primary, WAL and enabled changefeed recovery set; or copy the complete recovery set while the DB is closed. Key rotation is not a backup mechanism. Test restores monthly. Use object storage (S3, GCS) with versioning for offsite. Automate and alert on backup age.",
 		[]string{"fact", "operations", "backup", "database", "hexxladb", "user-123"},
 	},
 	{

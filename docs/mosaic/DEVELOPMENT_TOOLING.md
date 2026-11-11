@@ -15,7 +15,7 @@ MCP client connection settings remain local because configuration locations and 
 
 ## Codex MCP setup
 
-Start Mosaic using the [server quick start](../../README.md#step-5--run-the-mcp-server), then register its local Streamable HTTP endpoint:
+Start Mosaic using the [server quick start](../../README.md#start), then register its local Streamable HTTP endpoint:
 
 ```bash
 codex mcp add mosaic --url http://127.0.0.1:8787/mcp
@@ -53,7 +53,7 @@ Run `scripts/tool.sh golangci-lint run --enable modernize ./...` for an
 optional modernization pass.
 
 Tag a commit from `main` after CI passes. Build new versions from the tagged
-source using the [README instructions](../../README.md#get-started).
+source using the [README instructions](../../README.md#start).
 Published archives for [v0.3.0](https://github.com/hexxla/mosaic/releases/tag/v0.3.0)
 remain available.
 

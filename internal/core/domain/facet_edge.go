@@ -6,12 +6,12 @@ const (
 )
 
 // PutFacetCommand writes derived facet content for one cell facet slot ([0..MaxFacetID]).
-// PutFacet ignores derivation-hash coupling; use engine UpdateFacet workflows if you need
-// content-hash guarding (not exposed via Mosaic MCP currently).
+// ExpectedContentSHA256 selects guarded native UpdateFacet; omission selects unconditional PutFacet.
 type PutFacetCommand struct {
-	Coord          AxialCoord
-	FacetID        uint8
-	DerivedContent string
+	Coord                 AxialCoord
+	FacetID               uint8
+	DerivedContent        string
+	ExpectedContentSHA256 string
 }
 
 // LinkCellsCommand creates or replaces an edge Key(from→to,type) via the spec helper Tx.LinkCells.

@@ -2,6 +2,7 @@ package hexxlastore
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"time"
 
@@ -40,7 +41,18 @@ func (a *FacetEdgeStoreAdapter) PutFacet(ctx context.Context, cmd *domain.PutFac
 			if err := ctx.Err(); err != nil {
 				return fmt.Errorf("context: %w", err)
 			}
-			if err := tx.PutFacet(rec); err != nil {
+			var err error
+			if cmd.ExpectedContentSHA256 != "" {
+				digest, decodeErr := hex.DecodeString(cmd.ExpectedContentSHA256)
+				if decodeErr != nil || len(digest) != len(rec.DerivationHash) {
+					return fmt.Errorf("invalid facet content hash")
+				}
+				copy(rec.DerivationHash[:], digest)
+				err = tx.UpdateFacet(rec)
+			} else {
+				err = tx.PutFacet(rec)
+			}
+			if err != nil {
 				return fmt.Errorf("tx PutFacet: %w", err)
 			}
 			return nil

@@ -45,11 +45,11 @@ func runPostDeleteMaintain(ctx context.Context, live *LiveDB, cfg config.DeleteA
 	return nil
 }
 
-// scheduleMaintenance coalesces deletes. The mutex also serializes shutdown
+// scheduleMaintenance coalesces deletes. The gate also serializes shutdown
 // with a running callback and prevents a superseded timer from doing work.
 func (a *CellWriterAdapter) scheduleMaintenance(ctx context.Context) {
-	a.maintainMu.Lock()
-	defer a.maintainMu.Unlock()
+	a.maintenanceGate <- struct{}{}
+	defer func() { <-a.maintenanceGate }()
 	if a.maintenanceStopped {
 		return
 	}
@@ -63,8 +63,8 @@ func (a *CellWriterAdapter) scheduleMaintenance(ctx context.Context) {
 	a.maintenanceGeneration++
 	generation := a.maintenanceGeneration
 	a.debounceTimer = time.AfterFunc(a.maintain.DebounceAfterDelete, func() {
-		a.maintainMu.Lock()
-		defer a.maintainMu.Unlock()
+		a.maintenanceGate <- struct{}{}
+		defer func() { <-a.maintenanceGate }()
 		if a.maintenanceStopped || a.maintenanceGeneration != generation {
 			return
 		}
@@ -81,11 +81,18 @@ func (a *CellWriterAdapter) reportMaintenance(ctx context.Context) {
 	}
 }
 
-// FlushPostDeleteMaintain waits for active pruning and runs any pending pass
-// before the database is closed.
+// FlushPostDeleteMaintain waits for active pruning or context cancellation.
+// Once it owns the gate, it stops scheduling and runs any pending pass.
 func (a *CellWriterAdapter) FlushPostDeleteMaintain(ctx context.Context) error {
-	a.maintainMu.Lock()
-	defer a.maintainMu.Unlock()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case a.maintenanceGate <- struct{}{}:
+	}
+	defer func() { <-a.maintenanceGate }()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	a.maintenanceStopped = true
 	if a.debounceTimer == nil {
 		return nil

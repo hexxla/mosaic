@@ -4,10 +4,8 @@ For completed work, see [`CHANGELOG.md`](../CHANGELOG.md).
 
 ## Near-term
 
-Engineering polish aligned with Mosaic as the MCP orchestration layer over HexxlaDB. Details and checkboxes live in [`TODOS.md`](../TODOS.md); echoed here as roadmap themes.
-
-- **Large retrieval responses** — Context packs already trim against the remaining session budget. Query, search, and diagnostics still rely on a final serialized-size check. Profile representative workloads before adding response shaping or pre-estimation. See [`TODOS.md`](../TODOS.md).
-- **Approximate metering vs tokenizer** — `approx_tokens_used` is JSON UTF‑8 length ÷ `bytes_per_approx_token`, not the host tokenizer. **Explore:** labeling vs optional hooks. [`TODOS.md`](../TODOS.md) *(Pending)*.
+- **Large retrieval responses** — Context packs trim against the remaining session budget. Search and diagnostics rely on a final serialized-size check. Profile representative workloads before adding response shaping or pre-estimation.
+- **Approximate metering and tokenizer alignment** — `approx_tokens_used` estimates token cost from JSON UTF-8 bytes. Explore clearer labeling or host tokenizer hooks if an agent workflow needs them.
 
 ## Future
 
@@ -21,11 +19,13 @@ Spec or direction exists; scheduling TBD.
 Interesting but unvalidated; needs product signal.
 
 - **Metrics export** — Prometheus/OpenTelemetry counters for `approx_tokens_used` per session or globally (today: in-process + `mosaic_hexxla_retrieval_budget_status`).
-- **Bounded taxonomy analytics (recommended first read-only experiment)** — Evaluate `TagCooccurrences(min_count)` and radius-bounded `UntaggedCells` tools. They directly improve tag reuse and memory hygiene, require no Ollama, and can be hard-capped by minimum count, radius, and result count.
-- **Bounded relationship traversal (recommended second read-only experiment)** — Evaluate `FindEdgePath` and `WalkEdgeCoords` behind strict `max_hops`, `max_nodes`/`max_coords`, relation filters, and response-size caps. Validate a real agent navigation workflow before exposing weighted-path details.
-- **Lattice density diagnostics** — Evaluate a small `RingDensityMap` response for placement/coverage decisions. Keep rendered grids and super-hex derived indexes in native/operator tooling unless a concrete agent workflow demonstrates value.
-- **Snapshot/time-travel reads** — Evaluate list/read/diff operations only after specifying retained-history availability, authorization, maximum sequence/time span, and response caps. Snapshot creation/deletion remains operator-only.
-- **Bounded changelog peek** — Evaluate `ReadChangelogFiltered` only for a demonstrated audit workflow with strict sequence, operation, record-count, and byte limits. Consumer cursor mutation and retention coordination remain operator-only.
+- **Global/ranked continuation** — Regional browsing/export now has snapshot-pinned continuation. Global ranked queries still need a native stable cursor, tie-breaking and work/byte budgets; do not emulate them with offsets over changing results.
+- **Bounded native diagnostics** — Snapshot diff materializes its narrow window, and storage statistics/snapshot-name enumeration lack scan cancellation. Add native memory/work budgets before expanding these agent limits.
+- **Bounded super-hex summaries** — The native global derived-index rebuild lacks a cell/memory budget; add a bounded upstream contract before exposing it generally.
+- **Minimum dependency adoption** — Publish/adopt HexxlaDB's typed retained-changefeed, embedding-count and read-sequence accessors, then remove the isolated legacy compatibility scans. Mosaic currently supports both published pins and current checkouts.
+- **Context orchestration** — Evaluate pluggable seed selection, multi-seed ranking, and host-provided packing strategies with representative agent queries.
+- **Memory evolution** — Explore application-managed facet derivation and rotation, preference-aware ranking, and reviewable conflict detection and resolution. Measure retrieval coherence, resolution quality, reproducibility, and neighborhood latency before exposing automatic behavior.
+- **Inspectability** — Evaluate ring and seam overlays, temporal navigation, and changefeed-backed collaboration against concrete operator workflows.
 
 ## Out of Scope
 

@@ -23,8 +23,11 @@ type MosaicConfigLoaded struct {
 	Ratchet         bool
 	AdvancedTools   bool
 	// DatabasePassphrase is optional at-rest encryption passphrase from YAML (prefer MOSAIC_DB_PASSPHRASE or -db-passphrase).
-	DatabasePassphrase string
-	Retrieval          RetrievalBudgetConfig
+	PageCacheBytes      int64
+	UsePrimaryFdatasync bool
+	ChangelogLazy       bool
+	DatabasePassphrase  string
+	Retrieval           RetrievalBudgetConfig
 
 	// MVCCRetainCommitsBehindHead is forwarded into [hexxladb.Options.MVCCRetention] on each Mosaic open (including post-compact reopen).
 	MVCCRetainCommitsBehindHead uint64
@@ -33,7 +36,8 @@ type MosaicConfigLoaded struct {
 	// OllamaBaseURL — trimmed from **`ollama.base_url`** when set ([ResolveOllama] applies after env).
 	OllamaBaseURL string
 	// OllamaEmbedModel — trimmed from **`ollama.embed_model`** when set.
-	OllamaEmbedModel string
+	OllamaEmbedModel     string
+	OllamaExpectedDigest string
 }
 
 // retentionYAMLFields is the retention subsection (capture_mode, enforcement, notes).
@@ -45,7 +49,10 @@ type retentionYAMLFields struct {
 
 // databaseYAMLFields is optional DB encryption hints (avoid committing real secrets in Git).
 type databaseYAMLFields struct {
-	Passphrase string `yaml:"passphrase"`
+	PageCacheBytes      int64  `yaml:"page_cache_bytes,omitempty"`
+	UsePrimaryFdatasync bool   `yaml:"use_primary_fdatasync,omitempty"`
+	ChangelogLazy       bool   `yaml:"changelog_lazy,omitempty"`
+	Passphrase          string `yaml:"passphrase"`
 	// MVCCRetainCommitsBehindHead maps to [hexxladb.Options.MVCCRetention] when opening Mosaic MCP (see OPERATIONS pruning).
 	MVCCRetainCommitsBehindHead *uint64           `yaml:"mvcc_retain_commits_behind_head,omitempty"`
 	AutoMaintainAfterCellDelete *autoMaintainYAML `yaml:"auto_maintain_after_cell_delete,omitempty"`
@@ -69,8 +76,9 @@ type retrievalYAMLFields struct {
 
 // ollamaYAMLFields is optional Ollama HTTP root and embedding model (see [ResolveOllama] precedence).
 type ollamaYAMLFields struct {
-	BaseURL    string `yaml:"base_url,omitempty"`
-	EmbedModel string `yaml:"embed_model,omitempty"`
+	ExpectedDigest string `yaml:"expected_digest,omitempty"`
+	BaseURL        string `yaml:"base_url,omitempty"`
+	EmbedModel     string `yaml:"embed_model,omitempty"`
 }
 
 // rawMosaicConfig is the top-level YAML document.
@@ -203,13 +211,25 @@ func ParseMosaicConfigYAML(data []byte) (MosaicConfigLoaded, error) {
 		}
 	}
 
-	ollURL, ollModel := "", ""
+	ollURL, ollModel, ollDigest := "", "", ""
 	if raw.Ollama != nil {
 		ollURL = strings.TrimSpace(raw.Ollama.BaseURL)
 		ollModel = strings.TrimSpace(raw.Ollama.EmbedModel)
+		ollDigest = strings.TrimSpace(raw.Ollama.ExpectedDigest)
 	}
 
+	var cacheBytes int64
+	var fdatasync, lazy bool
+	if raw.Database != nil {
+		cacheBytes = raw.Database.PageCacheBytes
+		fdatasync = raw.Database.UsePrimaryFdatasync
+		lazy = raw.Database.ChangelogLazy
+		if cacheBytes < -1 || cacheBytes > 1<<30 {
+			return MosaicConfigLoaded{}, fmt.Errorf("database.page_cache_bytes must be -1..1073741824")
+		}
+	}
 	loaded := MosaicConfigLoaded{
+		PageCacheBytes: cacheBytes, UsePrimaryFdatasync: fdatasync, ChangelogLazy: lazy,
 		Retention:                   rt,
 		AllowDeleteCell:             allowDelete,
 		Ratchet:                     raw.Ratchet,
@@ -220,6 +240,7 @@ func ParseMosaicConfigYAML(data []byte) (MosaicConfigLoaded, error) {
 		DeleteAutoMaintain:          delMaintain,
 		OllamaBaseURL:               ollURL,
 		OllamaEmbedModel:            ollModel,
+		OllamaExpectedDigest:        ollDigest,
 	}
 	applyDeleteAutoMaintainDefaults(&loaded)
 	return loaded, nil

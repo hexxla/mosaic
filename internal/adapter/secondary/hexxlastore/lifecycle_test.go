@@ -1,11 +1,13 @@
 package hexxlastore
 
 import (
+	"context"
 	"errors"
 	"path/filepath"
 	"runtime"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/hexxla/hexxladb"
@@ -75,6 +77,34 @@ func TestLiveDBCloseWaitsForActiveCallAndRejectsNewCalls(t *testing.T) {
 	if err := live.Close(); err != nil {
 		t.Fatalf("repeated Close: %v", err)
 	}
+}
+
+func TestFlushCancellationWhileMaintenanceOwnsGate(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		writer := NewCellWriterAdapter(nil, config.DeleteAutoMaintainConfig{})
+		writer.maintenanceGate <- struct{}{}
+		defer func() { <-writer.maintenanceGate }()
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+		done := make(chan error, 1)
+		go func() { done <- writer.FlushPostDeleteMaintain(ctx) }()
+		synctest.Wait()
+		select {
+		case err := <-done:
+			t.Fatalf("flush returned while maintenance owned the gate: %v", err)
+		default:
+		}
+		cancel()
+		synctest.Wait()
+		select {
+		case err := <-done:
+			if !errors.Is(err, context.Canceled) {
+				t.Fatalf("flush error = %v, want context.Canceled", err)
+			}
+		default:
+			t.Fatal("flush still waiting for active maintenance after cancellation")
+		}
+	})
 }
 
 func TestFlushRunsPendingMaintenanceAndStopsFutureScheduling(t *testing.T) {

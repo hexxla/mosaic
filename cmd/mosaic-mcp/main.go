@@ -37,7 +37,7 @@ func main() {
 	}
 }
 
-func run(log *slog.Logger) error {
+func run(log *slog.Logger) (runErr error) {
 	policyFlag := flag.String("policy", "", "path to Mosaic config YAML (retention section; overrides "+config.EnvPolicyFile+")")
 	dbPassphraseFlag := flag.String("db-passphrase", "", "optional HexxlaDB encryption passphrase (overrides "+config.EnvDBPassphrase+"; avoid on shared hosts — visible in process list)")
 	dbFlag := flag.String("db", "", "path to HexxlaDB file (overrides -name and "+config.EnvDBPath+")")
@@ -45,6 +45,7 @@ func run(log *slog.Logger) error {
 	dbDirFlag := flag.String("db-dir", "", "parent directory when using -name (default: from "+config.EnvMosaicDBDir+" or .tmp)")
 	changefeedFlag := flag.Bool("changefeed", false, "enable the HexxlaDB changefeed; an existing default sidecar is continued automatically")
 	changefeedPathFlag := flag.String("changefeed-path", "", "use this HexxlaDB changefeed sidecar instead of the default; implies -changefeed")
+	lexicalOnlyFlag := flag.Bool("lexical-only", false, "disable all embedding generation/search/writes; permit lexical access without adopting native vectors of unknown origin")
 	reembedFlag := flag.Bool("reembed", false, "regenerate all live-cell embeddings with the configured Ollama model and exit")
 	ratchetConfigFlag := flag.String("ratchet-config", "", "path to Ratchet workflow YAML (overrides "+config.EnvRatchetConfigFile+"); a custom path enables Ratchet")
 	ratchetObservabilityTokenFileFlag := flag.String("ratchet-observability-token-file", "", "private bearer-token file; enables the authenticated live Ratchet WebSocket stream")
@@ -102,8 +103,9 @@ func run(log *slog.Logger) error {
 	}
 
 	ollamaCfg, err := config.ResolveOllama(config.OllamaResolveInput{
-		YAMLBaseURL:    mosaicLoaded.OllamaBaseURL,
-		YAMLEmbedModel: mosaicLoaded.OllamaEmbedModel,
+		YAMLBaseURL:        mosaicLoaded.OllamaBaseURL,
+		YAMLEmbedModel:     mosaicLoaded.OllamaEmbedModel,
+		YAMLExpectedDigest: mosaicLoaded.OllamaExpectedDigest,
 	})
 	if err != nil {
 		return fmt.Errorf("config ollama: %w", err)
@@ -132,6 +134,9 @@ func run(log *slog.Logger) error {
 	}
 
 	openOpts := config.MergeMVCCRetainIntoOpenOptions(encOpts, mosaicLoaded.MVCCRetainCommitsBehindHead)
+	openOpts.PageCacheSize = mosaicLoaded.PageCacheBytes
+	openOpts.UsePrimaryFdatasync = mosaicLoaded.UsePrimaryFdatasync
+	openOpts.ChangelogLazy = mosaicLoaded.ChangelogLazy
 	openOpts.ChangelogPath = *changefeedPathFlag
 	openOpts.ChangelogEnabled = *changefeedFlag || openOpts.ChangelogPath != ""
 
@@ -145,28 +150,33 @@ func run(log *slog.Logger) error {
 		return fmt.Errorf("open database: %w", err)
 	}
 	ollamaClient := ollamac.NewClient(ollamaCfg.Base, ollamaCfg.Model)
+	ollamaClient.ExpectedDigest = ollamaCfg.ExpectedDigest
+	modelIdentity := ollamaClient.ModelIdentity()
 	embedder := ollamaembed.NewTextEmbedder(ollamaClient)
+	if *reembedFlag && *lexicalOnlyFlag {
+		return errors.Join(errors.New("-reembed and -lexical-only are mutually exclusive"), db.Close())
+	}
 	if *reembedFlag {
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer stop()
-		err := hexxlastore.Reembed(ctx, db, ollamaCfg.Model, embedder)
+		err := hexxlastore.Reembed(ctx, db, modelIdentity, embedder)
 		if err := errors.Join(err, db.Close()); err != nil {
 			return fmt.Errorf("re-embed database: %w", err)
 		}
 		log.Info("re-embedded database", "path", dbCfg.Path, "model", ollamaCfg.Model)
 		return nil
 	}
-	if err := hexxlastore.EnsureEmbeddingModel(db, ollamaCfg.Model); err != nil {
+	if err := ensureServerEmbeddingModel(db, modelIdentity, *lexicalOnlyFlag); err != nil {
 		return fmt.Errorf("database embedding model: %w", errors.Join(err, db.Close()))
 	}
 	embeddingDimAtBoot := db.EmbeddingDimension()
+	if *lexicalOnlyFlag {
+		embeddingDimAtBoot = 0
+		embedder = nil
+	}
 
 	live := hexxlastore.NewLiveDB(db)
-	defer func() {
-		if cerr := live.Close(); cerr != nil {
-			log.Error("close database", "err", cerr)
-		}
-	}()
+	defer closeServerDatabase(&runErr, live.Close)
 
 	engineHealth := hexxlastore.NewEngineHealthAdapter(live, dbCfg.Path)
 	healthSvc := services.NewHealthService(engineHealth, version, mosaicLoaded.MVCCRetainCommitsBehindHead)
@@ -176,7 +186,7 @@ func run(log *slog.Logger) error {
 	cellRetrieval := services.NewCellRetrievalService(
 		cellReader, embeddingANN,
 		embedder,
-		embeddingDimAtBoot,
+		embeddingDimAtBoot, modelIdentity,
 	)
 
 	contextPackLoader := hexxlastore.NewContextPackAdapter(live)
@@ -195,6 +205,7 @@ func run(log *slog.Logger) error {
 	mutationSvc := services.NewCellMutationService(
 		cellWriter, embedder, embeddingDimAtBoot,
 		services.WithMutationPolicy(runtimeCfg.MutationPolicy()),
+		services.WithEmbeddingModel(modelIdentity),
 	)
 
 	seamStore := hexxlastore.NewSeamStoreAdapter(live)
@@ -221,9 +232,20 @@ func run(log *slog.Logger) error {
 		func() error { return mcpsrv.RegisterListTagsTool(srv, tagBrowseSvc, log, retrievalBudget) },
 	}
 	if mosaicLoaded.AdvancedTools {
+		explorerStore := hexxlastore.NewMemoryExplorerAdapter(live)
+		explorerSvc := services.NewMemoryExplorationService(explorerStore)
+		embeddingMaintenance := services.NewEmbeddingMaintenanceService(explorerStore, !*lexicalOnlyFlag)
 		registrations = append(registrations,
+			func() error {
+				return mcpsrv.RegisterBrowseTools(srv, services.NewMemoryBrowseService(explorerStore), retrievalBudget)
+			},
+			func() error {
+				return mcpsrv.RegisterExplorationTools(srv, explorerSvc, embeddingMaintenance, retrievalBudget)
+			},
+			func() error { return mcpsrv.RegisterCellBatchTool(srv, mutationSvc) },
 			func() error { return mcpsrv.RegisterPutEmbeddingTool(srv, mutationSvc, log) },
 			func() error { return mcpsrv.RegisterContextBudgetEstimateTool(srv, log) },
+			func() error { return mcpsrv.RegisterSeamRecordTool(srv, services.NewSeamRecordService(seamStore)) },
 			func() error { return mcpsrv.RegisterSeamTools(srv, seamSvc, log, retrievalBudget) },
 			func() error { return mcpsrv.RegisterFacetEdgeTools(srv, facetEdgeSvc, log) },
 			func() error { return mcpsrv.RegisterFacetEdgeBrowseTools(srv, facetEdgeBrowse, log, retrievalBudget) },
@@ -282,6 +304,12 @@ func run(log *slog.Logger) error {
 		serveErr = nil
 	}
 	return errors.Join(serveErr, shutdownErr)
+}
+
+func closeServerDatabase(runErr *error, closeDB func() error) {
+	if err := closeDB(); err != nil {
+		*runErr = errors.Join(*runErr, fmt.Errorf("close database: %w", err))
+	}
 }
 
 func openMosaicDatabase(path string, opts *hexxladb.Options) (*hexxladb.DB, error) {
@@ -415,4 +443,11 @@ func (c *activeToolCalls) stop() <-chan struct{} {
 		}
 	}
 	return c.drained
+}
+
+func ensureServerEmbeddingModel(db *hexxladb.DB, model string, lexicalOnly bool) error {
+	if lexicalOnly {
+		return nil
+	}
+	return hexxlastore.EnsureEmbeddingModel(db, model)
 }

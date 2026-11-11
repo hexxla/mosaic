@@ -43,7 +43,19 @@ func (s *ContextAssemblyService) LoadFromSeeds(ctx context.Context, cmd *domain.
 	if len(cmd.Seeds) > maxContextSeedCoords {
 		return domain.ContextPackResponse{}, fmt.Errorf("context assembly: too many seeds (max %d)", maxContextSeedCoords)
 	}
+	if cmd.Snapshot != nil {
+		if err := validateSnapshot(*cmd.Snapshot); err != nil {
+			return domain.ContextPackResponse{}, err
+		}
+		if cmd.EdgeFilter != "" || cmd.IncludeEdges {
+			return domain.ContextPackResponse{}, fmt.Errorf("historical context cannot traverse or enrich current edges")
+		}
+	}
 	normalized := *cmd
+	if cmd.MaxRing < 0 || cmd.MaxCells < 0 || cmd.MaxHops < 0 || cmd.MaxHops > 32 || cmd.SeamRadius < 0 || cmd.SeamRadius > 32 {
+		return domain.ContextPackResponse{}, fmt.Errorf("context assembly: ring, seam radius and hops must be 0..32; max_cells must be nonnegative")
+	}
+
 	if normalized.MaxRing <= 0 {
 		normalized.MaxRing = defaultContextMaxRing
 	}

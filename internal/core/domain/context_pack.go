@@ -1,8 +1,17 @@
 package domain
 
+import "time"
+
 // LoadContextPackCommand selects HexxlaDB context candidates and Mosaic budgeting.
 type LoadContextPackCommand struct {
-	Seeds []AxialCoord
+	Snapshot            *SnapshotSelector
+	Seeds               []AxialCoord
+	EdgeFilter          string
+	MaxHops             int
+	AsOf                *time.Time
+	IncludeEdges        bool
+	SeamRadius          int
+	UnresolvedSeamsOnly bool
 
 	MaxRing  int
 	MaxCells int // caps candidate pool; 0 uses the engine default (256)
@@ -25,8 +34,20 @@ type ContextPackStatsDTO struct {
 	MaxRingUsed       int `json:"max_ring_used"`
 }
 
+// ContextFacetMetadata identifies a facet without duplicating its text payload.
+type ContextFacetMetadata struct {
+	FacetID        uint8  `json:"facet_id"`
+	LastRotated    string `json:"last_rotated,omitempty"`
+	DerivationHash string `json:"derivation_hash,omitempty"`
+}
+
 // ContextPackCell is a slim projection of a cell in an assembled pack.
 type ContextPackCell struct {
+	ClusterHint    *AxialCoord            `json:"cluster_hint,omitempty"`
+	SupersededFrom *AxialCoord            `json:"superseded_from,omitempty"`
+	FacetMetadata  []ContextFacetMetadata `json:"facet_metadata,omitempty"`
+	Edges          []EdgeBullet           `json:"edges,omitempty"`
+
 	Coord      AxialCoord `json:"coord"`
 	RawContent string     `json:"raw_content,omitempty"`
 	Tags       []string   `json:"tags,omitempty"`
@@ -47,10 +68,16 @@ type ContextPackCell struct {
 
 // ContextSeamSummary is a minimal seam projection for tooling.
 type ContextSeamSummary struct {
-	ID               string `json:"id"`
-	SeamType         string `json:"seam_type"`
-	Reason           string `json:"reason,omitempty"`
-	ResolutionStatus string `json:"resolution_status,omitempty"`
+	CellA            AxialCoord `json:"cell_a"`
+	CellB            AxialCoord `json:"cell_b"`
+	ResolutionNote   string     `json:"resolution_note,omitempty"`
+	SourceID         string     `json:"source_id,omitempty"`
+	ValidFrom        string     `json:"valid_from,omitempty"`
+	ValidTo          string     `json:"valid_to,omitempty"`
+	ID               string     `json:"id"`
+	SeamType         string     `json:"seam_type"`
+	Reason           string     `json:"reason,omitempty"`
+	ResolutionStatus string     `json:"resolution_status,omitempty"`
 }
 
 // ContextPackResponse is the MCP result for Mosaic context assembly.

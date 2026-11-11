@@ -1,6 +1,7 @@
 package config
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -53,5 +54,16 @@ func TestResolveOllama_flagOverridesYAML(t *testing.T) {
 	}
 	if got.Base.String() != "http://flag:1" || got.Model != "flag-model" {
 		t.Fatalf("got base=%s model=%s", got.Base.String(), got.Model)
+	}
+}
+
+func TestResolveOllamaDigestPin(t *testing.T) {
+	t.Setenv(EnvEmbedDigest, "")
+	got, err := ResolveOllama(OllamaResolveInput{YAMLExpectedDigest: "sha256:" + strings.Repeat("a", 64)})
+	if err != nil || got.ExpectedDigest != strings.Repeat("a", 64) {
+		t.Fatalf("digest=%+v,%v", got, err)
+	}
+	if _, err := ResolveOllama(OllamaResolveInput{YAMLExpectedDigest: "invalid"}); err == nil {
+		t.Fatal("invalid digest accepted")
 	}
 }

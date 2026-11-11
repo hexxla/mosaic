@@ -67,6 +67,7 @@ func main() {
 		credentials.YAMLPassphrase = loaded.DatabasePassphrase
 		ollIn.YAMLBaseURL = loaded.OllamaBaseURL
 		ollIn.YAMLEmbedModel = loaded.OllamaEmbedModel
+		ollIn.YAMLExpectedDigest = loaded.OllamaExpectedDigest
 	}
 	ollamaCfg, err := config.ResolveOllama(ollIn)
 	if err != nil {
@@ -81,6 +82,7 @@ func main() {
 	}
 
 	oc := ollamac.NewClient(ollamaCfg.Base, ollamaCfg.Model)
+	oc.ExpectedDigest = ollamaCfg.ExpectedDigest
 
 	if err := run(log, dbPath, replaceExisting, oc, credentials, layout); err != nil {
 		log.Error(err.Error())
@@ -120,7 +122,7 @@ func run(
 	sessionID := fmt.Sprintf("mosaic-seed-%d", time.Now().UnixNano())
 	embedDim := int(layout.EmbeddingDimension)
 	if err := hexxlastore.CreateCandidate(ctx, dbPath, opts, func(db *hexxladb.DB) error {
-		if err := hexxlastore.EnsureEmbeddingModel(db, oc.Model); err != nil {
+		if err := hexxlastore.EnsureEmbeddingModel(db, oc.ModelIdentity()); err != nil {
 			return fmt.Errorf("bind seed embedding model: %w", err)
 		}
 		return seedDatabase(ctx, log, db, oc, sessionID, embedDim)

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/hex"
 	"fmt"
 	"net/url"
 	"os"
@@ -10,6 +11,8 @@ import (
 const (
 	// EnvOllamaURL is the env var for the Ollama HTTP root (e.g. http://127.0.0.1:11434).
 	EnvOllamaURL = "MOSAIC_OLLAMA_URL" //nolint:gosec // G101: documented env name, not a secret
+	// EnvEmbedDigest optionally pins a SHA256 model digest.
+	EnvEmbedDigest = "MOSAIC_EMBED_DIGEST"
 	// EnvEmbedModel is the env var for the embedding model name (e.g. all-minilm).
 	EnvEmbedModel  = "MOSAIC_EMBED_MODEL"
 	defaultOllama  = "http://127.0.0.1:11434"
@@ -21,7 +24,8 @@ type Ollama struct {
 	// Base is the parsed Ollama root URL (e.g. http://127.0.0.1:11434).
 	Base *url.URL
 	// Model is the embeddings model name (e.g. all-minilm).
-	Model string
+	Model          string
+	ExpectedDigest string
 }
 
 // OllamaResolveInput selects Ollama settings with explicit precedence ([ResolveOllama]).
@@ -31,8 +35,9 @@ type OllamaResolveInput struct {
 	// FlagEmbedModel — non-empty from CLI (e.g. mosaic-seed -embed-model).
 	FlagEmbedModel string
 	// YAMLBaseURL / YAMLEmbedModel come from optional policy **`ollama:`** (**`base_url`**, **`embed_model`**).
-	YAMLBaseURL    string
-	YAMLEmbedModel string
+	YAMLExpectedDigest string
+	YAMLBaseURL        string
+	YAMLEmbedModel     string
 }
 
 // ResolveOllama builds [Ollama] with precedence:
@@ -70,7 +75,18 @@ func ResolveOllama(in OllamaResolveInput) (Ollama, error) {
 	if model == "" {
 		model = defaultEmbedML
 	}
-	return Ollama{Base: u, Model: model}, nil
+	digest := strings.TrimSpace(in.YAMLExpectedDigest)
+	if digest == "" {
+		digest = strings.TrimSpace(os.Getenv(EnvEmbedDigest))
+	}
+	digest = strings.ToLower(strings.TrimPrefix(digest, "sha256:"))
+	if digest != "" {
+		decoded, err := hex.DecodeString(digest)
+		if err != nil || len(decoded) != 32 {
+			return Ollama{}, fmt.Errorf("embedding digest must contain 64 hexadecimal SHA256 characters")
+		}
+	}
+	return Ollama{Base: u, Model: model, ExpectedDigest: digest}, nil
 }
 
 // Keep parsing causes inspectable without printing potentially secret URL components.

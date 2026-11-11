@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/sploitzberg/mosaic/internal/core/domain"
 	"github.com/sploitzberg/mosaic/internal/core/ports/primary"
@@ -23,14 +24,20 @@ const (
 
 // CellMutationService implements [primary.CellMutation] with validation and optional Ollama for embed text.
 type CellMutationService struct {
-	writer    secondary.CellWriter
-	embedText secondary.TextEmbedder
-	embedDim  uint16
-	policy    domain.MutationPolicy
+	writer         secondary.CellWriter
+	embedText      secondary.TextEmbedder
+	embedDim       uint16
+	embeddingModel string
+	policy         domain.MutationPolicy
 }
 
 // CellMutationOption configures [NewCellMutationService].
 type CellMutationOption func(*CellMutationService)
+
+// WithEmbeddingModel requires caller-declared identity for external vectors.
+func WithEmbeddingModel(model string) CellMutationOption {
+	return func(s *CellMutationService) { s.embeddingModel = model }
+}
 
 // WithMutationPolicy sets the application policy for cell writes.
 func WithMutationPolicy(policy domain.MutationPolicy) CellMutationOption {
@@ -133,6 +140,9 @@ func (s *CellMutationService) PutEmbedding(ctx context.Context, cmd *domain.PutE
 			return fmt.Errorf("cell mutation embed: %w", err)
 		}
 	} else {
+		if s.embeddingModel != "" && cmd.EmbeddingModel != s.embeddingModel {
+			return fmt.Errorf("cell mutation: raw vector embedding_model must match %q", s.embeddingModel)
+		}
 		vec = cmd.Vector
 		if len(vec) != int(s.embedDim) {
 			return fmt.Errorf("cell mutation: vector length %d does not match database embedding dimension %d", len(vec), s.embedDim)
@@ -178,12 +188,15 @@ func normalizePutCell(cmd *domain.PutCellCommand) (*domain.PutCellCommand, error
 		kind = domain.CellPutKindFact
 	}
 	switch kind {
-	case domain.CellPutKindFact, domain.CellPutKindUserMessage, domain.CellPutKindAssistantResponse:
+	case domain.CellPutKindFact, domain.CellPutKindUserMessage, domain.CellPutKindAssistantResponse, domain.CellPutKindSystemPrompt:
 	default:
 		return nil, fmt.Errorf("cell mutation: kind must be %q, %q, or %q",
 			domain.CellPutKindFact, domain.CellPutKindUserMessage, domain.CellPutKindAssistantResponse)
 	}
-	tags := make([]string, 0, len(cmd.Tags))
+	var tags []string
+	if cmd.Tags != nil {
+		tags = make([]string, 0, len(cmd.Tags))
+	}
 	for _, t := range cmd.Tags {
 		t = strings.TrimSpace(t)
 		if t == "" {
@@ -228,7 +241,28 @@ func normalizePutCell(cmd *domain.PutCellCommand) (*domain.PutCellCommand, error
 		return nil, fmt.Errorf("cell mutation: placement must be %q or %q",
 			domain.CellPlacementExact, domain.CellPlacementNearAnchor)
 	}
+	if m := cmd.Metadata; m != nil {
+		for _, instant := range []*time.Time{m.ValidFrom, m.ValidTo, m.CreatedAt, m.UpdatedAt} {
+			if err := validateWireTime(instant); err != nil {
+				return nil, err
+			}
+		}
+		if len(m.FactType) > 512 {
+			return nil, fmt.Errorf("fact_type exceeds 512 bytes")
+		}
+
+		if m.ClearValidity && (m.ValidFrom != nil || m.ValidTo != nil) {
+			return nil, fmt.Errorf("cell mutation: clear_validity conflicts with validity bounds")
+		}
+		if m.ClearClusterHint && m.ClusterHint != nil {
+			return nil, fmt.Errorf("cell mutation: clear_cluster_hint conflicts with cluster_hint")
+		}
+		if m.ValidFrom != nil && m.ValidTo != nil && !m.ValidFrom.Before(*m.ValidTo) {
+			return nil, fmt.Errorf("cell mutation: valid_from must precede valid_to")
+		}
+	}
 	out := &domain.PutCellCommand{
+		Metadata:       cmd.Metadata,
 		Coord:          cmd.Coord,
 		RawContent:     cmd.RawContent,
 		Tags:           tags,
@@ -246,3 +280,10 @@ func normalizePutCell(cmd *domain.PutCellCommand) (*domain.PutCellCommand, error
 
 // Ensure CellMutationService implements primary.CellMutation.
 var _ primary.CellMutation = (*CellMutationService)(nil)
+
+func validateWireTime(instant *time.Time) error {
+	if instant != nil && !instant.Equal(time.Unix(0, instant.UnixNano())) {
+		return fmt.Errorf("timestamp is outside the nanosecond storage range")
+	}
+	return nil
+}

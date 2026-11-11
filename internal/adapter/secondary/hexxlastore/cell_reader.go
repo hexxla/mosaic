@@ -34,7 +34,7 @@ func (a *CellReaderAdapter) SearchCells(ctx context.Context, q *domain.CellSearc
 	hq.Embedding = embedding
 	var out domain.CellHitsResponse
 	err = a.live.WithRead(func(db *hexxladb.DB) error {
-		return db.View(func(tx *hexxladb.Tx) error {
+		return viewSnapshot(db, q.Snapshot, func(tx *hexxladb.Tx) error {
 			res, stats, err := tx.QueryCellsWithStats(ctx, hq)
 			out.ScanLimitReached = errors.Is(err, hexxladb.ErrQueryScanLimit)
 			if err != nil && !out.ScanLimitReached {
@@ -80,6 +80,13 @@ func (a *CellReaderAdapter) GetCell(ctx context.Context, coord domain.AxialCoord
 				return nil
 			}
 			view := hexxladb.CellView{Coord: hexxladb.Coord{Q: coord.Q, R: coord.R}, RawContent: rec.RawContent, Tags: rec.Tags, Provenance: rec.Provenance, Validity: rec.Validity}
+			if rec.ClusterHint != nil {
+				hint, err := hexxladb.Unpack(*rec.ClusterHint)
+				if err != nil {
+					return err
+				}
+				view.ClusterHint = &hint
+			}
 			hit := viewToCellHit(&view, 0, "")
 			out = domain.CellLookupResponse{Found: true, Cell: &hit}
 			return ctx.Err()
@@ -100,17 +107,18 @@ func toCellQuery(q *domain.CellSearchCommand) (hexxladb.CellQuery, error) {
 		text = q.LexicalQuery
 	}
 	hq := hexxladb.CellQuery{
-		Query:         text,
-		RequireTags:   slices.Clone(q.RequireTags),
-		AnyTags:       slices.Clone(q.AnyTags),
-		ExcludeTags:   slices.Clone(q.ExcludeTags),
-		SourceID:      q.SourceID,
-		MinConfidence: q.MinConfidence,
-		MaxConfidence: q.MaxConfidence,
-		Radius:        q.Radius,
-		MaxResults:    q.MaxResults,
-		MaxScanRows:   q.MaxScanRows,
-		Explain:       q.Explain,
+		Query:                   text,
+		RequireTags:             slices.Clone(q.RequireTags),
+		AnyTags:                 slices.Clone(q.AnyTags),
+		ExcludeTags:             slices.Clone(q.ExcludeTags),
+		SourceID:                q.SourceID,
+		MinConfidence:           q.MinConfidence,
+		MaxConfidence:           q.MaxConfidence,
+		Radius:                  q.Radius,
+		MaxResults:              q.MaxResults,
+		MaxScanRows:             q.MaxScanRows,
+		EmbeddingCandidateLimit: q.EmbeddingCandidateLimit,
+		Explain:                 q.Explain,
 	}
 	if q.Center != nil {
 		hq.Center = hexxladb.Coord{Q: q.Center.Q, R: q.Center.R}
@@ -146,6 +154,7 @@ func viewToCellHit(v *hexxladb.CellView, score float64, explanation string) doma
 	}
 	createdAt, updatedAt, validFrom, validTo := timingsFromCellView(v)
 	return domain.CellHit{
+		ClusterHint: domainCoordPtr(v.ClusterHint),
 		Coord:       domain.AxialCoord{Q: v.Coord.Q, R: v.Coord.R},
 		RawContent:  v.RawContent,
 		Tags:        append([]string(nil), v.Tags...),
@@ -162,3 +171,10 @@ func viewToCellHit(v *hexxladb.CellView, score float64, explanation string) doma
 
 // Ensure CellReaderAdapter implements secondary.CellReader.
 var _ secondary.CellReader = (*CellReaderAdapter)(nil)
+
+func domainCoordPtr(coord *hexxladb.Coord) *domain.AxialCoord {
+	if coord == nil {
+		return nil
+	}
+	return new(domain.AxialCoord(*coord))
+}

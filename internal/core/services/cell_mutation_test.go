@@ -323,3 +323,16 @@ func TestPutEmbeddingExpectedContentHash(t *testing.T) {
 		t.Fatal("hash was not normalized separately from the caller's command")
 	}
 }
+
+func TestExternalVectorsDeclareCompatibleModel(t *testing.T) {
+	w := &stubCellWriter{}
+	svc := NewCellMutationService(w, nil, 2, WithEmbeddingModel("model-a"))
+	for _, model := range []string{"", "model-b"} {
+		if err := svc.PutEmbedding(t.Context(), &domain.PutEmbeddingCommand{Vector: []float32{1, 0}, EmbeddingModel: model}); err == nil {
+			t.Fatalf("accepted model %q", model)
+		}
+	}
+	if err := svc.PutEmbedding(t.Context(), &domain.PutEmbeddingCommand{Vector: []float32{1, 0}, EmbeddingModel: "model-a"}); err != nil {
+		t.Fatal(err)
+	}
+}

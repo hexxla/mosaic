@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"strings"
 
@@ -35,6 +36,12 @@ func (s *FacetEdgeService) PutFacet(ctx context.Context, cmd *domain.PutFacetCom
 	}
 	if cmd.FacetID > domain.MaxFacetID {
 		return fmt.Errorf("facet edge: facet_id must be 0..%d", domain.MaxFacetID)
+	}
+	if cmd.ExpectedContentSHA256 != "" {
+		digest, err := hex.DecodeString(cmd.ExpectedContentSHA256)
+		if err != nil || len(digest) != 32 {
+			return fmt.Errorf("facet edge: expected_content_sha256 must contain 64 hexadecimal characters")
+		}
 	}
 	dc := cmd.DerivedContent
 	if len(dc) > maxFacetDerivedBytes {

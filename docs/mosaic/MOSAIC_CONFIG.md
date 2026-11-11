@@ -4,7 +4,7 @@ Reference for the Mosaic MCP server configuration file. Policy affects **`mosaic
 
 **Example (minimal):** [`configs/config.yaml`](../../configs/config.yaml)
 
-**Related:** [Persistence policy semantics](./PERSISTENCE_POLICY.md) · [Database path & encryption](./DATABASE_CREATION.md) · [HEXXLA_TROUBLESHOOTING](./HEXXLA_TROUBLESHOOTING.md) (disk, deletes, MVCC)
+**Related:** [Persistence policy semantics](./PERSISTENCE_POLICY.md) · [Database path & encryption](./DATABASE_CREATION.md) · [Database diagnostics](./DATABASE_CREATION.md#diagnose-deletes-and-disk-usage)
 
 ---
 
@@ -17,6 +17,14 @@ Reference for the Mosaic MCP server configuration file. Policy affects **`mosaic
 | **`mosaic-mcp` without policy** | Built-in defaults ([`DefaultMosaicConfig`](../../internal/config/mosaic_yaml.go)); no file required |
 
 Restart **`mosaic-mcp`** after editing YAML.
+
+## MCP listener
+
+`MOSAIC_MCP_ADDR` defaults to `127.0.0.1:8787`. The listener accepts only
+loopback addresses. `MOSAIC_MCP_PATH` defaults to `/mcp` and must be a
+canonical literal HTTP path. [Transport and lifecycle](../architecture/architecture.md#mcp-transport-and-lifecycle)
+
+## Policy validation
 
 Files must contain exactly one YAML document. Unknown fields are rejected,
 including misspelled retention and encryption settings. Use only the canonical
@@ -35,13 +43,14 @@ are rejected.
 | **`retention`** | No | Which chat turn kinds may be stored and whether the server **enforces** capture rules. |
 | **`allow_delete_cell`** | No | Default **`false`**. When **`false`**, **`mosaic_hexxla_delete_cell`** errors. |
 | **`retrieval`** | No | Optional cumulative session read budget (metering / cap). |
-| **`ollama`** | No | Optional **`base_url`** and **`embed_model`** — override **`MOSAIC_OLLAMA_URL`** / **`MOSAIC_EMBED_MODEL`** when set (see precedence below). |
-| **`database`** | No | Optional passphrase hint, MVCC retention, post-delete pruning. |
+| **`ollama`** | No | Optional **`base_url`**, **`embed_model`** and **`expected_digest`** — override **`MOSAIC_OLLAMA_URL`** / **`MOSAIC_EMBED_MODEL`** when set (see precedence below). |
+| **`database`** | No | Optional credentials, cache/durability settings, MVCC retention and post-delete pruning. |
 
 The default seven tools are health, search_cells, get_cell, load_context_pack,
 put_cell, delete_cell and list_tags, with the `mosaic_hexxla_` prefix. Advanced
-tools add raw embedding writes, facets/edges, seams, tag counts, policy
-inspection, retrieval-budget status and byte estimation. See
+tools expand the inventory to 43, adding graph/spatial exploration, retained
+history, changefeed inspection, regional export, atomic batches and vector
+maintenance. See
 [Ratchet integration](./RATCHET_INTEGRATION.md) for activation and mutation coverage.
 
 ---
@@ -93,6 +102,7 @@ HTTP root and embedding model for **Ollama** (semantic/hybrid search, atomic cel
 | ----- | ---- | ----------------- |
 | **`base_url`** | string | Omit to fall back to **`MOSAIC_OLLAMA_URL`**, then **`http://127.0.0.1:11434`**. |
 | **`embed_model`** | string | Omit to fall back to **`MOSAIC_EMBED_MODEL`**, then **`all-minilm`**. |
+| **`expected_digest`** | string | Optional 64-hex SHA256 (optional `sha256:` prefix), falling back to `MOSAIC_EMBED_DIGEST`. Pins provider model content. |
 
 **Precedence** (URL): **`mosaic-seed -ollama`** (flag) → YAML **`ollama.base_url`** → **`MOSAIC_OLLAMA_URL`** → default. Same for model: **`-embed-model`** → **`ollama.embed_model`** → **`MOSAIC_EMBED_MODEL`** → default.
 
@@ -105,7 +115,35 @@ error-body diagnostics are limited to 4 KiB. Components must fit finite float32.
 
 ---
 
+The recorded identity is the configured model name, optionally followed by
+`@sha256:<digest>`. Adding, removing or changing a digest on an existing vector
+store requires `mosaic-mcp -reembed` just like a model-name change. When pinned,
+Mosaic checks Ollama's [model-list digest](https://docs.ollama.com/api/tags)
+before and after each inference and rejects a changed result before a write.
+This trusts the provider's metadata; unpinned mutable names cannot detect a
+same-name retag. Raw query/write vectors must declare the complete recorded
+identity through `embedding_model`; declaration cannot verify how an external
+vector was computed.
+
+Use `mosaic-mcp -lexical-only` to serve a native database without adopting
+unknown vector provenance. This disables semantic/hybrid queries, embedding
+generation/writes and vector mutation/rebuild; lexical/history reads and ordinary
+cell operations remain available. It neither adopts nor changes model identity.
+It cannot be combined with `-reembed`.
+
 ## `database` (optional)
+
+### Runtime engine settings
+
+| Field | Type | Default / behavior |
+| --- | --- | --- |
+| `page_cache_bytes` | int | `0`: native 4 MiB default; `-1` disables caching; positive byte budget up to 1 GiB |
+| `use_primary_fdatasync` | bool | `false`; native platform-specific durability option; review HexxlaDB durability guidance before enabling |
+| `changelog_lazy` | bool | `false`; when a feed is enabled, defer feed fsync while durable primary outbox intents protect delivery; a crash can redeliver events |
+
+Enable/select the feed with `-changefeed` / `-changefeed-path`. Existing default
+sidecars continue automatically. These are runtime options, not persisted
+layout overrides. Changefeed inspection never acknowledges a consumer.
 
 ### Passphrase (encryption)
 
@@ -144,4 +182,4 @@ Shutdown **`mosaic-mcp`** drains active SDK calls, including disconnected POSTs,
 pending debounced maintenance before closing the DB. Prune rounds are bounded
 by count; an individual storage operation is synchronous and has no hard deadline.
 
-See [CHANGELOG](../../CHANGELOG.md) and [HEXXLA_TROUBLESHOOTING](./HEXXLA_TROUBLESHOOTING.md) for disk expectations (extend-only file, MVCC tombstones).
+See [database diagnostics](./DATABASE_CREATION.md#diagnose-deletes-and-disk-usage) for disk usage and MVCC tombstones.

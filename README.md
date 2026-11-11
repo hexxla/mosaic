@@ -78,10 +78,10 @@ Custom grouped workflows are optional. Ratchet enforces successful call order;
 it does not prove that a query inspected the target or that a write chose
 appropriate tags. [Workflow contract](docs/mosaic/RATCHET_INTEGRATION.md)
 
-Set `advanced_tools: true` to expose all 22 tools, including facets, edges,
-seams, independent embedding maintenance, policy/budget diagnostics, and the
-optional approximate-token-to-byte estimator. Physical maintenance, raw KV,
-encryption, and bulk transfer remain operator/native API operations.
+Set `advanced_tools: true` to expose all 43 tools: graph/spatial exploration,
+retained-history and changefeed inspection, resumable regional export, atomic
+batch capture, guarded facets, vector maintenance and diagnostics. Physical
+maintenance, raw KV and encryption recovery remain operator workflows.
 [Complete API mapping](docs/mosaic/HEXXLA_API_SURFACE_COVERAGE.md)
 
 ## Development

@@ -49,6 +49,11 @@ func (a *queryANN) Search(context.Context, []float32, int, float64) ([]domain.Ce
 	return []domain.CellHit{{Score: a.score}}, a.err
 }
 
+func (a *queryANN) SearchWithStats(ctx context.Context, v []float32, limit int, score float64, _ int) (domain.CellHitsResponse, error) {
+	hits, err := a.Search(ctx, v, limit, score)
+	return domain.CellHitsResponse{Hits: hits}, err
+}
+
 func TestUnifiedRetrievalPaths(t *testing.T) {
 	for _, mode := range []domain.SearchMode{domain.SearchLexical, domain.SearchSemantic, domain.SearchHybrid} {
 		t.Run(string(mode), func(t *testing.T) {

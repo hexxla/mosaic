@@ -48,6 +48,13 @@ func (a *EngineHealthAdapter) Check(ctx context.Context, fullCheck bool) (domain
 			EmbeddingDimension: db.EmbeddingDimension(),
 			EmbeddingMetric:    embeddingMetricLabel(db.EmbeddingDimension(), db.EmbeddingMetric()),
 		}
+		if err := db.View(func(tx *hexxladb.Tx) error {
+			model, _, err := tx.Get([]byte(embeddingModelKey))
+			summary.DatabaseLayout.EmbeddingModel = string(model)
+			return err
+		}); err != nil {
+			return err
+		}
 		summary.Disk = diskFootprintFromPath(a.primaryPath)
 		return nil
 	})

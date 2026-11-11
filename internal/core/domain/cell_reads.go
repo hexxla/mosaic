@@ -34,24 +34,29 @@ type AxialCoord struct {
 // embedded and LexicalQuery optionally applies an independent literal filter.
 // Semantic mode retains pure vector scoring; structured filters use hybrid mode.
 type CellSearchCommand struct {
-	Query         string
-	Mode          SearchMode
-	LexicalQuery  string
-	RequireTags   []string
-	AnyTags       []string
-	ExcludeTags   []string
-	SourceID      string
-	MinConfidence float64
-	MaxConfidence float64
-	After         *time.Time
-	Before        *time.Time
-	Center        *AxialCoord
-	Radius        int
-	MaxResults    int
-	MaxScanRows   int
-	SortBy        CellQuerySort
-	Explain       bool
-	MinScore      float64
+	Snapshot                *SnapshotSelector
+	Embedding               []float32
+	EmbeddingModel          string
+	EfSearch                int
+	EmbeddingCandidateLimit int
+	Query                   string
+	Mode                    SearchMode
+	LexicalQuery            string
+	RequireTags             []string
+	AnyTags                 []string
+	ExcludeTags             []string
+	SourceID                string
+	MinConfidence           float64
+	MaxConfidence           float64
+	After                   *time.Time
+	Before                  *time.Time
+	Center                  *AxialCoord
+	Radius                  int
+	MaxResults              int
+	MaxScanRows             int
+	SortBy                  CellQuerySort
+	Explain                 bool
+	MinScore                float64
 }
 
 // CellLookupResponse distinguishes missing cells from empty cell content.
@@ -62,13 +67,14 @@ type CellLookupResponse struct {
 
 // CellHit is one ranked cell from QueryCells or SearchCells (MCP-safe projection).
 type CellHit struct {
-	Coord       AxialCoord `json:"coord"`
-	RawContent  string     `json:"raw_content,omitempty"`
-	Tags        []string   `json:"tags,omitempty"`
-	Score       float64    `json:"score"`
-	Explanation string     `json:"explanation,omitempty"`
-	SourceID    string     `json:"source_id,omitempty"`
-	Confidence  float64    `json:"confidence"`
+	ClusterHint *AxialCoord `json:"cluster_hint,omitempty"`
+	Coord       AxialCoord  `json:"coord"`
+	RawContent  string      `json:"raw_content,omitempty"`
+	Tags        []string    `json:"tags,omitempty"`
+	Score       float64     `json:"score"`
+	Explanation string      `json:"explanation,omitempty"`
+	SourceID    string      `json:"source_id,omitempty"`
+	Confidence  float64     `json:"confidence"`
 
 	// Provenance and validity (RFC3339Nano UTC) from cell wire; omitted when unknown or zero on wire.
 	CreatedAt string `json:"created_at,omitempty"`
@@ -79,6 +85,7 @@ type CellHit struct {
 
 // CellHitsResponse is the MCP JSON body for query/search cell tools.
 type CellHitsResponse struct {
+	EfSearch                       int        `json:"ef_search,omitzero"`
 	Mode                           SearchMode `json:"mode" jsonschema:"score semantics: lexical, pure-vector semantic, or confidence-aware hybrid"`
 	Hits                           []CellHit  `json:"hits" jsonschema:"ranked cell rows"`
 	RetrievalHint                  string     `json:"retrieval_hint,omitempty" jsonschema:"when to chain mosaic_hexxla_load_context_pack"`

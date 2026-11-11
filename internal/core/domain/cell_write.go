@@ -1,6 +1,9 @@
 package domain
 
-import "errors"
+import (
+	"errors"
+	"time"
+)
 
 // CellPutKind selects which HexxlaDB cell template to use before merging Tags.
 // Fact is the generic path (arbitrary tags); user_message and assistant_response follow
@@ -10,6 +13,8 @@ type CellPutKind string
 const (
 	// CellPutKindFact uses a fact-style template with SourceID as provenance source (default).
 	CellPutKindFact CellPutKind = "fact"
+	// CellPutKindSystemPrompt uses the native versioned system prompt template.
+	CellPutKindSystemPrompt CellPutKind = "system_prompt"
 	// CellPutKindUserMessage uses standard user-message tags; SourceID acts as session identifier.
 	CellPutKindUserMessage CellPutKind = "user_message"
 	// CellPutKindAssistantResponse uses standard assistant tags; SourceID acts as session identifier.
@@ -42,8 +47,25 @@ var ErrMutationCommitDurable = errors.New("commit_outcome=durable: mutation save
 // ErrMutationCommitUncertain means recovery is required before reconciling the write.
 var ErrMutationCommitUncertain = errors.New("commit_outcome=uncertain: reopen the database before reconciling or retrying the mutation")
 
+// CellMetadata selects explicit metadata overrides. Omitted fields preserve metadata
+// on overwrite; Replace clears prior validity and cluster metadata first.
+type CellMetadata struct {
+	Replace          bool        `json:"replace,omitzero"`
+	ValidFrom        *time.Time  `json:"valid_from,omitempty"`
+	ValidTo          *time.Time  `json:"valid_to,omitempty"`
+	ClearValidity    bool        `json:"clear_validity,omitzero"`
+	ClusterHint      *AxialCoord `json:"cluster_hint,omitempty"`
+	ClearClusterHint bool        `json:"clear_cluster_hint,omitzero"`
+	CreatedAt        *time.Time  `json:"created_at,omitempty"`
+	UpdatedAt        *time.Time  `json:"updated_at,omitempty"`
+	FactType         string      `json:"fact_type,omitempty"`
+	ExactTags        bool        `json:"exact_tags,omitzero"`
+}
+
 // PutCellCommand writes one cell at an axial coordinate (within DB.Update).
 type PutCellCommand struct {
+	Metadata *CellMetadata
+
 	Coord      AxialCoord
 	RawContent string
 	Tags       []string
@@ -64,9 +86,10 @@ type PutCellCommand struct {
 
 // PutEmbeddingCommand stores a vector at coord: supply either embed Text (Ollama) or Vector (raw).
 type PutEmbeddingCommand struct {
-	Coord  AxialCoord
-	Text   string // natural language; embedded via Ollama when non-empty
-	Vector []float32
+	EmbeddingModel string
+	Coord          AxialCoord
+	Text           string // natural language; embedded via Ollama when non-empty
+	Vector         []float32
 	// ExpectedContentSHA256 optionally guards the current RawContent in the
 	// same transaction as the embedding write. Empty disables the guard.
 	ExpectedContentSHA256 string
@@ -96,4 +119,13 @@ type PutCellMutationResult struct {
 type DeleteCellMutationResult struct {
 	OK          bool `json:"ok"`
 	CellRemoved bool `json:"cell_removed"`
+}
+
+// PutCellsCommand groups a bounded set of keyed near-anchor writes atomically.
+type PutCellsCommand struct{ Cells []PutCellCommand }
+
+// PutCellsResult reports original coordinates on an idempotent batch replay.
+type PutCellsResult struct {
+	OK      bool                    `json:"ok"`
+	Results []PutCellMutationResult `json:"results"`
 }

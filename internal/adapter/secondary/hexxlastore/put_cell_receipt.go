@@ -19,6 +19,7 @@ var errPutCellReplay = errors.New("put_cell receipt already exists")
 // The v1 fingerprint names the request fields explicitly so future command
 // fields cannot invalidate existing receipts.
 type putCellFingerprint struct {
+	Metadata   *domain.CellMetadata `json:",omitzero"`
 	Q, R       int
 	RawContent string
 	Tags       []string
@@ -43,7 +44,7 @@ func newPutCellRequest(cmd *domain.PutCellCommand) (putCellRequest, error) {
 	tags := slices.Clone(cmd.Tags)
 	slices.Sort(tags)
 	payload, err := json.Marshal(putCellFingerprint{
-		Q: cmd.Coord.Q, R: cmd.Coord.R, RawContent: cmd.RawContent, Tags: slices.Compact(tags),
+		Metadata: cmd.Metadata, Q: cmd.Coord.Q, R: cmd.Coord.R, RawContent: cmd.RawContent, Tags: slices.Compact(tags),
 		SourceID: cmd.SourceID, Confidence: cmd.Confidence, Kind: cmd.Kind, MaxRadius: cmd.MaxRadius, Embed: cmd.Embed,
 	})
 	if err != nil {

@@ -19,15 +19,20 @@ const (
 
 // CellRetrievalService owns retrieval mode and bounds; storage owns scoring.
 type CellRetrievalService struct {
-	reader       secondary.CellReader
-	ann          secondary.EmbeddingANN
-	embedder     secondary.TextEmbedder
-	embeddingDim uint16
+	reader         secondary.CellReader
+	ann            secondary.EmbeddingANN
+	embedder       secondary.TextEmbedder
+	embeddingDim   uint16
+	embeddingModel string
 }
 
 // NewCellRetrievalService composes structured reads, pure-vector reads and optional text embedding.
-func NewCellRetrievalService(reader secondary.CellReader, ann secondary.EmbeddingANN, embedder secondary.TextEmbedder, embeddingDim uint16) *CellRetrievalService {
-	return &CellRetrievalService{reader: reader, ann: ann, embedder: embedder, embeddingDim: embeddingDim}
+func NewCellRetrievalService(reader secondary.CellReader, ann secondary.EmbeddingANN, embedder secondary.TextEmbedder, embeddingDim uint16, model ...string) *CellRetrievalService {
+	var identity string
+	if len(model) > 0 {
+		identity = model[0]
+	}
+	return &CellRetrievalService{reader: reader, ann: ann, embedder: embedder, embeddingDim: embeddingDim, embeddingModel: identity}
 }
 
 // SearchCells keeps lexical, pure-vector, and confidence-aware hybrid scores distinct.
@@ -44,20 +49,30 @@ func (s *CellRetrievalService) SearchCells(ctx context.Context, command *domain.
 	}
 	var vector []float32
 	if q.Mode != domain.SearchLexical {
-		if s.embedder == nil || s.embeddingDim == 0 {
+		if (s.embedder == nil && len(q.Embedding) == 0) || s.embeddingDim == 0 {
 			return domain.CellHitsResponse{}, fmt.Errorf("cell retrieval: %s mode requires an embedder and a configured database dimension", q.Mode)
 		}
 		if q.Mode == domain.SearchSemantic && s.ann == nil {
 			return domain.CellHitsResponse{}, fmt.Errorf("cell retrieval: semantic index is unavailable")
 		}
-		vector, err = s.embedder.Embed(ctx, q.Query, int(s.embeddingDim))
+		if len(q.Embedding) > 0 {
+			if len(q.Embedding) != int(s.embeddingDim) {
+				return domain.CellHitsResponse{}, fmt.Errorf("query vector has wrong dimension")
+			}
+			if s.embeddingModel != "" && q.EmbeddingModel != s.embeddingModel {
+				return domain.CellHitsResponse{}, fmt.Errorf("query vector embedding_model must match %q", s.embeddingModel)
+			}
+			vector = q.Embedding
+		} else {
+			vector, err = s.embedder.Embed(ctx, q.Query, int(s.embeddingDim))
+		}
 		if err != nil {
 			return domain.CellHitsResponse{}, fmt.Errorf("cell retrieval embed: %w", err)
 		}
 	}
 	var out domain.CellHitsResponse
 	if q.Mode == domain.SearchSemantic {
-		out.Hits, err = s.ann.Search(ctx, vector, q.MaxResults, q.MinScore)
+		out, err = s.ann.SearchWithStats(ctx, vector, q.MaxResults, q.MinScore, q.EfSearch)
 		if out.Hits == nil && err == nil {
 			out.Hits = []domain.CellHit{}
 		}
@@ -92,6 +107,14 @@ func normalizeCellSearch(command *domain.CellSearchCommand) (*domain.CellSearchC
 		return nil, fmt.Errorf("cell retrieval: nil search command")
 	}
 	q := *command
+	if q.Snapshot != nil {
+		if err := validateSnapshot(*q.Snapshot); err != nil {
+			return nil, err
+		}
+		if q.Mode != "" && q.Mode != domain.SearchLexical {
+			return nil, fmt.Errorf("historical search supports lexical mode only; native historical vectors are unavailable")
+		}
+	}
 	q.Query = strings.TrimSpace(q.Query)
 	if q.Mode == "" {
 		q.Mode = domain.SearchLexical
@@ -123,7 +146,19 @@ func normalizeCellSearch(command *domain.CellSearchCommand) (*domain.CellSearchC
 	if q.Mode != domain.SearchSemantic && q.MinScore != 0 {
 		return nil, fmt.Errorf("cell retrieval: min_score applies only to semantic mode")
 	}
-	if q.Mode != domain.SearchLexical && q.Query == "" {
+	if q.EfSearch < 0 || q.EfSearch > 10000 || q.EmbeddingCandidateLimit < 0 || q.EmbeddingCandidateLimit > 10000 {
+		return nil, fmt.Errorf("cell retrieval: vector budgets must be 0..10000")
+	}
+	if q.EfSearch != 0 && q.Mode != domain.SearchSemantic {
+		return nil, fmt.Errorf("ef_search applies only to semantic mode")
+	}
+	if q.EmbeddingCandidateLimit != 0 && (q.Mode != domain.SearchHybrid || q.MaxScanRows > 0) {
+		return nil, fmt.Errorf("embedding_candidate_limit requires hybrid mode without max_scan_rows")
+	}
+	if q.Mode == domain.SearchLexical && len(q.Embedding) > 0 {
+		return nil, fmt.Errorf("query vector requires semantic or hybrid mode")
+	}
+	if q.Mode != domain.SearchLexical && q.Query == "" && len(q.Embedding) == 0 {
 		return nil, fmt.Errorf("cell retrieval: query is required for %s mode", q.Mode)
 	}
 	if q.Mode == domain.SearchSemantic {

@@ -10,6 +10,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/hexxla/hexxladb"
+
+	"github.com/sploitzberg/mosaic/internal/adapter/secondary/hexxlastore"
 	"github.com/sploitzberg/mosaic/internal/config"
 )
 
@@ -31,6 +34,37 @@ func TestRunRefusesMissingDatabase(t *testing.T) {
 	entries, err := os.ReadDir(filepath.Dir(path))
 	if err != nil || len(entries) != 0 {
 		t.Fatalf("startup created files: %v, %v", entries, err)
+	}
+}
+
+func TestCloseServerDatabasePreservesShutdownErrors(t *testing.T) {
+	closeErr := errors.New("close failed")
+	serveErr := errors.New("serve failed")
+	for _, tc := range []struct {
+		name         string
+		serve, close error
+	}{
+		{name: "close failure", close: closeErr},
+		{name: "combined failures", serve: serveErr, close: closeErr},
+		{name: "successful close", serve: serveErr},
+		{name: "clean shutdown"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			run := func() (err error) {
+				defer closeServerDatabase(&err, func() error { return tc.close })
+				return tc.serve
+			}
+			err := run()
+			if tc.close != nil && (!errors.Is(err, tc.close) || !strings.Contains(err.Error(), "close database")) {
+				t.Fatalf("run error = %v, want contextual database close error", err)
+			}
+			if tc.serve != nil && !errors.Is(err, tc.serve) {
+				t.Fatalf("run error = %v, want server error preserved", err)
+			}
+			if tc.close == nil && tc.serve == nil && err != nil {
+				t.Fatalf("clean shutdown returned %v", err)
+			}
+		})
 	}
 }
 
@@ -78,5 +112,28 @@ func TestBundledRatchetProfilesAndCustomOptIn(t *testing.T) {
 	}
 	if _, err := loadRatchetGate(false, path, false, slog.Default(), nil); err == nil || !strings.Contains(err.Error(), "misspelled_tool") {
 		t.Fatalf("unknown inactive policy tool accepted: %v", err)
+	}
+}
+
+func TestLexicalOnlyDoesNotAdoptUnknownNativeVectors(t *testing.T) {
+	db, err := hexxladb.Open(filepath.Join(t.TempDir(), "native.hexxla"), &hexxladb.Options{EmbeddingDimension: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	if err := db.Update(func(tx *hexxladb.Tx) error {
+		key, _ := hexxladb.Pack(hexxladb.Coord{})
+		return tx.PutEmbedding(key, []float32{1, 0})
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := ensureServerEmbeddingModel(db, "model", false); !errors.Is(err, hexxlastore.ErrEmbeddingModelMismatch) {
+		t.Fatalf("unknown model accepted=%v", err)
+	}
+	if err := ensureServerEmbeddingModel(db, "model", true); err != nil {
+		t.Fatal(err)
+	}
+	if err := ensureServerEmbeddingModel(db, "model", false); !errors.Is(err, hexxlastore.ErrEmbeddingModelMismatch) {
+		t.Fatal("lexical-only silently adopted native vector model")
 	}
 }

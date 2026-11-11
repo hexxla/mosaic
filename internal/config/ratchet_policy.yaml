@@ -24,3 +24,13 @@ rules:
   - tool: mosaic_hexxla_resolve_seam
     after_any: [mosaic_hexxla_find_seams]
     consume: true
+  - tool: mosaic_hexxla_delete_embedding
+    after_any: [mosaic_hexxla_get_embedding, mosaic_hexxla_get_cell]
+  - tool: mosaic_hexxla_rebuild_embedding_index
+    after_any: [mosaic_hexxla_storage_diagnostics, mosaic_hexxla_health]
+  - tool: mosaic_hexxla_put_cells
+    after_any: [mosaic_hexxla_list_tags]
+    consume: true
+  - tool: mosaic_hexxla_put_seam
+    after_any: [mosaic_hexxla_find_seams]
+    consume: true

@@ -41,7 +41,7 @@ func RegisterPersistencePolicyTool(server *mcp.Server, rt config.MosaicRuntimeCo
 
 	return addTool(server, &mcp.Tool{
 		Name:        "mosaic_hexxla_get_persistence_policy",
-		Description: "Return the Mosaic config snapshot loaded at server startup (YAML via -policy or MOSAIC_POLICY_FILE). Includes retention (capture_mode, enforcement as boolean, notes), allow_delete_cell, and optional config path. persistence_policy in YAML is deprecated in favor of retention.",
+		Description: "Return the Mosaic config snapshot loaded at server startup (YAML via -policy or MOSAIC_POLICY_FILE). Includes retention (capture_mode, enforcement as boolean, notes), allow_delete_cell, and optional config path. Use the retention block in YAML. The legacy persistence_policy key is rejected.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ empty) (*mcp.CallToolResult, MosaicConfigPolicyResponse, error) {
 		if log != nil {
 			log.DebugContext(ctx, "mosaic_hexxla_get_persistence_policy invoked")

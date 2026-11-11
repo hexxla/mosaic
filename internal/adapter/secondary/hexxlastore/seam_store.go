@@ -33,41 +33,27 @@ func (a *SeamStoreAdapter) FindSeams(ctx context.Context, q *domain.FindSeamsQue
 	var out []domain.SeamHit
 	err := a.live.WithRead(func(db *hexxladb.DB) error {
 		return db.View(func(tx *hexxladb.Tx) error {
-			recs, err := tx.FindSeams(ctx, hexxladb.Coord{Q: q.Center.Q, R: q.Center.R}, q.Radius, q.UnresolvedOnly)
+			var recs []hexxladb.SeamRecord
+			var err error
+			if q.AsOf != nil {
+				recs, err = tx.FindSeamsAt(ctx, hexxladb.Coord(q.Center), q.Radius, q.UnresolvedOnly, *q.AsOf)
+			} else {
+				recs, err = tx.FindSeams(ctx, hexxladb.Coord(q.Center), q.Radius, q.UnresolvedOnly)
+			}
 			if err != nil {
 				return fmt.Errorf("tx FindSeams: %w", err)
 			}
 			out = make([]domain.SeamHit, 0, len(recs))
 			for i := range recs {
 				r := recs[i]
-				ca, err := hexxladb.Unpack(r.CellA)
+				if q.SourceID != "" && r.Provenance.SourceID != q.SourceID {
+					continue
+				}
+				hit, err := seamHit(r)
 				if err != nil {
-					return fmt.Errorf("unpack seam cell_a: %w", err)
+					return err
 				}
-				cb, err := hexxladb.Unpack(r.CellB)
-				if err != nil {
-					return fmt.Errorf("unpack seam cell_b: %w", err)
-				}
-				src := ""
-				if r.Provenance.SourceID != "" {
-					src = r.Provenance.SourceID
-				}
-				when := ""
-				if r.DetectedAt > 0 {
-					when = time.Unix(0, r.DetectedAt).UTC().Format(time.RFC3339Nano)
-				}
-				out = append(out, domain.SeamHit{
-					ID:                r.ID,
-					CellA:             domain.AxialCoord{Q: ca.Q, R: ca.R},
-					CellB:             domain.AxialCoord{Q: cb.Q, R: cb.R},
-					SeamType:          r.SeamType,
-					Reason:            r.Reason,
-					ConfidenceDelta:   r.ConfidenceDelta,
-					DetectedAtRFC3339: when,
-					ResolutionStatus:  r.ResolutionStatus,
-					ResolutionNote:    r.ResolutionNote,
-					SourceID:          src,
-				})
+				out = append(out, hit)
 			}
 			return nil
 		})
@@ -122,3 +108,42 @@ func (a *SeamStoreAdapter) updateSeam(ctx context.Context, operation, method str
 
 // Ensure SeamStoreAdapter implements secondary.SeamStore.
 var _ secondary.SeamStore = (*SeamStoreAdapter)(nil)
+
+// PutSeam stores the complete custom seam through the native typed API.
+func (a *SeamStoreAdapter) PutSeam(ctx context.Context, q domain.PutSeamCommand) (domain.MutationOK, error) {
+	aKey, err := hexxladb.Pack(hexxladb.Coord(q.CellA))
+	if err != nil {
+		return domain.MutationOK{}, err
+	}
+	bKey, err := hexxladb.Pack(hexxladb.Coord(q.CellB))
+	if err != nil {
+		return domain.MutationOK{}, err
+	}
+	rec := hexxladb.SeamRecord{ID: q.ID, CellA: aKey, CellB: bKey, SeamType: q.SeamType, Reason: q.Reason, ConfidenceDelta: q.ConfidenceDelta, ResolutionStatus: q.ResolutionStatus, ResolutionNote: q.ResolutionNote, Provenance: hexxladb.NewProvenanceWire(q.SourceID, q.Confidence)}
+	if q.CreatedAt != nil {
+		rec.Provenance.CreatedAt = q.CreatedAt.UnixNano()
+	}
+	if q.UpdatedAt != nil {
+		rec.Provenance.UpdatedAt = q.UpdatedAt.UnixNano()
+	}
+	if q.DetectedAt != nil {
+		rec.DetectedAt = q.DetectedAt.UnixNano()
+	} else {
+		rec.DetectedAt = time.Now().UTC().UnixNano()
+	}
+	if q.ValidFrom != nil {
+		rec.Validity.ValidFrom = new(q.ValidFrom.UnixNano())
+	}
+	if q.ValidTo != nil {
+		rec.Validity.ValidTo = new(q.ValidTo.UnixNano())
+	}
+	err = a.live.WithRead(func(db *hexxladb.DB) error {
+		return updateMutation(db, func(tx *hexxladb.Tx) error {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			return tx.PutSeam(ctx, rec)
+		})
+	})
+	return domain.MutationOK{OK: err == nil}, err
+}

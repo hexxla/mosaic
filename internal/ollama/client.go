@@ -41,6 +41,8 @@ type Client struct {
 	Base *url.URL
 	// Model is the embedding model name (e.g. all-minilm).
 	Model string
+	// ExpectedDigest optionally requires stable provider model identity around each embedding.
+	ExpectedDigest string
 }
 
 // NewClient returns a Client with HTTP defaults suitable for local Ollama.
@@ -90,6 +92,9 @@ func (c *Client) Embed(ctx context.Context, prompt string, expectedDim int) ([]f
 	client := c.HTTP
 	if client == nil {
 		client = http.DefaultClient
+	}
+	if err := c.VerifyModelDigest(ctx); err != nil {
+		return nil, err
 	}
 	embedURL := c.Base.JoinPath("api", "embeddings")
 	embedURL.Fragment, embedURL.RawFragment = "", ""
@@ -142,6 +147,9 @@ func (c *Client) Embed(ctx context.Context, prompt string, expectedDim int) ([]f
 			return nil, fmt.Errorf("ollama embedding component %d is outside the finite float32 range", i)
 		}
 		out[i] = float32(result.Embedding[i])
+	}
+	if err := c.VerifyModelDigest(ctx); err != nil {
+		return nil, err
 	}
 	return out, nil
 }

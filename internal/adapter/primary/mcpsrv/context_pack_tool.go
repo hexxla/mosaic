@@ -17,10 +17,17 @@ type seedCoord struct {
 }
 
 type contextPackInput struct {
-	Seeds          []seedCoord `json:"seeds" jsonschema:"one or more lattice coords from get_cell or search_cells"`
-	MaxRing        int         `json:"max_ring,omitzero" jsonschema:"hex rings from each seed (default 3, max 32)"`
-	MaxCells       int         `json:"max_cells,omitzero" jsonschema:"candidate pool cap before eviction (default 256, max 8192)"`
-	MaxBudgetBytes int         `json:"max_budget_bytes,omitzero" jsonschema:"UTF-8 byte ceiling (64-100000, default 4096)"`
+	Snapshot            *domain.SnapshotSelector `json:"snapshot,omitempty" jsonschema:"optional retained snapshot: exactly one of seq, tag or RFC3339 at; historical edges/vectors unavailable"`
+	Seeds               []seedCoord              `json:"seeds" jsonschema:"one or more lattice coords from get_cell or search_cells"`
+	EdgeFilter          string                   `json:"edge_filter,omitempty" jsonschema:"comma-separated relations; selects graph BFS instead of radial expansion"`
+	MaxHops             int                      `json:"max_hops,omitzero" jsonschema:"graph depth, default 5, maximum 32"`
+	AsOf                string                   `json:"as_of,omitempty" jsonschema:"RFC3339 validity time; distinct from historical snapshot time"`
+	IncludeEdges        bool                     `json:"include_edges,omitzero"`
+	SeamRadius          int                      `json:"seam_radius,omitzero" jsonschema:"regional seam radius, default max_ring, maximum 32"`
+	UnresolvedSeamsOnly bool                     `json:"unresolved_seams_only,omitzero"`
+	MaxRing             int                      `json:"max_ring,omitzero" jsonschema:"hex rings from each seed (default 3, max 32)"`
+	MaxCells            int                      `json:"max_cells,omitzero" jsonschema:"candidate pool cap before eviction (default 256, max 8192)"`
+	MaxBudgetBytes      int                      `json:"max_budget_bytes,omitzero" jsonschema:"UTF-8 byte ceiling (64-100000, default 4096)"`
 
 	FilterSuperseded bool `json:"filter_superseded,omitempty"`
 	IncludeSeams     bool `json:"include_seams,omitempty"`
@@ -57,7 +64,12 @@ func RegisterContextPackTool(server *mcp.Server, svc primary.ContextAssembly, lo
 		for _, s := range in.Seeds {
 			seeds = append(seeds, domain.AxialCoord{Q: s.Q, R: s.R})
 		}
-		cmd := &domain.LoadContextPackCommand{
+		asOf, err := parseOptionalRFC3339(in.AsOf)
+		if err != nil {
+			return nil, domain.ContextPackResponse{}, err
+		}
+		cmd := &domain.LoadContextPackCommand{Snapshot: in.Snapshot,
+			EdgeFilter: in.EdgeFilter, MaxHops: in.MaxHops, AsOf: asOf, IncludeEdges: in.IncludeEdges, SeamRadius: in.SeamRadius, UnresolvedSeamsOnly: in.UnresolvedSeamsOnly,
 			Seeds:            seeds,
 			MaxRing:          in.MaxRing,
 			MaxBudgetBytes:   in.MaxBudgetBytes,

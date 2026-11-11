@@ -21,8 +21,8 @@ rules, and missing protection for enabled mutations fail startup.
 The default profile exposes seven tools: health, search_cells, get_cell,
 load_context_pack, put_cell, delete_cell, and list_tags (all with the
 `mosaic_hexxla_` prefix). `advanced_tools: true` adds raw embedding writes,
-facets/edges, seams, tag counts, policy inspection, retrieval-budget status and
-byte-budget estimation. Policy coverage follows the enabled profile; inactive
+facets/edges, seams, graph/spatial/history exploration, resumable regional
+transfer, atomic capture batches, diagnostics and vector maintenance. Policy coverage follows the enabled profile; inactive
 tools and alternatives are removed before the engine is constructed. The
 remaining blocks and prerequisites keep their configured order. Startup fails
 if an enabled guarded tool has no usable block.
@@ -31,10 +31,16 @@ if an enabled guarded tool has no usable block.
 
 | Tool | Recent successful prerequisite | Consumption |
 | --- | --- | --- |
-| `put_cell` | `list_tags` | Once per write |
+| `put_cell`, `put_cells` | `list_tags` | Once per write/batch |
 | `put_embedding`, `put_facet`, `delete_cell`, `load_context_pack` | `get_cell` or `search_cells` | Reusable |
 | `link_cells` | `load_context_pack` | Once per link |
-| `mark_conflict`, `mark_supersedes`, `resolve_seam` | `find_seams` | Once per mutation |
+| `mark_conflict`, `mark_supersedes`, `resolve_seam`, `put_seam` | `find_seams` | Once per mutation |
+| `delete_embedding` | `get_embedding` or `get_cell` | Reusable |
+| `rebuild_embedding_index` | `storage_diagnostics` or `health` | Reusable |
+
+Custom policies must protect the new mutations when the advanced profile is
+enabled; otherwise startup fails with their names. Regional cursors are also
+bound to the originating session and cannot serve as another session's cursor.
 
 Completions last ten minutes by default. Completions issued by
 `load_context_pack` last five minutes. Only tools needed as prerequisites retain

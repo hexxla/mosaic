@@ -9,6 +9,15 @@ import (
 // HasRetainedChangefeed reports whether the primary still has state that must
 // be opened with its matching sidecar. The caller holds the database file lock.
 func HasRetainedChangefeed(db *hexxladb.DB) (bool, error) {
+	if status, ok := any(db).(interface{ HasRetainedChangefeed() (bool, error) }); ok {
+		return status.HasRetainedChangefeed()
+	}
+	return hasRetainedChangefeedLegacy(db)
+}
+
+// Compatibility with the published HexxlaDB pin. Remove after the minimum
+// dependency provides HasRetainedChangefeed; no new physical-key assumptions belong here.
+func hasRetainedChangefeedLegacy(db *hexxladb.DB) (bool, error) {
 	consumers, err := db.ListChangelogConsumers()
 	if err != nil || len(consumers) > 0 {
 		return len(consumers) > 0, err

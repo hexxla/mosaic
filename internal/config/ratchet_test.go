@@ -62,7 +62,7 @@ func TestBundledRatchetPolicy(t *testing.T) {
 	if !foundContext {
 		t.Fatal("context completion TTL must be five minutes")
 	}
-	if len(policy.Rules) != 9 {
+	if len(policy.Rules) != 13 {
 		t.Fatalf("bundled rules=%d", len(policy.Rules))
 	}
 }

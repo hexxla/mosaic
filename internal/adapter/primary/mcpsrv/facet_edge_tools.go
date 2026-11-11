@@ -20,23 +20,25 @@ func RegisterFacetEdgeTools(server *mcp.Server, svc primary.FacetEdge, log *slog
 
 func registerPutFacetTool(server *mcp.Server, svc primary.FacetEdge, log *slog.Logger) error {
 	type putFacetInput struct {
-		Q              int    `json:"q" jsonschema:"axial q of host cell"`
-		R              int    `json:"r" jsonschema:"axial r"`
-		FacetID        byte   `json:"facet_id" jsonschema:"0..5 facet slot"`
-		DerivedContent string `json:"derived_content" jsonschema:"facet body (direct PutFacet)"`
+		Q                     int    `json:"q" jsonschema:"axial q of host cell"`
+		R                     int    `json:"r" jsonschema:"axial r"`
+		FacetID               byte   `json:"facet_id" jsonschema:"0..5 facet slot"`
+		ExpectedContentSHA256 string `json:"expected_content_sha256,omitempty" jsonschema:"optional SHA256 of source raw_content; rejects stale derivation atomically"`
+		DerivedContent        string `json:"derived_content" jsonschema:"facet body (direct PutFacet)"`
 	}
 
 	return addTool(server, &mcp.Tool{
 		Name:        "mosaic_hexxla_put_facet",
-		Description: "Write derived facet content to slot facet_id (0..5) at Hexxla cell (q,r) via Tx.PutFacet. Does not enforce derivation-hash coupling (use engine UpdateFacet in native code when you need content-hash guarding).",
+		Description: "Write derived facet content to slot facet_id (0..5) at Hexxla cell (q,r) via Tx.PutFacet. Set expected_content_sha256 to guard against stale derivation using native UpdateFacet; omission explicitly writes unconditionally.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in putFacetInput) (*mcp.CallToolResult, domain.MutationOK, error) {
 		if log != nil {
 			log.DebugContext(ctx, "mosaic_hexxla_put_facet invoked", "q", in.Q, "r", in.R, "facet_id", in.FacetID)
 		}
 		err := svc.PutFacet(ctx, &domain.PutFacetCommand{
-			Coord:          domain.AxialCoord{Q: in.Q, R: in.R},
-			FacetID:        in.FacetID,
-			DerivedContent: in.DerivedContent,
+			Coord:                 domain.AxialCoord{Q: in.Q, R: in.R},
+			FacetID:               in.FacetID,
+			DerivedContent:        in.DerivedContent,
+			ExpectedContentSHA256: in.ExpectedContentSHA256,
 		})
 		if err != nil {
 			return nil, domain.MutationOK{}, err

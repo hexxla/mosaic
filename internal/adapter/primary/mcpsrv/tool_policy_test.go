@@ -15,12 +15,15 @@ import (
 )
 
 func TestMCPToolPolicyInventory(t *testing.T) {
-	const wantToolCount = 22
+	const wantToolCount = 43
 	if got := len(mcpToolPolicies); got != wantToolCount {
 		t.Fatalf("tool policy count = %d, want %d", got, wantToolCount)
 	}
 
 	wantMutations := []string{
+		"mosaic_hexxla_put_seam",
+		"mosaic_hexxla_put_cells",
+		"mosaic_hexxla_delete_embedding", "mosaic_hexxla_rebuild_embedding_index",
 		"mosaic_hexxla_delete_cell",
 		"mosaic_hexxla_link_cells",
 		"mosaic_hexxla_mark_conflict",
@@ -30,6 +33,7 @@ func TestMCPToolPolicyInventory(t *testing.T) {
 		"mosaic_hexxla_put_facet",
 		"mosaic_hexxla_resolve_seam",
 	}
+	slices.Sort(wantMutations)
 	if got := MutationToolNames(true); !slices.Equal(got, wantMutations) {
 		t.Fatalf("mutation tools = %v, want %v", got, wantMutations)
 	}

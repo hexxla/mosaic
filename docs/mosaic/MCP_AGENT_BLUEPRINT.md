@@ -139,15 +139,72 @@ Use the retrieval sequence above when configuring a client for Mosaic. Tool desc
 
 ## Security posture
 
-- Bind MCP **loopback** only in production-style setups; see [`MCP_BLUEPRINT.md`](./MCP_BLUEPRINT.md).
+- The MCP server binds only to loopback. See the [transport and lifecycle contract](../architecture/architecture.md#mcp-transport-and-lifecycle).
 - Never put credentials in MCP tool arguments; DB encryption and paths come from environment (`MOSAIC_DB_PATH`, etc.).
 
 ---
 
 ## See also
 
-- [`HEXXLA_TROUBLESHOOTING.md`](./HEXXLA_TROUBLESHOOTING.md) — MCP deletes, **`mosaic_hexxla_health`** / **`integrity_ok`**, MVCC index semantics
-- [`../ROADMAP.md`](../ROADMAP.md) — roadmap themes; [`../../TODOS.md`](../../TODOS.md) — session scratchpad
+- [Database diagnostics](./DATABASE_CREATION.md#diagnose-deletes-and-disk-usage) — deletes, integrity checks, and MVCC disk usage
+- [Roadmap](../ROADMAP.md) — pending and exploratory work
 - [`DEVELOPMENT_TOOLING.md`](./DEVELOPMENT_TOOLING.md) — repository agent policy, project skill, and editor tasks
 - [`PERSISTENCE_POLICY.md`](./PERSISTENCE_POLICY.md) — YAML `retention` / `allow_delete_cell` (startup file, `mosaic_hexxla_get_persistence_policy`)
 - [`HEXXLA_API_SURFACE_COVERAGE.md`](./HEXXLA_API_SURFACE_COVERAGE.md) — Hexxla ↔ MCP capability matrix
+
+## Rich records, graph and history
+
+`put_cell.metadata` explicitly overrides validity bounds, cluster hints and
+provenance timestamps. Omission preserves those fields and the original
+creation time on overwrite; omitted tags also survive. Use `exact_tags` for
+native tag fidelity, `fact_type` for a category, or `kind: system_prompt` with a
+version in `source_id`. Clearing validity/cluster fields requires explicit clear
+flags or `metadata.replace`. `put_facet.expected_content_sha256` rejects a
+facet derived from stale raw content; without the hash the write is unconditional.
+
+For relationship context, use `load_context_pack.edge_filter` with comma-separated
+relations and `max_hops`, optionally `include_edges`. Inspect `superseded_from`
+when current-truth substitution moves a result. Advanced `walk_graph` explores
+outgoing relationships; `find_path` uses native weighted directed edges.
+FOV accepts explicit blocked coordinates; Voronoi uses uniform region costs.
+
+`search_cells` and `load_context_pack` accept `snapshot` with exactly one of
+`seq`, `tag`, or RFC3339 `at`. This selects a commit snapshot. The context
+`as_of` and seam-discovery `as_of` fields instead filter domain validity.
+Historical vector/graph reads are unsupported and never silently use current
+data. `list_snapshots` reports names and the retention floor; tags can expire
+under pruning. `snapshot_diff` is a bounded retained cell/seam diagnostic;
+inspect both `truncated` and `history_pruned`. Use `read_changes` for logical
+changefeed inspection, remembering at-least-once delivery and hash-only large
+payloads. Advance with `next_seq` even when operation filters match nothing.
+
+## Resumable regional transfer
+
+With advanced tools enabled:
+
+1. Call `browse_cells` with `center`, `radius` (0–128) and optional page limits.
+   Use `export_cells` to include content by default.
+2. Keep `snapshot_seq`. Repeat with only `cursor: next_cursor` until `done`.
+   Empty pages can advance through sparse coordinates. Repeating the same
+   cursor is safe; do not move it between sessions or tool names.
+3. Retrieve every `deferred_cells` identity through `read_cell_chunk` with
+   `snapshot: {seq: snapshot_seq}`, `format: record_json`, and `offset: 0`.
+   Advance to `next_offset`, concatenate base64-decoded chunks, then verify
+   the complete document's `sha256`. The same tool supports raw `content` bytes.
+
+Cursors expire after five minutes or server restart. Pruning can expire their
+snapshot sooner; restart enumeration rather than mixing snapshots. Each page
+limits coordinate probes, result count and cell JSON bytes. Complete response
+JSON still goes through session metering. Transfer is regional and cell-only;
+it is neither ranked-query pagination nor a full recovery backup.
+
+`put_cells` captures 1–32 cells in one transaction, with at most 1 MiB of
+content/tags. Every item uses `near_anchor` and its own distinct idempotency
+key. Validate/generate embeddings before the transaction; a database failure
+rolls back the group. Retry the same ordered commands and keys after a lost
+response to recover original coordinates. The bundled Ratchet policy consumes
+one `list_tags` completion per batch, so repeat that prerequisite before retrying.
+
+Custom seams use `put_seam` with a stable caller-assigned ULID. Reuse the ID on
+retry to avoid creating another logical seam; replacement still adds a version.
+Snapshot names and changefeed consumer acknowledgement remain operator-owned.

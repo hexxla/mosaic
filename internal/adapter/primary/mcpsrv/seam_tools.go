@@ -22,10 +22,12 @@ func RegisterSeamTools(server *mcp.Server, svc primary.SeamLifecycle, log *slog.
 
 func registerFindSeamsTool(server *mcp.Server, svc primary.SeamLifecycle, log *slog.Logger, budget *RetrievalBudgetTracker) error {
 	type findSeamsInput struct {
-		CenterQ        int  `json:"center_q" jsonschema:"axial q of search center"`
-		CenterR        int  `json:"center_r" jsonschema:"axial r of search center"`
-		Radius         *int `json:"radius,omitempty" jsonschema:"hex rings from center; omit for default 3, use 0 for center cell only"`
-		UnresolvedOnly bool `json:"unresolved_only,omitempty" jsonschema:"only seams with empty resolution_status"`
+		AsOf           string `json:"as_of,omitempty" jsonschema:"optional RFC3339 validity filter"`
+		SourceID       string `json:"source_id,omitempty"`
+		CenterQ        int    `json:"center_q" jsonschema:"axial q of search center"`
+		CenterR        int    `json:"center_r" jsonschema:"axial r of search center"`
+		Radius         *int   `json:"radius,omitempty" jsonschema:"hex rings from center; omit for default 3, use 0 for center cell only"`
+		UnresolvedOnly bool   `json:"unresolved_only,omitempty" jsonschema:"only seams with empty resolution_status"`
 	}
 
 	return addTool(server, &mcp.Tool{
@@ -35,12 +37,17 @@ func registerFindSeamsTool(server *mcp.Server, svc primary.SeamLifecycle, log *s
 		if log != nil {
 			log.DebugContext(ctx, "mosaic_hexxla_find_seams invoked", "center_q", in.CenterQ, "center_r", in.CenterR)
 		}
+		asOf, err := parseOptionalRFC3339(in.AsOf)
+		if err != nil {
+			return nil, domain.FindSeamsResponse{}, err
+		}
 		radius := 3
 		if in.Radius != nil {
 			radius = *in.Radius
 		}
 		out, err := budget.RunBudgetedRead(req, func() (domain.FindSeamsResponse, error) {
 			return svc.FindSeams(ctx, &domain.FindSeamsQuery{
+				AsOf: asOf, SourceID: in.SourceID,
 				Center:         domain.AxialCoord{Q: in.CenterQ, R: in.CenterR},
 				Radius:         radius,
 				UnresolvedOnly: in.UnresolvedOnly,
