@@ -4,6 +4,11 @@
 and MCP Ratchet. It defines future work; it is not a completed qualification
 report. CI success on a development revision does not promote the stack.
 
+Completed baseline/recovery and 30-minute / 1-hour lexical results are recorded
+in the [2026-11-11 candidate report](qualification/2026-11-11-baseline-short-soaks.md).
+The 24-hour gate, enabled live-service qualification and operational pilot remain
+pending. The procedure below continues to own their acceptance criteria.
+
 Each repository's `VERSIONING.md` owns its release/compatibility gates:
 [HexxlaDB](https://github.com/hexxla/hexxladb/blob/main/VERSIONING.md),
 [Mosaic](../VERSIONING.md),
